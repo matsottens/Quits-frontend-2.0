@@ -1,23 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import api from '../services/api';
+import { validatePhoneNumber, formatPhoneNumber } from '../utils/phoneValidation';
 
 const AddPhoneNumber = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [formattedNumber, setFormattedNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Format phone number as user types
+  useEffect(() => {
+    if (phoneNumber) {
+      setFormattedNumber(formatPhoneNumber(phoneNumber));
+    }
+  }, [phoneNumber]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
+    // Validate phone number
+    const validation = validatePhoneNumber(phoneNumber);
+    if (!validation.isValid) {
+      setError(validation.error || 'Invalid phone number');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      // TODO: Implement phone number verification
-      // For now, we'll just proceed to the next screen
+      // Update user profile with phone number
+      await api.auth.updatePhoneNumber(formattedNumber);
+      
+      // Proceed to scanning page
       navigate('/scanning');
     } catch (err: any) {
       setError(err.message || 'Failed to save phone number');
@@ -77,6 +97,11 @@ const AddPhoneNumber = () => {
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#26457A] focus:border-[#26457A] sm:text-sm"
                   />
                 </div>
+                {formattedNumber && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    Formatted: {formattedNumber}
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col space-y-3">
