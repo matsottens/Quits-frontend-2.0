@@ -19,20 +19,11 @@ import SubscriptionList from './components/SubscriptionList';
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-function App() {
+function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -45,104 +36,110 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className="min-h-screen bg-[#F5F7FA]">
-        {isAuthenticated && (
-          <>
-            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-            <div className="lg:pl-64">
-              <div className="sticky top-0 z-10 flex h-16 flex-shrink-0 bg-white shadow lg:hidden">
-                <button
-                  type="button"
-                  className="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#26457A] lg:hidden"
-                  onClick={() => setIsSidebarOpen(true)}
+    <div className="min-h-screen bg-[#F5F7FA]">
+      {isAuthenticated && (
+        <>
+          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+          <div className="lg:pl-64">
+            <div className="sticky top-0 z-10 flex h-16 flex-shrink-0 bg-white shadow lg:hidden">
+              <button
+                type="button"
+                className="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#26457A] lg:hidden"
+                onClick={() => setIsSidebarOpen(true)}
+              >
+                <span className="sr-only">Open sidebar</span>
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="1.5"
+                  stroke="currentColor"
+                  aria-hidden="true"
                 >
-                  <span className="sr-only">Open sidebar</span>
-                  <svg
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth="1.5"
-                    stroke="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                    />
-                  </svg>
-                </button>
-              </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                  />
+                </svg>
+              </button>
             </div>
-          </>
-        )}
+          </div>
+        </>
+      )}
 
-        <main className={isAuthenticated ? "lg:pl-64" : ""}>
-          <Routes>
-            <Route
-              path="/"
-              element={
-                isAuthenticated ? (
-                  <Navigate to="/dashboard" replace />
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route
-              path="/get-started"
-              element={
-                isAuthenticated ? <GetStarted /> : <Navigate to="/login" replace />
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />
-              }
-            />
-            <Route
-              path="/scanning"
-              element={
-                <ProtectedRoute>
-                  <ScanningPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/calendar"
-              element={
-                <ProtectedRoute>
-                  <Calendar />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/subscription/:id"
-              element={
-                <ProtectedRoute>
-                  <SubscriptionDetails />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </main>
-      </div>
+      <main className={isAuthenticated ? "lg:pl-64" : ""}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route
+            path="/get-started"
+            element={
+              isAuthenticated ? <GetStarted /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="/scanning"
+            element={
+              <ProtectedRoute>
+                <ScanningPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <Calendar />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/subscription/:id"
+            element={
+              <ProtectedRoute>
+                <SubscriptionDetails />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </main>
       {isAuthenticated && <Navigation />}
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
