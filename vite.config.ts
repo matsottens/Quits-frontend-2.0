@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -7,9 +8,22 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  },
+  envPrefix: 'VITE_',
   server: {
-    port: 5173,
+    host: true,
+    port: 3000
   },
   preview: {
     port: 4173,
