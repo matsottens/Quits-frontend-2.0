@@ -13,10 +13,11 @@ const api = {
       return response.data;
     },
     
-    // Handle Google OAuth callback
+    // Handle Google OAuth callback - this is now handled by the backend redirect
     handleGoogleCallback: async (code: string) => {
-      const response = await axios.post(`${API_URL}/auth/google/callback`, { code });
-      return response.data;
+      // This is no longer needed as the backend handles the callback
+      console.log('Callback handled by backend redirect');
+      return { success: true };
     },
     
     // Get current user info
