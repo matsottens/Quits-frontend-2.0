@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npx typescript@5.2.2 --project tsconfig.json && vite build",
+    "compile": "tsc",
+    "build": "npm run compile && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview"
