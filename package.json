@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "npm install @vitejs/plugin-react",
-    "build": "vite build",
+    "build": "./node_modules/.bin/vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview"
