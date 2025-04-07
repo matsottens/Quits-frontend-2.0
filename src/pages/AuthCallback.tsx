@@ -15,6 +15,21 @@ const AuthCallback = () => {
         // Extract the authorization code from URL parameters
         const searchParams = new URLSearchParams(location.search);
         const code = searchParams.get('code');
+        const token = searchParams.get('token');
+        
+        if (token) {
+          // If we have a token, we're coming from the backend callback
+          // Parse the token and user data
+          const userData = { token }; // Simplified user data
+          const tokenData = { access_token: token };
+          
+          // Save user data and tokens in auth context
+          login(userData, tokenData);
+          
+          // Redirect to scanning page
+          navigate('/scanning');
+          return;
+        }
         
         if (!code) {
           setError('No authorization code received');
@@ -28,8 +43,8 @@ const AuthCallback = () => {
           // Save user data and tokens in auth context
           login(response.user, response.tokens);
           
-          // Redirect to dashboard
-          navigate('/dashboard');
+          // Redirect to scanning page
+          navigate('/scanning');
         } else {
           setError('Authentication failed');
         }
