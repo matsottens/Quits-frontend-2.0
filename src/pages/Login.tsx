@@ -13,8 +13,13 @@ const Login = () => {
     try {
       setError(null);
       setIsLoading(true);
-      const { url } = await login();
-      window.location.href = url;
+      const redirectUrl = window.location.origin + '/auth/callback';
+      const response = await login('google', redirectUrl);
+      if (response?.url) {
+        window.location.href = response.url;
+      } else {
+        throw new Error('No redirect URL received');
+      }
     } catch (err) {
       setError('Failed to initialize Google login. Please try again.');
       setIsLoading(false);
