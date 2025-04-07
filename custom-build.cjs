@@ -25,7 +25,14 @@ function createFallbackBuild(errorMessage) {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Build Error</title>
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; }
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; 
+          max-width: 800px; 
+          margin: 0 auto; 
+          padding: 2rem; 
+          background-color: #FFEDD6;
+          color: #26457A;
+        }
         .error { background-color: #ffdddd; padding: 1rem; border-radius: 4px; }
       </style>
     </head>
@@ -85,6 +92,12 @@ try {
           height: 100vh;
           margin: 0;
           text-align: center;
+          background-color: #FFEDD6;
+          color: #26457A;
+        }
+        a {
+          color: #26457A;
+          font-weight: bold;
         }
       </style>
     </head>
@@ -237,8 +250,8 @@ try {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f5f5f5;
-      color: #333;
+      background-color: #FFEDD6;
+      color: #26457A;
       line-height: 1.6;
     }
     
@@ -252,8 +265,8 @@ try {
     
     .get-started-container {
       background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(38, 69, 122, 0.15);
       max-width: 600px;
       width: 100%;
       padding: 3rem;
@@ -263,13 +276,13 @@ try {
     .get-started-container h1 {
       font-size: 2.4rem;
       margin-bottom: 1rem;
-      color: #333;
+      color: #26457A;
     }
     
     .get-started-container p {
       font-size: 1.2rem;
       margin-bottom: 2rem;
-      color: #666;
+      color: #26457A;
     }
     
     .cta-button-container {
@@ -282,25 +295,25 @@ try {
       font-size: 1rem;
       font-weight: 500;
       text-decoration: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
       transition: all 0.2s ease;
     }
     
     .button.primary {
-      background-color: #4CAF50;
+      background-color: #26457A;
       color: white;
       border: none;
     }
     
     .button.primary:hover {
-      background-color: #45a049;
+      background-color: #1c3459;
     }
     
     .button.google {
       background-color: white;
-      color: #333;
-      border: 1px solid #ddd;
+      color: #26457A;
+      border: 1px solid #d0d0d0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -315,8 +328,8 @@ try {
     
     .auth-container {
       background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(38, 69, 122, 0.15);
       max-width: 400px;
       width: 100%;
       padding: 2rem;
@@ -326,6 +339,7 @@ try {
       font-size: 1.8rem;
       margin-bottom: 1.5rem;
       text-align: center;
+      color: #26457A;
     }
     
     .auth-options {
@@ -343,12 +357,13 @@ try {
     .divider::after {
       content: '';
       flex: 1;
-      border-bottom: 1px solid #ddd;
+      border-bottom: 1px solid #d0d0d0;
     }
     
     .divider span {
       padding: 0 10px;
-      color: #888;
+      color: #26457A;
+      opacity: 0.7;
     }
     
     .auth-form {
@@ -361,10 +376,16 @@ try {
     
     input {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+      padding: 12px;
+      border: 1px solid #d0d0d0;
+      border-radius: 8px;
       font-size: 1rem;
+      color: #26457A;
+    }
+    
+    input::placeholder {
+      color: #26457A;
+      opacity: 0.6;
     }
     
     .auth-form button {
@@ -375,12 +396,37 @@ try {
     .auth-footer {
       text-align: center;
       margin-top: 20px;
-      color: #666;
+      color: #26457A;
     }
     
     .auth-footer a {
-      color: #4CAF50;
+      color: #26457A;
+      font-weight: bold;
       text-decoration: none;
+    }
+    
+    .dashboard-container {
+      background-color: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(38, 69, 122, 0.15);
+      max-width: 800px;
+      width: 100%;
+      padding: 2rem;
+    }
+    
+    .dashboard-container h1 {
+      color: #26457A;
+      margin-bottom: 1.5rem;
+    }
+    
+    .dashboard-container p {
+      color: #26457A;
+    }
+    
+    .timestamp {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      opacity: 0.7;
     }
   `);
   
