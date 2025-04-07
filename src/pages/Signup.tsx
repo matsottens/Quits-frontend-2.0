@@ -38,7 +38,7 @@ const SignUp = () => {
       }
 
       if (user) {
-        // Redirect to phone number screen instead of showing success message
+        // Redirect to phone number screen
         window.location.href = '/add-phone';
       }
     } catch (err: any) {

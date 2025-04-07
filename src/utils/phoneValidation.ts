@@ -17,9 +17,6 @@ export const validatePhoneNumber = (phoneNumber: string): { isValid: boolean; er
     return { isValid: false, error: 'Phone number must not exceed 15 digits' };
   }
   
-  // Format the phone number for display
-  const formattedNumber = formatPhoneNumber(phoneNumber);
-  
   return { isValid: true };
 };
 

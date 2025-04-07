@@ -61,7 +61,7 @@ const AddPhoneNumber = () => {
                 Add Your Phone Number
               </h2>
               <p className="mt-2 text-center text-sm text-gray-600">
-                This helps us verify your identity and send important notifications
+                This helps us verify your identity and send notifications when your subscriptions are nearly due
               </p>
             </div>
 
