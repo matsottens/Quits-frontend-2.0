@@ -10,6 +10,7 @@ import SubscriptionDetails from './pages/SubscriptionDetails';
 import AuthCallback from './pages/AuthCallback';
 import Navigation from './components/Navigation';
 import Sidebar from './components/Sidebar';
+import ForgotPassword from './pages/ForgotPassword';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import SubscriptionList from './components/SubscriptionList';
 
@@ -44,6 +45,7 @@ function AppRoutes() {
           <Route path="/" element={<GetStarted />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           
           {/* Protected routes */}
