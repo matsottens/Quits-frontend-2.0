@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import api from '../services/api';
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
+import api, { supabase } from '../services/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,9 +21,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // Check active sessions and sets the user
-    const { data: { subscription } } = api.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, currentSession: Session | null) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
       setLoading(false);
     });
 
@@ -33,10 +34,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      const { data: { session }, error } = await api.auth.signInWithEmail(email, password);
+      const { data: { session: newSession }, error } = await api.auth.signInWithEmail(email, password);
       if (error) throw error;
-      setSession(session);
-      setUser(session?.user ?? null);
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
     } catch (error) {
       throw error;
     }
@@ -60,6 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     loading,
+    isLoading: loading,
   };
 
   return (

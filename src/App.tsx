@@ -13,6 +13,8 @@ import Sidebar from './components/Sidebar';
 import ForgotPassword from './pages/ForgotPassword';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import SubscriptionList from './components/SubscriptionList';
+import ResetPassword from './pages/ResetPassword';
+import LoadingSpinner from './components/LoadingSpinner';
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -32,9 +34,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
   
-  // Don't render anything while still loading auth state
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
   
   return (
@@ -42,10 +47,20 @@ function AppRoutes() {
       {isAuthenticated && <Sidebar />}
       <div className={isAuthenticated ? "md:pl-64" : ""}>
         <Routes>
-          <Route path="/" element={<GetStarted />} />
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           
           {/* Protected routes */}
