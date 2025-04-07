@@ -1,4 +1,6 @@
 {
   "framework": "vite",
-  "installCommand": "npm install --legacy-peer-deps"
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "node custom-build.cjs",
+  "outputDirectory": "dist"
 } 
