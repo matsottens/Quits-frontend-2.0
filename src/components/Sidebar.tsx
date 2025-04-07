@@ -51,7 +51,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           <div className="flex-1">
             <div className="flex items-center justify-between h-16 px-4 bg-[#26457A] text-white">
               <Link to="/" className="flex items-center space-x-3">
-                <img src="/quits-logo.svg" alt="Quits" className="h-8 w-8" />
+                <img src="/quits-logo.svg" alt="Quits" className="h-12 w-auto" />
               </Link>
               <button
                 onClick={onClose}

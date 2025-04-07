@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const AuthCallback = () => {
   const [error, setError] = useState<string | null>(null);
@@ -22,25 +23,25 @@ const AuthCallback = () => {
         }
         
         // Exchange the code for tokens and user data
-        const response = await api.auth.handleGoogleCallback(code);
+        const { data } = await api.auth.handleGoogleCallback(code);
         
-        if (response.error) {
-          setError(response.error);
+        if (data.error) {
+          setError(data.error);
           return;
         }
 
-        if (response.user && response.tokens) {
-          // Save user data and tokens in auth context
-          login(response.user, response.tokens);
+        if (data.user && data.token) {
+          // Save user data and token in auth context
+          await login(data.user, data.token);
           
           // Redirect to scanning page
           navigate('/scanning');
         } else {
           setError('Authentication failed');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Auth callback error:', err);
-        setError('Failed to complete authentication');
+        setError(err.message || 'Failed to complete authentication');
       }
     };
 
@@ -75,7 +76,7 @@ const AuthCallback = () => {
               <div className="mt-6 text-center">
                 <button
                   onClick={() => navigate('/login')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-[#26457A] hover:bg-[#1c345c] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A]"
                 >
                   Back to Login
                 </button>
@@ -92,9 +93,7 @@ const AuthCallback = () => {
       <div className="max-w-md w-full text-center">
         <div className="bg-white py-8 px-4 shadow-xl rounded-lg sm:px-10">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Completing Authentication</h2>
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-          </div>
+          <LoadingSpinner />
           <p className="mt-4 text-sm text-gray-600">Please wait while we complete the authentication process...</p>
         </div>
       </div>
