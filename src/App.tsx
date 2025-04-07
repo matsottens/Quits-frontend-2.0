@@ -11,7 +11,6 @@ import AuthCallback from './pages/AuthCallback';
 import Navigation from './components/Navigation';
 import Sidebar from './components/Sidebar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import './App.css';
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {

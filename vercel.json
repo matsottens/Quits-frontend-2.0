@@ -6,5 +6,9 @@
   "installCommand": "npm install",
   "routes": [
     { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  ],
+  "env": {
+    "NPM_FLAGS": "--no-optional",
+    "NODE_VERSION": "20.x"
+  }
 } 

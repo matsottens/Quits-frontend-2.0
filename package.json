@@ -7,14 +7,13 @@
     "dev": "vite",
     "prebuild": "npm install @vitejs/plugin-react",
     "build": "vite build",
-    "vercel-build": "npm install && vite build",
+    "vercel-build": "npm ci && ./node_modules/.bin/vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
-    "@tailwindcss/postcss": "^4.1.3",
     "autoprefixer": "^10.4.21",
     "axios": "^1.8.4",
     "postcss": "^8.5.3",
