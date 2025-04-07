@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import api from '../services/api';
 
 const Login = () => {
-  const navigate = useNavigate();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -13,10 +13,9 @@ const Login = () => {
     try {
       setError(null);
       setIsLoading(true);
-      const redirectUrl = window.location.origin + '/auth/callback';
-      const response = await login('google', redirectUrl);
-      if (response?.url) {
-        window.location.href = response.url;
+      const { url } = await api.auth.getGoogleAuthUrl();
+      if (url) {
+        window.location.href = url;
       } else {
         throw new Error('No redirect URL received');
       }
