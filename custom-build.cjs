@@ -66,77 +66,386 @@ try {
     console.log('Found vite.config.ts');
   }
   
-  if (fs.existsSync('index.html')) {
-    console.log('Found index.html');
-    // Copy index.html to dist folder
-    const htmlContent = fs.readFileSync('index.html', 'utf8');
-    fs.writeFileSync(path.join(distPath, 'index.html'), htmlContent);
-    console.log('Copied index.html to dist folder');
-  } else {
-    console.log('No index.html found, creating a default one');
-    // Create a basic index.html
-    fs.writeFileSync(path.join(distPath, 'index.html'), `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Quits</title>
-        <link rel="stylesheet" href="/css/main.css">
-      </head>
-      <body>
-        <div id="root"></div>
-        <script type="module" src="/js/main.js"></script>
-      </body>
-      </html>
-    `);
+  // Create main index.html with redirect to get-started
+  console.log('Creating index.html with redirect to get-started...');
+  fs.writeFileSync(path.join(distPath, 'index.html'), `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta http-equiv="refresh" content="0;url=/get-started" />
+      <title>Quits - Redirecting...</title>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          margin: 0;
+          text-align: center;
+        }
+      </style>
+    </head>
+    <body>
+      <div>
+        <h1>Redirecting to Get Started...</h1>
+        <p>If you are not redirected automatically, <a href="/get-started">click here</a>.</p>
+      </div>
+    </body>
+    </html>
+  `);
+  
+  // Create directory structure for get-started page
+  console.log('Creating get-started page...');
+  const getStartedPath = path.join(distPath, 'get-started');
+  if (!fs.existsSync(getStartedPath)) {
+    fs.mkdirSync(getStartedPath, { recursive: true });
   }
   
-  // Create a simple CSS and JS file for the build
+  // Create get-started/index.html
+  fs.writeFileSync(path.join(getStartedPath, 'index.html'), `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Quits - Get Started</title>
+      <link rel="stylesheet" href="/css/main.css">
+    </head>
+    <body>
+      <div id="root">
+        <div class="get-started-container">
+          <h1>Welcome to Quits</h1>
+          <p>Track your subscriptions and save money</p>
+          <div class="cta-button-container">
+            <a href="/signup" class="button primary">Continue</a>
+          </div>
+        </div>
+      </div>
+      <script src="/js/main.js"></script>
+    </body>
+    </html>
+  `);
+  
+  // Create signup page
+  console.log('Creating signup page...');
+  const signupPath = path.join(distPath, 'signup');
+  if (!fs.existsSync(signupPath)) {
+    fs.mkdirSync(signupPath, { recursive: true });
+  }
+  
+  fs.writeFileSync(path.join(signupPath, 'index.html'), `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Quits - Sign Up</title>
+      <link rel="stylesheet" href="/css/main.css">
+    </head>
+    <body>
+      <div id="root">
+        <div class="auth-container">
+          <h1>Create Your Account</h1>
+          <div class="auth-options">
+            <a href="/login" class="button google">
+              <span>Sign up with Google</span>
+            </a>
+            <div class="divider">
+              <span>or</span>
+            </div>
+            <form class="auth-form">
+              <div class="form-group">
+                <input type="email" placeholder="Email" required />
+              </div>
+              <div class="form-group">
+                <input type="password" placeholder="Password" required />
+              </div>
+              <button type="submit" class="button primary">Sign Up</button>
+            </form>
+            <p class="auth-footer">
+              Already have an account? <a href="/login">Log in</a>
+            </p>
+          </div>
+        </div>
+      </div>
+      <script src="/js/main.js"></script>
+    </body>
+    </html>
+  `);
+  
+  // Create login page
+  console.log('Creating login page...');
+  const loginPath = path.join(distPath, 'login');
+  if (!fs.existsSync(loginPath)) {
+    fs.mkdirSync(loginPath, { recursive: true });
+  }
+  
+  fs.writeFileSync(path.join(loginPath, 'index.html'), `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Quits - Log In</title>
+      <link rel="stylesheet" href="/css/main.css">
+    </head>
+    <body>
+      <div id="root">
+        <div class="auth-container">
+          <h1>Log In to Your Account</h1>
+          <div class="auth-options">
+            <a href="/login" class="button google">
+              <span>Log in with Google</span>
+            </a>
+            <div class="divider">
+              <span>or</span>
+            </div>
+            <form class="auth-form">
+              <div class="form-group">
+                <input type="email" placeholder="Email" required />
+              </div>
+              <div class="form-group">
+                <input type="password" placeholder="Password" required />
+              </div>
+              <button type="submit" class="button primary">Log In</button>
+            </form>
+            <p class="auth-footer">
+              Don't have an account? <a href="/signup">Sign up</a>
+            </p>
+          </div>
+        </div>
+      </div>
+      <script src="/js/main.js"></script>
+    </body>
+    </html>
+  `);
+  
+  // Create CSS for the application
   if (!fs.existsSync(path.join(distPath, 'css'))) {
     fs.mkdirSync(path.join(distPath, 'css'), { recursive: true });
   }
-  if (!fs.existsSync(path.join(distPath, 'js'))) {
-    fs.mkdirSync(path.join(distPath, 'js'), { recursive: true });
-  }
   
   fs.writeFileSync(path.join(distPath, 'css', 'main.css'), `
+    * {
+      box-sizing: border-box;
+    }
+    
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
       margin: 0;
       padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    
+    #root {
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      text-align: center;
-      background-color: #f5f5f5;
+      padding: 2rem;
     }
     
-    #root {
-      padding: 2rem;
+    .get-started-container {
       background-color: white;
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      max-width: 800px;
+      max-width: 600px;
+      width: 100%;
+      padding: 3rem;
+      text-align: center;
+    }
+    
+    .get-started-container h1 {
+      font-size: 2.4rem;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+    
+    .get-started-container p {
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+      color: #666;
+    }
+    
+    .cta-button-container {
+      margin-top: 2rem;
+    }
+    
+    .button {
+      display: inline-block;
+      padding: 0.8rem 1.6rem;
+      font-size: 1rem;
+      font-weight: 500;
+      text-decoration: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .button.primary {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+    }
+    
+    .button.primary:hover {
+      background-color: #45a049;
+    }
+    
+    .button.google {
+      background-color: white;
+      color: #333;
+      border: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    
+    .button.google:hover {
+      background-color: #f5f5f5;
+    }
+    
+    .auth-container {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      width: 100%;
+      padding: 2rem;
+    }
+    
+    .auth-container h1 {
+      font-size: 1.8rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    
+    .auth-options {
+      width: 100%;
+    }
+    
+    .divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 20px 0;
+    }
+    
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .divider span {
+      padding: 0 10px;
+      color: #888;
+    }
+    
+    .auth-form {
+      margin-top: 20px;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    .auth-form button {
+      width: 100%;
+      margin-top: 10px;
+    }
+    
+    .auth-footer {
+      text-align: center;
+      margin-top: 20px;
+      color: #666;
+    }
+    
+    .auth-footer a {
+      color: #4CAF50;
+      text-decoration: none;
     }
   `);
   
+  // Create JavaScript for the application
+  if (!fs.existsSync(path.join(distPath, 'js'))) {
+    fs.mkdirSync(path.join(distPath, 'js'), { recursive: true });
+  }
+  
   fs.writeFileSync(path.join(distPath, 'js', 'main.js'), `
     document.addEventListener('DOMContentLoaded', () => {
-      const root = document.getElementById('root');
+      // Handle form submissions
+      const forms = document.querySelectorAll('form');
       
-      if (root) {
-        root.innerHTML = \`
-          <h1>Quits App</h1>
-          <p>The application is being built. Please check back later or contact support if this message persists.</p>
-          <div>
-            <p>Build timestamp: ${new Date().toISOString()}</p>
-            <p>Deployed with Vercel</p>
-          </div>
-        \`;
-      }
+      forms.forEach(form => {
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          
+          // Get the form data
+          const formData = new FormData(form);
+          const data = {};
+          
+          for (let [key, value] of formData.entries()) {
+            data[key] = value;
+          }
+          
+          // In a real app, you would send this data to a backend
+          console.log('Form submitted with data:', data);
+          
+          // For now, just redirect to a dashboard page
+          window.location.href = '/dashboard';
+        });
+      });
+      
+      // Add any additional functionality here
     });
+  `);
+  
+  // Create a simple dashboard page 
+  console.log('Creating dashboard page...');
+  const dashboardPath = path.join(distPath, 'dashboard');
+  if (!fs.existsSync(dashboardPath)) {
+    fs.mkdirSync(dashboardPath, { recursive: true });
+  }
+  
+  fs.writeFileSync(path.join(dashboardPath, 'index.html'), `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Quits - Dashboard</title>
+      <link rel="stylesheet" href="/css/main.css">
+    </head>
+    <body>
+      <div id="root">
+        <div class="dashboard-container">
+          <h1>Welcome to Quits Dashboard</h1>
+          <p>This is a placeholder dashboard page.</p>
+          <p>Please check back soon for more updates as the app is being built.</p>
+          <p class="timestamp">Build timestamp: ${new Date().toISOString()}</p>
+        </div>
+      </div>
+      <script src="/js/main.js"></script>
+    </body>
+    </html>
   `);
   
   console.log('Manual build completed successfully!');
