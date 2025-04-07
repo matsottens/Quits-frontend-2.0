@@ -3,6 +3,7 @@
   "installCommand": "npm install",
   "framework": "vite",
   "outputDirectory": "dist",
+  "devCommand": "npm run dev",
   "routes": [
     {
       "src": "/assets/(.*)",
