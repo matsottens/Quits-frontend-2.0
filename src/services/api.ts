@@ -6,7 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 // Google OAuth configuration
 const GOOGLE_OAUTH_CONFIG = {
   client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  redirect_uri: `${window.location.origin}/auth/callback`,
+  redirect_uri: import.meta.env.VITE_AUTH_REDIRECT_URI,
   scope: [
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
