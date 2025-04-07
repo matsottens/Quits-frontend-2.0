@@ -34,8 +34,8 @@ const AuthCallback = () => {
           // Save user data and token in auth context
           await login(data.user, data.token);
           
-          // Redirect to scanning page
-          navigate('/scanning');
+          // Redirect to phone number screen instead of scanning page
+          navigate('/add-phone');
         } else {
           setError('Authentication failed');
         }

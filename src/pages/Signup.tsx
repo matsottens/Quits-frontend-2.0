@@ -38,7 +38,8 @@ const SignUp = () => {
       }
 
       if (user) {
-        setSuccess('Please check your email to confirm your account.');
+        // Redirect to phone number screen instead of showing success message
+        window.location.href = '/add-phone';
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create account. Please try again.');

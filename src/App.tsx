@@ -16,6 +16,7 @@ import Calendar from './pages/Calendar';
 import SubscriptionDetails from './pages/SubscriptionDetails';
 import Navigation from './components/Navigation';
 import SubscriptionList from './components/SubscriptionList';
+import AddPhoneNumber from './pages/AddPhoneNumber';
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -24,7 +25,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   if (isLoading) {
@@ -85,6 +86,12 @@ function AppContent() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route
+            path="/add-phone"
+            element={
+              isAuthenticated ? <AddPhoneNumber /> : <Navigate to="/login" replace />
+            }
+          />
           <Route
             path="/get-started"
             element={
