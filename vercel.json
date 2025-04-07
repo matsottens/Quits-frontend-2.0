@@ -1,6 +1,6 @@
 {
-  "framework": "vite",
-  "buildCommand": "npm run build",
+  "framework": null,
+  "buildCommand": "node build-vercel.cjs",
   "devCommand": "npm run dev",
   "outputDirectory": "dist",
   "installCommand": "npm install",
@@ -8,7 +8,7 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
-    "NPM_FLAGS": "--no-optional",
+    "NPM_FLAGS": "--legacy-peer-deps",
     "NODE_VERSION": "20.x"
   }
 } 
