@@ -1,20 +1,21 @@
 import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
 
 // API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Google OAuth configuration
 const GOOGLE_OAUTH_CONFIG = {
   client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
   redirect_uri: import.meta.env.VITE_AUTH_REDIRECT_URI,
-  scope: [
-    'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/gmail.readonly'
-  ].join(' '),
+  scope: 'email profile https://www.googleapis.com/auth/gmail.readonly',
   response_type: 'code',
   access_type: 'offline',
-  prompt: 'consent'
+  prompt: 'consent',
 };
 
 // API service with methods for different API calls
@@ -23,22 +24,8 @@ const api = {
   auth: {
     // Get Google OAuth URL
     getGoogleAuthUrl: async () => {
-      try {
-        const params = new URLSearchParams({
-          client_id: GOOGLE_OAUTH_CONFIG.client_id,
-          redirect_uri: GOOGLE_OAUTH_CONFIG.redirect_uri,
-          scope: GOOGLE_OAUTH_CONFIG.scope,
-          response_type: GOOGLE_OAUTH_CONFIG.response_type,
-          access_type: GOOGLE_OAUTH_CONFIG.access_type,
-          prompt: GOOGLE_OAUTH_CONFIG.prompt
-        });
-
-        const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-        return { url };
-      } catch (error) {
-        console.error('Error generating Google OAuth URL:', error);
-        throw error;
-      }
+      const params = new URLSearchParams(GOOGLE_OAUTH_CONFIG);
+      return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` };
     },
     
     // Handle Google OAuth callback
@@ -57,6 +44,39 @@ const api = {
     logout: async () => {
       const response = await axios.post(`${API_URL}/auth/logout`);
       return response.data;
+    },
+    
+    signInWithEmail: async (email: string, password: string) => {
+      return await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+    },
+    
+    signUpWithEmail: async (email: string, password: string) => {
+      return await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+    },
+    
+    resetPassword: async (email: string) => {
+      return await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+    },
+    
+    updatePassword: async (newPassword: string) => {
+      return await supabase.auth.updateUser({
+        password: newPassword,
+      });
+    },
+    
+    signOut: async () => {
+      return await supabase.auth.signOut();
     },
   },
   

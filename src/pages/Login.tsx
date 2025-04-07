@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
@@ -8,6 +8,26 @@ const Login = () => {
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleEmailLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      setIsLoading(true);
+      const { data, error } = await api.auth.signInWithEmail(email, password);
+      if (error) throw error;
+      // Handle successful login
+      if (data?.user) {
+        window.location.href = '/dashboard';
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign in. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -33,7 +53,7 @@ const Login = () => {
           <div className="bg-white py-8 px-4 shadow-lg rounded-lg sm:px-10">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
               <div className="flex justify-center mb-6">
-                <img src="/assets/quits-logo.svg" alt="Quits" className="h-12 w-12" />
+                <img src="/quits-logo.svg" alt="Quits" className="h-12 w-12" />
               </div>
               <h2 className="text-center text-3xl font-extrabold text-gray-900">
                 Sign in to your account
@@ -62,16 +82,77 @@ const Login = () => {
             )}
 
             <div className="mt-6">
-              <button
-                onClick={handleGoogleLogin}
-                disabled={isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#26457A] hover:bg-[#1c345c] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A] transition-colors duration-200"
-              >
-                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12.545,12.151L12.545,12.151c0,1.054,0.855,1.909,1.909,1.909h3.536c-0.447,1.722-1.498,3.39-2.945,4.624 c-1.447,1.234-3.264,1.91-5.045,1.91c-2.068,0-4.021-0.806-5.488-2.273C3.044,16.854,2.238,14.901,2.238,12.833 c0-2.068,0.806-4.021,2.273-5.488c1.467-1.467,3.42-2.273,5.488-2.273c2.437,0,4.786,1.132,6.272,3.049l2.914-2.914 c-2.199-2.831-5.567-4.45-9.186-4.45c-3.247,0-6.291,1.264-8.587,3.561C-1.264,6.542,0,9.586,0,12.833 c0,3.247,1.264,6.291,3.561,8.587c2.296,2.296,5.34,3.561,8.587,3.561c3.247,0,6.291-1.264,8.587-3.561 c2.296-2.296,3.561-5.34,3.561-8.587c0-0.647-0.061-1.292-0.182-1.923h-9.66C12.545,10.91,12.545,12.151,12.545,12.151z"/>
-                </svg>
-                {isLoading ? 'Signing in...' : 'Continue with Google'}
-              </button>
+              <form onSubmit={handleEmailLogin} className="space-y-6">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email address
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#26457A] focus:border-[#26457A] sm:text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#26457A] focus:border-[#26457A] sm:text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#26457A] hover:bg-[#1c345c] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A] transition-colors duration-200"
+                  >
+                    {isLoading ? 'Signing in...' : 'Sign in'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A] transition-colors duration-200"
+                >
+                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.545,12.151L12.545,12.151c0,1.054,0.855,1.909,1.909,1.909h3.536c-0.447,1.722-1.498,3.39-2.945,4.624 c-1.447,1.234-3.264,1.91-5.045,1.91c-2.068,0-4.021-0.806-5.488-2.273C3.044,16.854,2.238,14.901,2.238,12.833 c0-2.068,0.806-4.021,2.273-5.488c1.467-1.467,3.42-2.273,5.488-2.273c2.437,0,4.786,1.132,6.272,3.049l2.914-2.914 c-2.199-2.831-5.567-4.45-9.186-4.45c-3.247,0-6.291,1.264-8.587,3.561C-1.264,6.542,0,9.586,0,12.833 c0,3.247,1.264,6.291,3.561,8.587c2.296,2.296,5.34,3.561,8.587,3.561c3.247,0,6.291-1.264,8.587-3.561 c2.296-2.296,3.561-5.34,3.561-8.587c0-0.647-0.061-1.292-0.182-1.923h-9.66C12.545,10.91,12.545,12.151,12.545,12.151z"/>
+                  </svg>
+                  Continue with Google
+                </button>
+              </div>
             </div>
 
             <div className="mt-6">

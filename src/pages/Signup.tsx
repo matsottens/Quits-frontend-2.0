@@ -1,48 +1,84 @@
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import api from '../services/api';
 
-const Signup = () => {
-  const [isLoading, setIsLoading] = useState(false);
+const SignUp = () => {
+  const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  
-  // Since we're using Google OAuth, this is just a simple redirect to Google signup
-  const handleGoogleSignup = async () => {
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const handleEmailSignUp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
     try {
-      setIsLoading(true);
       setError(null);
+      setSuccess(null);
+      setIsLoading(true);
       
-      const response = await api.auth.getGoogleAuthUrl();
+      // Check if user exists with Google OAuth
+      const { data: { user }, error: signUpError } = await api.auth.signUpWithEmail(email, password);
       
-      if (response.url) {
-        // Redirect to Google OAuth
-        window.location.href = response.url;
-      } else {
-        setError('Failed to get authentication URL');
+      if (signUpError) {
+        if (signUpError.message.includes('already exists')) {
+          setError('An account with this email already exists. Please sign in instead.');
+          return;
+        }
+        throw signUpError;
       }
-    } catch (err) {
-      setError('Authentication service is unavailable');
-      console.error('Google signup error:', err);
+
+      if (user) {
+        setSuccess('Please check your email to confirm your account.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
+      const { url } = await api.auth.getGoogleAuthUrl();
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No redirect URL received');
+      }
+    } catch (err) {
+      setError('Failed to initialize Google sign up. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F5F7FA]">
       <Header />
       <div className="flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-md">
-          <div className="bg-white py-8 px-4 shadow-xl rounded-lg sm:px-10">
+          <div className="bg-white py-8 px-4 shadow-lg rounded-lg sm:px-10">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
-              <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
+              <div className="flex justify-center mb-6">
+                <img src="/quits-logo.svg" alt="Quits" className="h-12 w-12" />
+              </div>
+              <h2 className="text-center text-3xl font-extrabold text-gray-900">
                 Create your account
               </h2>
               <p className="mt-2 text-center text-sm text-gray-600">
-                Already have an account?{' '}
-                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-                  Sign in
+                Or{' '}
+                <Link to="/login" className="font-medium text-[#26457A] hover:text-[#1c345c]">
+                  sign in to your existing account
                 </Link>
               </p>
             </div>
@@ -62,108 +98,110 @@ const Signup = () => {
               </div>
             )}
 
-            <div className="mt-6">
-              <button
-                onClick={handleGoogleSignup}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <img
-                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                  alt="Google logo"
-                  className="h-5 w-5 mr-2"
-                />
-                <span>{isLoading ? 'Creating account...' : 'Sign up with Google'}</span>
-              </button>
-
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300" />
+            {success && (
+              <div className="mt-4 bg-green-50 border border-green-400 rounded-md p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  <div className="ml-3">
+                    <p className="text-sm text-green-700">{success}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6">
+              <form onSubmit={handleEmailSignUp} className="space-y-6">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email address
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#26457A] focus:border-[#26457A] sm:text-sm"
+                    />
                   </div>
                 </div>
 
-                <form className="mt-6 space-y-6">
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                      Email address
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                      Password
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
-                      Confirm password
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        id="confirm-password"
-                        name="confirm-password"
-                        type="password"
-                        autoComplete="new-password"
-                        required
-                        className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center">
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
+                  <div className="mt-1">
                     <input
-                      id="terms"
-                      name="terms"
-                      type="checkbox"
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
                       required
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#26457A] focus:border-[#26457A] sm:text-sm"
                     />
-                    <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
-                      I agree to the{' '}
-                      <Link to="/terms" className="font-medium text-primary-600 hover:text-primary-500">
-                        Terms of Service
-                      </Link>{' '}
-                      and{' '}
-                      <Link to="/privacy" className="font-medium text-primary-600 hover:text-primary-500">
-                        Privacy Policy
-                      </Link>
-                    </label>
                   </div>
+                </div>
 
-                  <div>
-                    <button
-                      type="submit"
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                    >
-                      Create account
-                    </button>
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                    Confirm Password
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      autoComplete="new-password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#26457A] focus:border-[#26457A] sm:text-sm"
+                    />
                   </div>
-                </form>
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#26457A] hover:bg-[#1c345c] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A] transition-colors duration-200"
+                  >
+                    {isLoading ? 'Creating account...' : 'Create account'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  onClick={handleGoogleSignUp}
+                  disabled={isLoading}
+                  className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A] transition-colors duration-200"
+                >
+                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.545,12.151L12.545,12.151c0,1.054,0.855,1.909,1.909,1.909h3.536c-0.447,1.722-1.498,3.39-2.945,4.624 c-1.447,1.234-3.264,1.91-5.045,1.91c-2.068,0-4.021-0.806-5.488-2.273C3.044,16.854,2.238,14.901,2.238,12.833 c0-2.068,0.806-4.021,2.273-5.488c1.467-1.467,3.42-2.273,5.488-2.273c2.437,0,4.786,1.132,6.272,3.049l2.914-2.914 c-2.199-2.831-5.567-4.45-9.186-4.45c-3.247,0-6.291,1.264-8.587,3.561C-1.264,6.542,0,9.586,0,12.833 c0,3.247,1.264,6.291,3.561,8.587c2.296,2.296,5.34,3.561,8.587,3.561c3.247,0,6.291-1.264,8.587-3.561 c2.296-2.296,3.561-5.34,3.561-8.587c0-0.647-0.061-1.292-0.182-1.923h-9.66C12.545,10.91,12.545,12.151,12.545,12.151z"/>
+                  </svg>
+                  Continue with Google
+                </button>
               </div>
             </div>
           </div>
@@ -173,4 +211,4 @@ const Signup = () => {
   );
 };
 
-export default Signup; 
+export default SignUp; 

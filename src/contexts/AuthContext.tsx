@@ -1,107 +1,77 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
 import api from '../services/api';
 
-// Define the structure of the auth context
 interface AuthContextType {
   isAuthenticated: boolean;
-  isLoading: boolean;
-  user: any | null;
-  tokens: any | null;
-  login: (userData: any, tokenData: any) => void;
-  logout: () => void;
+  user: User | null;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  loading: boolean;
 }
 
-// Create context with default values
-const AuthContext = createContext<AuthContextType>({
-  isAuthenticated: false,
-  isLoading: true,
-  user: null,
-  tokens: null,
-  login: () => {},
-  logout: () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Create the provider component
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [user, setUser] = useState<any | null>(null);
-  const [tokens, setTokens] = useState<any | null>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Initialize auth state from localStorage
   useEffect(() => {
-    const initAuth = async () => {
-      const storedUser = localStorage.getItem('user');
-      const storedTokens = localStorage.getItem('tokens');
-      
-      if (storedUser && storedTokens) {
-        try {
-          const userData = JSON.parse(storedUser);
-          const tokenData = JSON.parse(storedTokens);
-          
-          setUser(userData);
-          setTokens(tokenData);
-          setIsAuthenticated(true);
-          
-          // Validate tokens by trying to fetch user info
-          // This is commented out for now since we're using a test server
-          // const response = await api.auth.getMe();
-          // if (!response || response.error) {
-          //   throw new Error('Invalid token');
-          // }
-        } catch (error) {
-          // Invalid stored data, clear everything
-          localStorage.removeItem('user');
-          localStorage.removeItem('tokens');
-          setUser(null);
-          setTokens(null);
-          setIsAuthenticated(false);
-        }
-      }
-      
-      setIsLoading(false);
-    };
+    // Check active sessions and sets the user
+    const { data: { subscription } } = api.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-    initAuth();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Login handler
-  const login = (userData: any, tokenData: any) => {
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('tokens', JSON.stringify(tokenData));
-    setUser(userData);
-    setTokens(tokenData);
-    setIsAuthenticated(true);
+  const login = async (email: string, password: string) => {
+    try {
+      const { data: { session }, error } = await api.auth.signInWithEmail(email, password);
+      if (error) throw error;
+      setSession(session);
+      setUser(session?.user ?? null);
+    } catch (error) {
+      throw error;
+    }
   };
 
-  // Logout handler
-  const logout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('tokens');
-    setUser(null);
-    setTokens(null);
-    setIsAuthenticated(false);
-    
-    // Optional: Call logout API endpoint
-    // api.auth.logout().catch(console.error);
+  const logout = async () => {
+    try {
+      await api.auth.signOut();
+      setSession(null);
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+      throw error;
+    }
   };
 
-  const contextValue: AuthContextType = {
-    isAuthenticated,
-    isLoading,
+  const value = {
+    isAuthenticated: !!user,
     user,
-    tokens,
+    session,
     login,
     logout,
+    loading,
   };
 
-  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };
 
-// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;

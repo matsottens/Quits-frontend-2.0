@@ -26,9 +26,8 @@ const Sidebar = () => {
     <aside className="hidden md:flex md:flex-col md:w-64 md:fixed md:inset-y-0 bg-white border-r border-gray-100">
       <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto">
         <div className="flex items-center flex-shrink-0 px-4">
-          <Link to="/dashboard" className="flex items-center space-x-3">
-            <img src="/assets/quits-logo.svg" alt="Quits" className="h-8 w-8" />
-            <span className="text-xl font-bold text-[#26457A]">Quits</span>
+          <Link to="/dashboard" className="flex items-center">
+            <img src="/quits-logo.svg" alt="Quits" className="h-8 w-8" />
           </Link>
         </div>
         <div className="mt-8 flex-grow flex flex-col">
