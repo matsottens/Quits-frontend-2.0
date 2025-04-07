@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "npm install @vitejs/plugin-react",
-    "build": "./node_modules/.bin/vite build",
+    "build": "npx vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -32,6 +32,7 @@
     "globals": "^15.15.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
+    "vercel": "41.4.1",
     "vite": "^6.2.0"
   }
 }
