@@ -23,25 +23,28 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="hidden md:flex md:flex-col md:w-64 md:fixed md:inset-y-0 bg-white border-r border-gray-200">
+    <aside className="hidden md:flex md:flex-col md:w-64 md:fixed md:inset-y-0 bg-white border-r border-gray-100">
       <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto">
         <div className="flex items-center flex-shrink-0 px-4">
-          <h1 className="text-2xl font-bold text-primary-500">Quits</h1>
+          <Link to="/dashboard" className="flex items-center space-x-3">
+            <img src="/quits-logo.svg" alt="Quits" className="h-8 w-8" />
+            <span className="text-xl font-bold text-[#26457A]">Quits</span>
+          </Link>
         </div>
-        <div className="mt-5 flex-grow flex flex-col">
-          <nav className="flex-1 px-2 space-y-1">
+        <div className="mt-8 flex-grow flex flex-col">
+          <nav className="flex-1 px-4 space-y-2">
             {/* Dashboard Link */}
             <Link
               to="/dashboard"
-              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+              className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                 isActive('/dashboard')
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-[#26457A] text-white'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-[#26457A]'
               }`}
             >
               <svg
-                className={`mr-3 flex-shrink-0 h-6 w-6 ${
-                  isActive('/dashboard') ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
+                className={`mr-3 flex-shrink-0 h-5 w-5 ${
+                  isActive('/dashboard') ? 'text-white' : 'text-gray-400 group-hover:text-[#26457A]'
                 }`}
                 fill="none"
                 viewBox="0 0 24 24"
@@ -60,15 +63,15 @@ const Sidebar = () => {
             {/* Calendar Link */}
             <Link
               to="/calendar"
-              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+              className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                 isActive('/calendar')
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-[#26457A] text-white'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-[#26457A]'
               }`}
             >
               <svg
-                className={`mr-3 flex-shrink-0 h-6 w-6 ${
-                  isActive('/calendar') ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
+                className={`mr-3 flex-shrink-0 h-5 w-5 ${
+                  isActive('/calendar') ? 'text-white' : 'text-gray-400 group-hover:text-[#26457A]'
                 }`}
                 fill="none"
                 viewBox="0 0 24 24"
@@ -87,15 +90,15 @@ const Sidebar = () => {
             {/* Scan Emails Link */}
             <Link
               to="/scanning"
-              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
+              className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                 isActive('/scanning')
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-[#26457A] text-white'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-[#26457A]'
               }`}
             >
               <svg
-                className={`mr-3 flex-shrink-0 h-6 w-6 ${
-                  isActive('/scanning') ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
+                className={`mr-3 flex-shrink-0 h-5 w-5 ${
+                  isActive('/scanning') ? 'text-white' : 'text-gray-400 group-hover:text-[#26457A]'
                 }`}
                 fill="none"
                 viewBox="0 0 24 24"
@@ -114,10 +117,10 @@ const Sidebar = () => {
             {/* Add Subscription Link */}
             <Link
               to="/dashboard?add=true"
-              className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              className="group flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-[#26457A]"
             >
               <svg
-                className="mr-3 flex-shrink-0 h-6 w-6 text-gray-400 group-hover:text-gray-500"
+                className="mr-3 flex-shrink-0 h-5 w-5 text-gray-400 group-hover:text-[#26457A]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -136,21 +139,21 @@ const Sidebar = () => {
       </div>
       
       {/* User profile */}
-      <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
+      <div className="flex-shrink-0 flex border-t border-gray-100 p-4">
         <Link to="/settings" className="flex-shrink-0 w-full group block">
           <div className="flex items-center">
             <div>
               <img
                 className="inline-block h-9 w-9 rounded-full"
-                src={user?.picture || 'https://ui-avatars.com/api/?name=User&background=0D8ABC&color=fff'}
+                src={user?.picture || 'https://ui-avatars.com/api/?name=User&background=26457A&color=fff'}
                 alt="Profile"
               />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+              <p className="text-sm font-medium text-gray-900 group-hover:text-[#26457A]">
                 {user?.name || user?.email || 'User'}
               </p>
-              <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700">
+              <p className="text-xs font-medium text-gray-500 group-hover:text-[#26457A]">
                 Settings
               </p>
             </div>

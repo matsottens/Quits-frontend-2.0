@@ -2,17 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-gray-50 text-gray-900 m-0 min-h-screen;
-    font-family: 'Inter', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+:root {
+  --color-primary: #26457A;
+  --color-background: #F5F7FA;
+  --color-text: #1A1A1A;
+}
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-bold leading-tight;
-  }
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  @apply bg-gray-50 text-gray-900 m-0 min-h-screen;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-bold leading-tight;
 }
 
 @layer components {
@@ -20,10 +26,10 @@
     @apply px-4 py-2 rounded-md font-medium transition-colors;
   }
   .btn-primary {
-    @apply bg-primary-500 text-white hover:bg-primary-600;
+    @apply bg-[#26457A] text-white hover:bg-[#1c345c] transition-colors duration-200;
   }
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+    @apply bg-white text-[#26457A] border border-[#26457A] hover:bg-gray-50 transition-colors duration-200;
   }
   .card {
     @apply bg-white rounded-lg shadow-md p-6;
@@ -31,4 +37,32 @@
   .input {
     @apply w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none;
   }
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply bg-[#26457A] text-white hover:bg-[#1c345c] transition-colors duration-200;
+}
+
+.btn-secondary {
+  @apply bg-white text-[#26457A] border border-[#26457A] hover:bg-gray-50 transition-colors duration-200;
+}
+
+/* Header styles */
+.app-header {
+  @apply bg-[#26457A] text-white shadow-md;
+}
+
+/* Navigation styles */
+.nav-link {
+  @apply text-gray-600 hover:text-[#26457A] transition-colors duration-200;
+}
+
+.nav-link.active {
+  @apply text-[#26457A] font-medium;
+}
+
+/* Card styles */
+.app-card {
+  @apply bg-white rounded-lg shadow-sm border border-gray-100;
 }

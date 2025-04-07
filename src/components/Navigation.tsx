@@ -23,7 +23,7 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="bg-white shadow fixed bottom-0 left-0 right-0 z-10 md:hidden">
+    <nav className="bg-white shadow-lg fixed bottom-0 left-0 right-0 z-10 md:hidden border-t border-gray-100">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
         <div className="relative flex items-center justify-between h-16">
           <div className="flex-1 flex items-center justify-evenly">
@@ -31,10 +31,10 @@ const Navigation = () => {
             <Link
               to="/dashboard"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/dashboard') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
+                isActive('/dashboard') ? 'text-[#26457A]' : 'text-gray-500 hover:text-[#26457A]'
               }`}
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`h-5 w-5 ${isActive('/dashboard') ? 'text-[#26457A]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -42,17 +42,17 @@ const Navigation = () => {
                   d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                 />
               </svg>
-              <span>Home</span>
+              <span className="mt-1">Home</span>
             </Link>
 
             {/* Calendar Link */}
             <Link
               to="/calendar"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/calendar') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
+                isActive('/calendar') ? 'text-[#26457A]' : 'text-gray-500 hover:text-[#26457A]'
               }`}
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`h-5 w-5 ${isActive('/calendar') ? 'text-[#26457A]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -60,30 +60,30 @@ const Navigation = () => {
                   d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
-              <span>Calendar</span>
+              <span className="mt-1">Calendar</span>
             </Link>
 
             {/* Add Subscription */}
             <Link
               to="/dashboard?add=true"
-              className={`flex flex-col items-center py-2 px-4 text-sm text-gray-500 hover:text-gray-900`}
+              className="flex flex-col items-center py-2 px-4 text-sm"
             >
-              <div className="bg-primary-500 rounded-full p-2">
-                <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="bg-[#26457A] rounded-full p-2">
+                <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </div>
-              <span>Add</span>
+              <span className="mt-1 text-[#26457A]">Add</span>
             </Link>
 
             {/* Scan Emails Link */}
             <Link
               to="/scanning"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/scanning') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
+                isActive('/scanning') ? 'text-[#26457A]' : 'text-gray-500 hover:text-[#26457A]'
               }`}
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`h-5 w-5 ${isActive('/scanning') ? 'text-[#26457A]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -91,17 +91,17 @@ const Navigation = () => {
                   d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                 />
               </svg>
-              <span>Scan</span>
+              <span className="mt-1">Scan</span>
             </Link>
 
             {/* Settings Link */}
             <Link
               to="/settings"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/settings') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
+                isActive('/settings') ? 'text-[#26457A]' : 'text-gray-500 hover:text-[#26457A]'
               }`}
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className={`h-5 w-5 ${isActive('/settings') ? 'text-[#26457A]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -115,7 +115,7 @@ const Navigation = () => {
                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                 />
               </svg>
-              <span>Settings</span>
+              <span className="mt-1">Settings</span>
             </Link>
           </div>
         </div>
