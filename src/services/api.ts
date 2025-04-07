@@ -34,7 +34,7 @@ const api = {
     
     // Handle Google OAuth callback
     handleGoogleCallback: async (code: string) => {
-      const response = await axios.post(`${API_URL}/auth/google/callback`, { code });
+      const response = await axios.get(`${API_URL}/auth/google/callback?code=${code}`);
       return response.data;
     },
     
