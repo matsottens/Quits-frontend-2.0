@@ -31,7 +31,7 @@ const Navigation = () => {
             <Link
               to="/dashboard"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/dashboard') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'
+                isActive('/dashboard') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -49,7 +49,7 @@ const Navigation = () => {
             <Link
               to="/calendar"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/calendar') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'
+                isActive('/calendar') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,7 +68,7 @@ const Navigation = () => {
               to="/dashboard?add=true"
               className={`flex flex-col items-center py-2 px-4 text-sm text-gray-500 hover:text-gray-900`}
             >
-              <div className="bg-blue-600 rounded-full p-2">
+              <div className="bg-primary-500 rounded-full p-2">
                 <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -80,7 +80,7 @@ const Navigation = () => {
             <Link
               to="/scanning"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/scanning') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'
+                isActive('/scanning') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -98,7 +98,7 @@ const Navigation = () => {
             <Link
               to="/settings"
               className={`flex flex-col items-center py-2 px-4 text-sm ${
-                isActive('/settings') ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900'
+                isActive('/settings') ? 'text-primary-500' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 // Define the structure of the auth context
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
-  token: string | null;
   user: any | null;
-  login: (token: string) => void;
+  tokens: any | null;
+  login: (userData: any, tokenData: any) => void;
   logout: () => void;
 }
 
@@ -15,58 +15,47 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isLoading: true,
-  token: null,
   user: null,
+  tokens: null,
   login: () => {},
   logout: () => {},
 });
-
-// API configuration
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Create the provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
-
-  // Configure axios defaults
-  const configureAxios = (newToken: string | null) => {
-    if (newToken) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  };
+  const [tokens, setTokens] = useState<any | null>(null);
 
   // Initialize auth state from localStorage
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('user');
+      const storedTokens = localStorage.getItem('tokens');
       
-      if (storedToken) {
-        setToken(storedToken);
-        configureAxios(storedToken);
-        
+      if (storedUser && storedTokens) {
         try {
-          // Validate token by fetching user data
-          const response = await axios.get(`${API_URL}/auth/me`);
+          const userData = JSON.parse(storedUser);
+          const tokenData = JSON.parse(storedTokens);
           
-          if (response.data && response.data.user) {
-            setUser(response.data.user);
-            setIsAuthenticated(true);
-          } else {
-            // Invalid token, clear everything
-            localStorage.removeItem('auth_token');
-            setToken(null);
-            configureAxios(null);
-          }
+          setUser(userData);
+          setTokens(tokenData);
+          setIsAuthenticated(true);
+          
+          // Validate tokens by trying to fetch user info
+          // This is commented out for now since we're using a test server
+          // const response = await api.auth.getMe();
+          // if (!response || response.error) {
+          //   throw new Error('Invalid token');
+          // }
         } catch (error) {
-          // Token validation failed, clear everything
-          localStorage.removeItem('auth_token');
-          setToken(null);
-          configureAxios(null);
+          // Invalid stored data, clear everything
+          localStorage.removeItem('user');
+          localStorage.removeItem('tokens');
+          setUser(null);
+          setTokens(null);
+          setIsAuthenticated(false);
         }
       }
       
@@ -77,30 +66,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Login handler
-  const login = (newToken: string) => {
-    localStorage.setItem('auth_token', newToken);
-    setToken(newToken);
-    configureAxios(newToken);
+  const login = (userData: any, tokenData: any) => {
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('tokens', JSON.stringify(tokenData));
+    setUser(userData);
+    setTokens(tokenData);
     setIsAuthenticated(true);
-    
-    // We'll fetch user info when needed using the token
-    // This avoids an extra request here
   };
 
   // Logout handler
   const logout = () => {
-    localStorage.removeItem('auth_token');
-    setToken(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('tokens');
     setUser(null);
+    setTokens(null);
     setIsAuthenticated(false);
-    configureAxios(null);
+    
+    // Optional: Call logout API endpoint
+    // api.auth.logout().catch(console.error);
   };
 
   const contextValue: AuthContextType = {
     isAuthenticated,
     isLoading,
-    token,
     user,
+    tokens,
     login,
     logout,
   };

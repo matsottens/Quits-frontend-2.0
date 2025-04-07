@@ -13,9 +13,21 @@ const api = {
       return response.data;
     },
     
+    // Handle Google OAuth callback
+    handleGoogleCallback: async (code: string) => {
+      const response = await axios.post(`${API_URL}/auth/google/callback`, { code });
+      return response.data;
+    },
+    
     // Get current user info
     getMe: async () => {
       const response = await axios.get(`${API_URL}/auth/me`);
+      return response.data;
+    },
+    
+    // Logout the user
+    logout: async () => {
+      const response = await axios.post(`${API_URL}/auth/logout`);
       return response.data;
     },
   },

@@ -29,10 +29,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function AppRoutes() {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // Don't render anything while still loading auth state
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+  
   return (
     <>
-      <Sidebar />
-      <div className="md:pl-64">
+      {isAuthenticated && <Sidebar />}
+      <div className={isAuthenticated ? "md:pl-64" : ""}>
         <Routes>
           <Route path="/" element={<GetStarted />} />
           <Route path="/login" element={<Login />} />
@@ -82,7 +89,7 @@ function AppRoutes() {
           />
         </Routes>
       </div>
-      <Navigation />
+      {isAuthenticated && <Navigation />}
     </>
   );
 }

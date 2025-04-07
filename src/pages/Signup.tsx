@@ -32,7 +32,7 @@ const Signup = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h1 className="text-center text-3xl font-extrabold text-gray-900">Create your account</h1>
+          <h1 className="text-center text-3xl font-extrabold text-gray-900">Sign up for Quits</h1>
           <p className="mt-2 text-center text-sm text-gray-600">
             Start tracking your subscriptions and save money
           </p>
@@ -49,7 +49,7 @@ const Signup = () => {
             <button
               onClick={handleGoogleSignup}
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-500 hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-primary-300"
             >
               {isLoading ? (
                 <span>Loading...</span>
@@ -83,7 +83,7 @@ const Signup = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
-              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link to="/login" className="font-medium text-primary-500 hover:text-primary-600">
                 Sign in
               </Link>
             </p>
