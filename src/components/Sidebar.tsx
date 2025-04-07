@@ -27,7 +27,7 @@ const Sidebar = () => {
       <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto">
         <div className="flex items-center flex-shrink-0 px-4">
           <Link to="/dashboard" className="flex items-center space-x-3">
-            <img src="/quits-logo.svg" alt="Quits" className="h-8 w-8" />
+            <img src="/assets/quits-logo.svg" alt="Quits" className="h-8 w-8" />
             <span className="text-xl font-bold text-[#26457A]">Quits</span>
           </Link>
         </div>

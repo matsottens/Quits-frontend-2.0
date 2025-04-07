@@ -33,7 +33,7 @@ const Login = () => {
           <div className="bg-white py-8 px-4 shadow-lg rounded-lg sm:px-10">
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
               <div className="flex justify-center mb-6">
-                <img src="/quits-logo.svg" alt="Quits" className="h-12 w-12" />
+                <img src="/assets/quits-logo.svg" alt="Quits" className="h-12 w-12" />
               </div>
               <h2 className="text-center text-3xl font-extrabold text-gray-900">
                 Sign in to your account

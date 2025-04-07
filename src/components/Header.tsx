@@ -9,7 +9,7 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <Link to="/" className="flex items-center space-x-3">
-            <img src="/quits-logo.svg" alt="Quits" className="h-8 w-8" />
+            <img src="/assets/quits-logo.svg" alt="Quits" className="h-8 w-8" />
             <span className="text-xl font-bold text-white">Quits</span>
           </Link>
           {!isAuthenticated && (
