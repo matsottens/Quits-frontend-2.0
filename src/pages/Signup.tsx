@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
+import GoogleLogo from '../components/GoogleLogo';
 import api from '../services/api';
 
 const SignUp = () => {
@@ -197,9 +198,7 @@ const SignUp = () => {
                   disabled={isLoading}
                   className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A] transition-colors duration-200"
                 >
-                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12.545,12.151L12.545,12.151c0,1.054,0.855,1.909,1.909,1.909h3.536c-0.447,1.722-1.498,3.39-2.945,4.624 c-1.447,1.234-3.264,1.91-5.045,1.91c-2.068,0-4.021-0.806-5.488-2.273C3.044,16.854,2.238,14.901,2.238,12.833 c0-2.068,0.806-4.021,2.273-5.488c1.467-1.467,3.42-2.273,5.488-2.273c2.437,0,4.786,1.132,6.272,3.049l2.914-2.914 c-2.199-2.831-5.567-4.45-9.186-4.45c-3.247,0-6.291,1.264-8.587,3.561C-1.264,6.542,0,9.586,0,12.833 c0,3.247,1.264,6.291,3.561,8.587c2.296,2.296,5.34,3.561,8.587,3.561c3.247,0,6.291-1.264,8.587-3.561 c2.296-2.296,3.561-5.34,3.561-8.587c0-0.647-0.061-1.292-0.182-1.923h-9.66C12.545,10.91,12.545,12.151,12.545,12.151z"/>
-                  </svg>
+                  <GoogleLogo className="w-5 h-5 mr-2" />
                   Continue with Google
                 </button>
               </div>
