@@ -46,9 +46,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Google OAuth configuration
 const GOOGLE_OAUTH_CONFIG = {
   client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  redirect_uri: import.meta.env.NODE_ENV === 'production'
-    ? 'https://quits.cc/auth/callback'
-    : 'http://localhost:5173/auth/callback',
+  redirect_uri: import.meta.env.VITE_AUTH_REDIRECT_URI,
   scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
   response_type: 'code',
   access_type: 'offline',
