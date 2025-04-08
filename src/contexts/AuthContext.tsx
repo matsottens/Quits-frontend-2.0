@@ -1,86 +1,43 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import api, { supabase } from '../services/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: User | null;
-  session: Session | null;
-  login: (email: string, password: string) => Promise<void>;
+  token: string | null;
+  login: (token: string) => Promise<void>;
   logout: () => Promise<void>;
-  loading: boolean;
-  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for existing session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-      } catch (error) {
-        console.error('Error checking auth session:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, currentSession: Session | null) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Check for existing token in localStorage
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      setToken(storedToken);
+      setIsAuthenticated(true);
+    }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    try {
-      const { data: { session: newSession }, error } = await api.auth.signInWithEmail(email, password);
-      if (error) throw error;
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-    } catch (error) {
-      throw error;
-    }
+  const login = async (token: string) => {
+    localStorage.setItem('token', token);
+    setToken(token);
+    setIsAuthenticated(true);
   };
 
   const logout = async () => {
-    try {
-      await api.auth.signOut();
-      setSession(null);
-      setUser(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
-    }
-  };
-
-  const value = {
-    isAuthenticated: !!user,
-    user,
-    session,
-    login,
-    logout,
-    loading,
-    isLoading: loading,
+    localStorage.removeItem('token');
+    setToken(null);
+    setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ isAuthenticated, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -88,8 +45,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}; 
+};
+
+export default AuthContext; 

@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import api from '../services/api';
 import { validatePhoneNumber, formatPhoneNumber } from '../utils/phoneValidation';
 
 const AddPhoneNumber = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
+  const navigate = useNavigate();
   const [formattedNumber, setFormattedNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +46,11 @@ const AddPhoneNumber = () => {
 
   const handleSkip = () => {
     navigate('/scanning');
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    setPhoneNumber(value);
   };
 
   return (
@@ -92,7 +95,7 @@ const AddPhoneNumber = () => {
                     type="tel"
                     autoComplete="tel"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={handlePhoneChange}
                     placeholder="+1 (555) 555-5555"
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#26457A] focus:border-[#26457A] sm:text-sm"
                   />

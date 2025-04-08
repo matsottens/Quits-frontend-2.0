@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { handleGoogleCallback } from '../api';
 
+interface AuthResponse {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    name?: string;
+    picture?: string;
+  };
+}
+
 const AuthCallback = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -19,10 +29,10 @@ const AuthCallback = () => {
           return;
         }
 
-        const response = await handleGoogleCallback(code);
+        const response = await handleGoogleCallback(code) as AuthResponse;
         
         if (response?.token && response?.user) {
-          await login(response.token, response.user);
+          await login(response.token);
           navigate('/dashboard');
         } else {
           console.error('Invalid response from server:', response);
