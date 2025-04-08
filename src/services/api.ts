@@ -136,19 +136,19 @@ const apiService = {
 
     // Get scanning status
     getScanningStatus: async () => {
-      const response = await api.get('/email/scan/status');
+      const response = await api.get('/email/status');
       return response.data;
     },
 
     // Get subscription suggestions from scanned emails
     getSubscriptionSuggestions: async () => {
-      const response = await api.get('/email/subscriptions/suggestions');
+      const response = await api.get('/email/suggestions');
       return response.data;
     },
 
-    // Confirm subscription suggestion
+    // Confirm or reject a subscription suggestion
     confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
-      const response = await api.post(`/email/subscriptions/suggestions/${suggestionId}/confirm`, {
+      const response = await api.post(`/email/suggestions/${suggestionId}/confirm`, {
         confirmed
       });
       return response.data;
