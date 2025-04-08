@@ -19,13 +19,13 @@ const AuthCallback = () => {
           return;
         }
 
-        const { data } = await api.get(`/auth/google/callback?code=${code}`);
+        const response = await api.auth.handleGoogleCallback(code);
         
-        if (data?.token) {
-          await login(data.token);
+        if (response?.token) {
+          await login(response.token);
           navigate('/dashboard');
         } else {
-          console.error('Invalid response from server:', data);
+          console.error('Invalid response from server:', response);
           navigate('/login');
         }
       } catch (error) {
