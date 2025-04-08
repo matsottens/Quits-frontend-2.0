@@ -21,15 +21,21 @@ const AuthCallback = () => {
 
         const response = await handleGoogleCallback(code);
         
-        if (response.token && response.user) {
+        if (response?.token && response?.user) {
           await login(response.token, response.user);
           navigate('/dashboard');
         } else {
-          console.error('Invalid response from server');
+          console.error('Invalid response from server:', response);
           navigate('/login');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Auth callback error:', error);
+        // Handle specific error types
+        if (error.response?.status === 500) {
+          console.error('Server error:', error.response?.data);
+        } else if (error.response?.status === 400) {
+          console.error('Bad request:', error.response?.data);
+        }
         navigate('/login');
       }
     };
