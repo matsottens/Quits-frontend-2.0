@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -10,10 +11,20 @@ const AuthCallback = () => {
     const handleCallback = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
+        const code = urlParams.get('code');
         
+        if (!code) {
+          console.error('No authorization code found in callback URL');
+          navigate('/login');
+          return;
+        }
+
+        // Exchange the code for a token
+        const response = await api.get(`/auth/google/callback?code=${code}`);
+        const { token } = response.data;
+
         if (!token) {
-          console.error('No token found in callback URL');
+          console.error('No token received from server');
           navigate('/login');
           return;
         }
