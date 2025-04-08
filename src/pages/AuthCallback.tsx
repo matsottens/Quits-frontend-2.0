@@ -19,9 +19,9 @@ const AuthCallback = () => {
           return;
         }
 
-        // Exchange the code for a token
-        const response = await api.get(`/auth/google/callback?code=${code}`);
-        const { token } = response.data;
+        // Exchange the code for a token using the auth service
+        const response = await api.auth.handleGoogleCallback(code);
+        const { token } = response;
 
         if (!token) {
           console.error('No token received from server');
