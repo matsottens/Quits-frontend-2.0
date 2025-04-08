@@ -18,6 +18,29 @@ const api = axios.create({
   }
 });
 
+// Add request interceptor to include JWT token
+api.interceptors.request.use(async (config) => {
+  const session = await supabase.auth.getSession();
+  if (session?.data?.session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.data.session.access_token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+// Add response interceptor to handle auth errors
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized error (e.g., redirect to login)
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Google OAuth configuration
