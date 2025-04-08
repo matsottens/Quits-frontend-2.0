@@ -85,6 +85,12 @@ const api = {
     },
 
     onAuthStateChange: supabase.auth.onAuthStateChange,
+
+    // Update user profile with phone number
+    updatePhoneNumber: async (phoneNumber: string) => {
+      const response = await axios.post(`${API_URL}/auth/update-phone`, { phoneNumber });
+      return response.data;
+    },
   },
   
   // Email scanning endpoints
