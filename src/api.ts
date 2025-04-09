@@ -20,9 +20,14 @@ const api = axios.create({
 
 export const handleGoogleCallback = async (code: string): Promise<AuthResponse> => {
   try {
-    const response = await api.get<AuthResponse>('/auth/google/callback', {
+    const response = await api.get<AuthResponse>('/auth/callback', {
       params: { code },
     });
+    
+    if (!response.data) {
+      throw new Error('No data received from authentication server');
+    }
+    
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
