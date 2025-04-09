@@ -8,6 +8,7 @@ interface AuthResponse {
     name?: string;
     picture?: string;
   };
+  error?: string;
 }
 
 // Always use api.quits.cc for auth operations, regardless of environment

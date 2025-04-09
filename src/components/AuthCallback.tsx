@@ -12,6 +12,7 @@ interface AuthResponse {
     name?: string;
     picture?: string;
   };
+  error?: string;
 }
 
 const AuthCallback = () => {
