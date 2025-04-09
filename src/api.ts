@@ -32,6 +32,15 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     // Make a direct fetch request to the server endpoint
     console.log('Making direct fetch request to auth endpoint');
+    
+    // Always use the authorized redirect URI in the body
+    // This should match exactly what's registered in Google Console
+    const redirectUri = window.location.origin.includes('www.') 
+      ? window.location.origin.replace('www.', '') + '/auth/callback'
+      : window.location.origin + '/auth/callback';
+    
+    console.log('Using redirect URI for token exchange:', redirectUri);
+    
     const response = await fetch(`${API_BASE_URL}/api/auth/google/callback/direct2`, {
       method: 'POST',
       headers: {
@@ -42,6 +51,7 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
       body: new URLSearchParams({
         code,
         origin: window.location.origin,
+        redirectUri, // Add the exact redirect URI used in Google OAuth
         requestId: 'req_' + Math.random().toString(36).substring(2)
       })
     });
