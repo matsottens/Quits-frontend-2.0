@@ -6,7 +6,7 @@ import axios from 'axios';
 
 interface AuthResponse {
   token: string;
-  user: {
+  user?: {
     id: string;
     email: string;
     name?: string;
@@ -19,8 +19,12 @@ const AuthCallback = () => {
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
+    const timeoutIds: NodeJS.Timeout[] = [];
+    let isMounted = true;
+
     const handleAuthCallback = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -29,15 +33,23 @@ const AuthCallback = () => {
         // Create debug info
         const debugObj = {
           url: window.location.href,
+          origin: window.location.origin,
+          hostname: window.location.hostname,
           code: code ? `${code.substring(0, 15)}...` : 'none',
           timestamp: new Date().toISOString()
         };
-        setDebugInfo(JSON.stringify(debugObj, null, 2));
+        
+        if (isMounted) setDebugInfo(JSON.stringify(debugObj, null, 2));
+        console.log('Auth callback debug:', debugObj);
         
         if (!code) {
           console.error('No authorization code found');
-          setError('No authorization code found');
-          setTimeout(() => navigate('/login'), 3000);
+          if (isMounted) {
+            setError('No authorization code found');
+            setIsProcessing(false);
+            const timeoutId = setTimeout(() => navigate('/login'), 3000);
+            timeoutIds.push(timeoutId);
+          }
           return;
         }
 
@@ -45,13 +57,33 @@ const AuthCallback = () => {
         const response = await handleGoogleCallback(code) as AuthResponse;
         
         if (response?.token) {
-          await login(response.token);
-          // Redirect to scanning page instead of dashboard
-          navigate('/scanning');
+          console.log('Successfully received auth token');
+          
+          try {
+            // Try to login with the token
+            await login(response.token);
+            
+            // Redirect to scanning page on success
+            if (isMounted) {
+              navigate('/scanning');
+            }
+          } catch (loginErr) {
+            console.error('Login error after successful token retrieval:', loginErr);
+            if (isMounted) {
+              setError('Error during login process. Please try again.');
+              setIsProcessing(false);
+              const timeoutId = setTimeout(() => navigate('/login'), 3000);
+              timeoutIds.push(timeoutId);
+            }
+          }
         } else {
           console.error('Invalid response from server:', response);
-          setError('Invalid server response');
-          setTimeout(() => navigate('/login'), 3000);
+          if (isMounted) {
+            setError('Invalid server response. No auth token received.');
+            setIsProcessing(false);
+            const timeoutId = setTimeout(() => navigate('/login'), 3000);
+            timeoutIds.push(timeoutId);
+          }
         }
       } catch (error: any) {
         console.error('Auth callback error:', error);
@@ -60,21 +92,36 @@ const AuthCallback = () => {
         
         // Handle specific error types
         if (axios.isAxiosError(error)) {
-          if (error.response?.status === 500) {
+          const axiosError = error as axios.AxiosError;
+          if (axiosError.response?.status === 500) {
             errorMessage = 'Server error. Please try again later.';
-          } else if (error.response?.status === 400) {
+          } else if (axiosError.response?.status === 400) {
             errorMessage = 'Invalid request. Please try again.';
-          } else if (error.code === 'ERR_NETWORK') {
+          } else if (axiosError.code === 'ERR_NETWORK') {
             errorMessage = 'Network error. Please check your connection.';
+          } else if (axiosError.message.includes('blocked by CORS')) {
+            errorMessage = 'Cross-Origin error. Please try again or contact support.';
           }
+        } else if (error.message?.includes('Content Security Policy')) {
+          errorMessage = 'Security policy error. Please try again or contact support.';
         }
         
-        setError(errorMessage);
-        setTimeout(() => navigate('/login'), 3000);
+        if (isMounted) {
+          setError(errorMessage);
+          setIsProcessing(false);
+          const timeoutId = setTimeout(() => navigate('/login'), 5000);
+          timeoutIds.push(timeoutId);
+        }
       }
     };
 
     handleAuthCallback();
+
+    // Clean up timeouts when unmounting
+    return () => {
+      isMounted = false;
+      timeoutIds.forEach(id => clearTimeout(id));
+    };
   }, [navigate, login]);
 
   return (
