@@ -7,6 +7,7 @@ const AuthCallback = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -14,6 +15,10 @@ const AuthCallback = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const errorParam = urlParams.get('error');
+        
+        // Log debugging information
+        setDebugInfo(`Using origin: ${window.location.origin}, API origin: ${api.defaults?.baseURL}, Code: ${code?.substring(0, 10)}...`);
+        console.log(`Auth callback initiated. Host: ${window.location.hostname}, Origin: ${window.location.origin}`);
         
         if (errorParam) {
           console.error('Error in callback URL:', errorParam);
@@ -30,6 +35,7 @@ const AuthCallback = () => {
         }
 
         // Exchange the code for a token using the auth service
+        console.log('Attempting to exchange code for token...');
         const response = await api.auth.handleGoogleCallback(code);
         const { token } = response;
 
@@ -40,12 +46,13 @@ const AuthCallback = () => {
           return;
         }
 
+        console.log('Token received, logging in...');
         await login(token);
         navigate('/dashboard');
       } catch (error) {
         console.error('Auth callback error:', error);
-        setError('Authentication failed. Please try again.');
-        setTimeout(() => navigate('/login'), 3000);
+        setError(`Authentication failed: ${error.message || 'Unknown error'}`);
+        setTimeout(() => navigate('/login'), 5000);
       }
     };
 
@@ -63,6 +70,11 @@ const AuthCallback = () => {
         <p className="mt-4 text-gray-600">
           {error ? 'Redirecting to login...' : 'Completing authentication...'}
         </p>
+        {(error || debugInfo) && (
+          <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left overflow-auto max-w-md max-h-32">
+            <pre>{debugInfo || ''}</pre>
+          </div>
+        )}
       </div>
     </div>
   );

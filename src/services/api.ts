@@ -2,7 +2,13 @@ import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
 // API base URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const isProd = window.location.hostname !== 'localhost';
+const API_URL = isProd 
+  ? 'https://api.quits.cc' 
+  : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
+
+console.log(`Using API URL: ${API_URL} in ${isProd ? 'production' : 'development'} mode`);
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -20,12 +26,14 @@ const api = axios.create({
 
 // Add request interceptor to include JWT token
 api.interceptors.request.use(async (config) => {
+  console.log(`Making request to: ${config.baseURL}${config.url}`);
   const session = await supabase.auth.getSession();
   if (session?.data?.session?.access_token) {
     config.headers.Authorization = `Bearer ${session.data.session.access_token}`;
   }
   return config;
 }, (error) => {
+  console.error('Request interceptor error:', error);
   return Promise.reject(error);
 });
 
@@ -66,7 +74,9 @@ const apiService = {
     // Handle Google OAuth callback
     handleGoogleCallback: async (code: string) => {
       try {
-        const response = await api.get(`/auth/google/callback?code=${code}`);
+        const endpoint = `/auth/google/callback?code=${code}`;
+        console.log(`Sending callback request to: ${API_URL}${endpoint}`);
+        const response = await api.get(endpoint);
         return response.data;
       } catch (error) {
         console.error('Google callback error:', error);
