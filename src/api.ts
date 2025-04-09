@@ -32,7 +32,7 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     // Make a direct fetch request to the server endpoint
     console.log('Making direct fetch request to auth endpoint');
-    const response = await fetch(`${API_BASE_URL}/auth/google/callback/direct2`, {
+    const response = await fetch(`${API_BASE_URL}/api/auth/google/callback/direct2`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
