@@ -65,8 +65,13 @@ const apiService = {
     
     // Handle Google OAuth callback
     handleGoogleCallback: async (code: string) => {
-      const response = await api.get(`/auth/google/callback?code=${code}`);
-      return response.data;
+      try {
+        const response = await api.get(`/auth/google/callback?code=${code}`);
+        return response.data;
+      } catch (error) {
+        console.error('Google callback error:', error);
+        throw error;
+      }
     },
     
     // Get current user info

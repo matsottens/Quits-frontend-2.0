@@ -38,7 +38,7 @@ export default defineConfig(({ command, mode }) => {
         },
       },
       headers: {
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' chrome-extension:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:3000 https://localhost:3000 https://oauth2.googleapis.com https://www.googleapis.com https://api.quits.cc https://quits.cc ws://localhost:5173 wss://localhost:5173 http://localhost:3000/api/auth/callback",
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' chrome-extension:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:3000 https://localhost:3000 https://oauth2.googleapis.com https://www.googleapis.com https://api.quits.cc https://quits.cc ws://localhost:5173 wss://localhost:5173 http://localhost:3000/api/auth/callback https://api.quits.cc/auth/google/callback https://api.quits.cc/auth/callback",
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Origin, Content-Type, Accept, Authorization',

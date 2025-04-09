@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -6,16 +6,26 @@ import api from '../services/api';
 const AuthCallback = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
+        const errorParam = urlParams.get('error');
+        
+        if (errorParam) {
+          console.error('Error in callback URL:', errorParam);
+          setError(`Authentication error: ${errorParam}`);
+          setTimeout(() => navigate('/login'), 3000);
+          return;
+        }
         
         if (!code) {
           console.error('No authorization code found in callback URL');
-          navigate('/login');
+          setError('Missing authorization code');
+          setTimeout(() => navigate('/login'), 3000);
           return;
         }
 
@@ -25,7 +35,8 @@ const AuthCallback = () => {
 
         if (!token) {
           console.error('No token received from server');
-          navigate('/login');
+          setError('Authentication failed: No token received');
+          setTimeout(() => navigate('/login'), 3000);
           return;
         }
 
@@ -33,7 +44,8 @@ const AuthCallback = () => {
         navigate('/dashboard');
       } catch (error) {
         console.error('Auth callback error:', error);
-        navigate('/login');
+        setError('Authentication failed. Please try again.');
+        setTimeout(() => navigate('/login'), 3000);
       }
     };
 
@@ -43,8 +55,14 @@ const AuthCallback = () => {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-        <p className="mt-4 text-gray-600">Completing authentication...</p>
+        {error ? (
+          <div className="text-red-500 mb-4">{error}</div>
+        ) : (
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
+        )}
+        <p className="mt-4 text-gray-600">
+          {error ? 'Redirecting to login...' : 'Completing authentication...'}
+        </p>
       </div>
     </div>
   );
