@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { handleGoogleCallback, checkForAuthResult } from '../api';
+import { handleGoogleCallback } from '../api';
 import axios, { AxiosError } from 'axios';
 
 interface AuthResponse {
@@ -29,22 +29,7 @@ const AuthCallback = () => {
 
     const handleAuthCallback = async () => {
       try {
-        // First check if we have auth data in the URL hash (from redirect)
-        const authResult = checkForAuthResult();
-        if (authResult) {
-          console.log('Found auth result in URL hash');
-          if (authResult.error) {
-            throw new Error(authResult.error);
-          }
-          
-          if (authResult.token) {
-            // Handle successful auth
-            await processSuccessfulAuth(authResult);
-            return;
-          }
-        }
-        
-        // If no auth data in hash, proceed with normal flow
+        // Get code from URL params
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         
@@ -54,8 +39,7 @@ const AuthCallback = () => {
           origin: window.location.origin,
           hostname: window.location.hostname,
           code: code ? `${code.substring(0, 15)}...` : 'none',
-          timestamp: new Date().toISOString(),
-          hasAuthResult: !!authResult
+          timestamp: new Date().toISOString()
         };
         
         if (isMounted) {
@@ -85,10 +69,28 @@ const AuthCallback = () => {
           // Update progress
           if (isMounted) setProgress(50);
           
-          const response = await handleGoogleCallback(code) as AuthResponse;
+          const response = await handleGoogleCallback(code);
           
           // Process successful authentication
-          await processSuccessfulAuth(response);
+          if (isMounted) setProgress(75);
+          
+          console.log('Successfully received auth token');
+          
+          if (response?.token) {
+            // Try to login with the token
+            await login(response.token);
+            
+            // Update progress
+            if (isMounted) setProgress(100);
+            
+            // Redirect to scanning page on success
+            if (isMounted) {
+              // Short delay to show completion
+              setTimeout(() => navigate('/scanning'), 500);
+            }
+          } else {
+            throw new Error('No token received from authentication server');
+          }
         } catch (error: any) {
           console.error('Auth callback error:', error);
           
@@ -114,6 +116,8 @@ const AuthCallback = () => {
             errorMessage = 'Authentication request timed out. Please try again or contact support.';
           } else if (error.message?.includes('Failed to fetch')) {
             errorMessage = 'Network error or CORS issue. Please try again or contact support.';
+          } else if (typeof error.message === 'string') {
+            errorMessage = error.message;
           }
           
           if (isMounted) {
@@ -154,39 +158,6 @@ const AuthCallback = () => {
         }
       }
     };
-    
-    const processSuccessfulAuth = async (response: AuthResponse) => {
-      try {
-        // Update progress
-        if (isMounted) setProgress(75);
-        
-        console.log('Successfully received auth token');
-        
-        if (response.token) {
-          // Try to login with the token
-          await login(response.token);
-          
-          // Update progress
-          if (isMounted) setProgress(100);
-          
-          // Redirect to scanning page on success
-          if (isMounted) {
-            // Short delay to show completion
-            setTimeout(() => navigate('/scanning'), 500);
-          }
-        } else {
-          throw new Error('No token received from authentication server');
-        }
-      } catch (err) {
-        console.error('Login error after successful token retrieval:', err);
-        if (isMounted) {
-          setError('Error during login process. Please try again.');
-          setIsProcessing(false);
-          const timeoutId = setTimeout(() => navigate('/login'), 3000);
-          timeoutIds.push(timeoutId);
-        }
-      }
-    };
 
     // Start the auth process
     handleAuthCallback();
@@ -197,19 +168,6 @@ const AuthCallback = () => {
       timeoutIds.forEach(id => clearTimeout(id));
     };
   }, [navigate, login]);
-
-  // Set up a listener for hash changes (in case we get redirected back)
-  useEffect(() => {
-    const handleHashChange = () => {
-      const authResult = checkForAuthResult();
-      if (authResult) {
-        window.location.reload();
-      }
-    };
-    
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
