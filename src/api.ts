@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 
 interface AuthResponse {
   token: string;
-  user: {
+  user?: {
     id: string;
     email: string;
     name?: string;
@@ -21,6 +21,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'X-Requested-With': 'XMLHttpRequest', // Helps with CORS in some servers
+    'Origin': window.location.origin // Include origin explicitly
   },
 });
 
@@ -30,9 +31,14 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     // First try the direct API call
     try {
-      // The URL should use /auth/google/callback not /auth/callback
+      // Use the correct endpoint path
       const response = await api.get<AuthResponse>('/auth/google/callback', {
         params: { code },
+        headers: {
+          // Add special headers to help with CORS
+          'Origin': window.location.origin,
+          'Referer': window.location.href
+        }
       });
       
       console.log('Auth response received:', response.status);
@@ -54,7 +60,8 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
+          'Origin': window.location.origin
         }
       });
       
@@ -63,29 +70,49 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
         return data;
       }
       
-      // If fetch also fails, try no-cors mode
-      console.log('Trying no-cors mode as last resort');
-      await fetch(`${API_BASE_URL}/auth/google/callback?code=${code}`, {
-        method: 'GET',
-        credentials: 'include',
-        mode: 'no-cors'
+      // If fetch also fails, try JSONP approach (most reliable for CORS issues)
+      console.log('Trying JSONP approach for maximum compatibility');
+      return new Promise<AuthResponse>((resolve, reject) => {
+        const callbackName = 'googleCallback_' + Math.random().toString(36).substring(2, 15);
+        
+        // Set up global callback function
+        window[callbackName] = (data: any) => {
+          console.log('JSONP callback received data:', data.token ? 'token present' : 'no token');
+          if (data.error) {
+            reject(new Error(data.error));
+          } else {
+            resolve(data);
+          }
+          
+          // Clean up
+          document.body.removeChild(script);
+          delete window[callbackName];
+        };
+        
+        // Create script element
+        const script = document.createElement('script');
+        script.src = `${API_BASE_URL}/auth/google/callback/jsonp?code=${code}&callback=${callbackName}`;
+        
+        // Handle errors
+        script.onerror = () => {
+          console.error('JSONP script failed to load');
+          document.body.removeChild(script);
+          delete window[callbackName];
+          reject(new Error('JSONP request failed'));
+        };
+        
+        // Add script to page
+        document.body.appendChild(script);
+        
+        // Set timeout to clean up if no response
+        setTimeout(() => {
+          if (document.body.contains(script)) {
+            document.body.removeChild(script);
+            delete window[callbackName];
+            reject(new Error('JSONP request timed out'));
+          }
+        }, 30000);
       });
-      
-      // We can't read the response in no-cors mode, so we'll try to check auth status separately
-      try {
-        const meResponse = await api.get('/auth/me');
-        if (meResponse.data) {
-          return { 
-            token: meResponse.data.token || 'placeholder-token',
-            user: meResponse.data.user || { id: 'unknown', email: 'unknown' }
-          };
-        }
-      } catch (meError) {
-        console.error('Failed to verify auth via /me endpoint:', meError);
-      }
-      
-      // Re-throw the original error if all fallbacks fail
-      throw apiError;
     }
   } catch (error) {
     if (axios.isAxiosError(error)) {

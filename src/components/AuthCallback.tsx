@@ -54,34 +54,64 @@ const AuthCallback = () => {
         }
 
         // Try to get token from server
-        const response = await handleGoogleCallback(code) as AuthResponse;
-        
-        if (response?.token) {
-          console.log('Successfully received auth token');
+        try {
+          console.log('Attempting to get token using handleGoogleCallback');
+          const response = await handleGoogleCallback(code) as AuthResponse;
           
-          try {
-            // Try to login with the token
-            await login(response.token);
+          if (response?.token) {
+            console.log('Successfully received auth token');
             
-            // Redirect to scanning page on success
-            if (isMounted) {
-              navigate('/scanning');
+            try {
+              // Try to login with the token
+              await login(response.token);
+              
+              // Redirect to scanning page on success
+              if (isMounted) {
+                navigate('/scanning');
+              }
+            } catch (loginErr) {
+              console.error('Login error after successful token retrieval:', loginErr);
+              if (isMounted) {
+                setError('Error during login process. Please try again.');
+                setIsProcessing(false);
+                const timeoutId = setTimeout(() => navigate('/login'), 3000);
+                timeoutIds.push(timeoutId);
+              }
             }
-          } catch (loginErr) {
-            console.error('Login error after successful token retrieval:', loginErr);
+          } else {
+            console.error('Invalid response from server:', response);
             if (isMounted) {
-              setError('Error during login process. Please try again.');
+              setError('Invalid server response. No auth token received.');
               setIsProcessing(false);
               const timeoutId = setTimeout(() => navigate('/login'), 3000);
               timeoutIds.push(timeoutId);
             }
           }
-        } else {
-          console.error('Invalid response from server:', response);
+        } catch (error: any) {
+          console.error('Auth callback error:', error);
+          
+          let errorMessage = 'Authentication failed';
+          
+          // Handle specific error types
+          if (axios.isAxiosError(error)) {
+            const axiosError = error as AxiosError;
+            if (axiosError.response?.status === 500) {
+              errorMessage = 'Server error. Please try again later.';
+            } else if (axiosError.response?.status === 400) {
+              errorMessage = 'Invalid request. Please try again.';
+            } else if (axiosError.code === 'ERR_NETWORK') {
+              errorMessage = 'Network error. Please check your connection.';
+            } else if (axiosError.message.includes('blocked by CORS')) {
+              errorMessage = 'Cross-Origin error. Please try again or contact support.';
+            }
+          } else if (error.message?.includes('Content Security Policy')) {
+            errorMessage = 'Security policy error. Please try again or contact support.';
+          }
+          
           if (isMounted) {
-            setError('Invalid server response. No auth token received.');
+            setError(errorMessage);
             setIsProcessing(false);
-            const timeoutId = setTimeout(() => navigate('/login'), 3000);
+            const timeoutId = setTimeout(() => navigate('/login'), 5000);
             timeoutIds.push(timeoutId);
           }
         }
