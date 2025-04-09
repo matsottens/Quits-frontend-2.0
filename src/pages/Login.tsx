@@ -47,17 +47,21 @@ const Login = () => {
         scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
         response_type: 'code',
         access_type: 'offline',
-        prompt: 'consent'
+        prompt: 'consent',
+        include_granted_scopes: 'true' // Request all previously granted scopes
       });
       
       const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
       console.log('Redirecting to Google OAuth URL:', url);
       
+      // Add a timestamp to the localStorage to track when the OAuth flow was initiated
+      localStorage.setItem('google_auth_started', Date.now().toString());
+      
       // Redirect to Google sign-in
       window.location.href = url;
     } catch (error) {
       console.error('Google login error:', error);
-      setError('Failed to initiate Google login');
+      setError('Failed to initiate Google login. Please try again.');
       setIsLoading(false);
     }
   };

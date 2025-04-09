@@ -34,7 +34,7 @@ const AuthCallback = () => {
           return;
         }
         
-        // Make direct call to the production API
+        // Make direct call to the production API with improved error handling
         console.log('Making direct API call to production endpoint');
         const apiUrl = 'https://api.quits.cc/auth/google/callback';
         const fullUrl = `${apiUrl}?code=${code}`;
@@ -47,7 +47,8 @@ const AuthCallback = () => {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
-          }
+          },
+          timeout: 30000 // increased timeout to 30 seconds
         });
         
         console.log('Auth response:', response.data);
@@ -62,9 +63,49 @@ const AuthCallback = () => {
           setTimeout(() => navigate('/login'), 3000);
         }
       } catch (err) {
-        // Handle the error
+        // Enhanced error handling
         console.error('Auth callback error:', err);
-        setError(`Authentication failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        let errorMessage = 'Authentication failed';
+        
+        if (axios.isAxiosError(err)) {
+          if (err.code === 'ECONNABORTED') {
+            errorMessage = 'Connection timed out. Please try again.';
+          } else if (err.code === 'ERR_NETWORK') {
+            // If there's a network error, try an alternative approach with fetch
+            try {
+              console.log('Trying alternative approach with fetch API');
+              const apiUrl = 'https://api.quits.cc/auth/google/callback';
+              const fullUrl = `${apiUrl}?code=${urlParams.get('code')}`;
+              
+              const fetchResponse = await fetch(fullUrl, {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                }
+              });
+              
+              if (fetchResponse.ok) {
+                const data = await fetchResponse.json();
+                if (data?.token) {
+                  await login(data.token);
+                  navigate('/dashboard');
+                  return;
+                }
+              }
+              
+              errorMessage = 'Network error. Please check your internet connection.';
+            } catch (fetchErr) {
+              console.error('Fetch fallback also failed:', fetchErr);
+              errorMessage = 'Network error. Please check your internet connection and try again.';
+            }
+          } else if (err.response) {
+            errorMessage = `Server error: ${err.response.status} - ${err.response.statusText || 'Unknown error'}`;
+          }
+        }
+        
+        setError(`${errorMessage}`);
         
         // Always redirect to login after error
         setTimeout(() => navigate('/login'), 5000);
