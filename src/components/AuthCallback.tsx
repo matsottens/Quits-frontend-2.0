@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { handleGoogleCallback } from '../api';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 interface AuthResponse {
   token: string;
@@ -92,7 +92,7 @@ const AuthCallback = () => {
         
         // Handle specific error types
         if (axios.isAxiosError(error)) {
-          const axiosError = error as axios.AxiosError;
+          const axiosError = error as AxiosError;
           if (axiosError.response?.status === 500) {
             errorMessage = 'Server error. Please try again later.';
           } else if (axiosError.response?.status === 400) {
