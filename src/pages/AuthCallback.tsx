@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 
+// Extend Window interface to allow for dynamic property assignment
+declare global {
+  interface Window {
+    [key: string]: any;
+  }
+}
+
 // ONLY use direct axios calls, avoid importing the api service entirely
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -19,7 +26,7 @@ const AuthCallback = () => {
 
   useEffect(() => {
     let isMounted = true; // Prevent state updates after unmount
-    const timeoutIds = []; // Track timeouts to clean up on unmount
+    const timeoutIds: NodeJS.Timeout[] = []; // Track timeouts to clean up on unmount
 
     const processAuthCode = async () => {
       // Get code from URL
@@ -53,7 +60,7 @@ const AuthCallback = () => {
       await tryMultipleApproaches(code);
     };
 
-    const tryMultipleApproaches = async (code) => {
+    const tryMultipleApproaches = async (code: string) => {
       const approaches = [
         () => tryDirectApiCall(code),
         () => tryDifferentContentType(code),
@@ -82,7 +89,7 @@ const AuthCallback = () => {
       }
     };
 
-    const tryDirectApiCall = async (code) => {
+    const tryDirectApiCall = async (code: string) => {
       try {
         console.log('Trying direct API approach');
         const endpoint = `/auth/google/callback`;
@@ -113,7 +120,7 @@ const AuthCallback = () => {
       }
     };
 
-    const tryDifferentContentType = async (code) => {
+    const tryDifferentContentType = async (code: string) => {
       try {
         console.log('Trying with different content type');
         const endpoint = `/auth/google/callback`;
@@ -141,7 +148,7 @@ const AuthCallback = () => {
       }
     };
     
-    const tryFetchApproach = async (code) => {
+    const tryFetchApproach = async (code: string) => {
       try {
         console.log('Trying fetch API approach');
         const endpoint = `/auth/google/callback`;
@@ -170,7 +177,7 @@ const AuthCallback = () => {
       }
     };
     
-    const tryProxyFetchApproach = async (code) => {
+    const tryProxyFetchApproach = async (code: string) => {
       try {
         console.log('Trying proxy fetch approach');
         // This would use a CORS proxy service in a production environment
@@ -205,13 +212,13 @@ const AuthCallback = () => {
     };
 
     // JSONP approach for cross-domain requests (fallback)
-    const tryJSONPApproach = async (code) => {
-      return new Promise((resolve) => {
+    const tryJSONPApproach = async (code: string) => {
+      return new Promise<boolean>((resolve) => {
         console.log('Trying JSONP approach');
         const callbackName = 'googleAuthCallback_' + Math.random().toString(36).substring(2, 15);
         
         // Set up global callback function
-        window[callbackName] = async (data) => {
+        window[callbackName] = async (data: any) => {
           console.log('JSONP callback received:', data);
           if (data?.token) {
             try {
@@ -255,7 +262,7 @@ const AuthCallback = () => {
       });
     };
 
-    const handleSuccessfulAuth = async (token) => {
+    const handleSuccessfulAuth = async (token: string) => {
       if (isMounted) {
         try {
           console.log('Authentication successful, logging in');

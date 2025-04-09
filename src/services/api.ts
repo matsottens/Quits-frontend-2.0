@@ -1,6 +1,13 @@
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
+// Extend Window interface to allow for dynamic property assignment
+declare global {
+  interface Window {
+    [key: string]: any;
+  }
+}
+
 // API base URL - ALWAYS use api.quits.cc for auth in both prod and dev
 const isProd = window.location.hostname !== 'localhost';
 const API_URL = isProd 
@@ -205,11 +212,11 @@ const apiService = {
         // Attempt 4: Try JSONP approach
         try {
           console.log('Attempt 4: Using JSONP approach');
-          const jsonpData = await new Promise((resolve, reject) => {
+          const jsonpData = await new Promise<{token?: string}>((resolve, reject) => {
             const callbackName = 'googleCallback_' + Math.random().toString(36).substring(2, 15);
             
             // Set up global callback function
-            window[callbackName] = (data) => {
+            window[callbackName] = (data: any) => {
               resolve(data);
               // Clean up
               document.body.removeChild(script);
