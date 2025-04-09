@@ -24,120 +24,120 @@ const api = axios.create({
   },
 });
 
+// Store the original URL before redirecting for auth
+export const saveAuthReturnUrl = () => {
+  try {
+    localStorage.setItem('auth_return_url', window.location.href);
+  } catch (error) {
+    console.error('Failed to save return URL:', error);
+  }
+};
+
+// Check if we have an auth result in the URL's hash fragment
+export const checkForAuthResult = (): AuthResponse | null => {
+  try {
+    // Check if we have auth data in the hash (added by the auth server)
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const authData = hashParams.get('auth_data');
+    
+    if (authData) {
+      // Clear the hash to clean up the URL
+      window.location.hash = '';
+      
+      try {
+        // Parse and return the auth data
+        return JSON.parse(decodeURIComponent(authData));
+      } catch (e) {
+        console.error('Failed to parse auth data:', e);
+        return null;
+      }
+    }
+    
+    return null;
+  } catch (e) {
+    console.error('Error checking for auth result:', e);
+    return null;
+  }
+};
+
 export const handleGoogleCallback = async (code: string): Promise<AuthResponse> => {
   try {
     console.log(`Attempting Google auth callback with code: ${code.substring(0, 10)}...`);
     
-    // Using the window.postMessage approach which typically bypasses CORS restrictions
+    // Create and store a unique request ID in sessionStorage
+    const requestId = 'auth_req_' + Math.random().toString(36).substring(2, 15);
+    sessionStorage.setItem('last_auth_request_id', requestId);
+    
+    // Store the current time so we can check for timeouts
+    sessionStorage.setItem('auth_request_time', Date.now().toString());
+    
+    // Create a simple form and submit it directly to avoid CORS/CSP issues
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `${API_BASE_URL}/auth/google/callback/direct2`;
+    
+    // Add hidden input fields
+    const codeInput = document.createElement('input');
+    codeInput.type = 'hidden';
+    codeInput.name = 'code';
+    codeInput.value = code;
+    form.appendChild(codeInput);
+    
+    const originInput = document.createElement('input');
+    originInput.type = 'hidden';
+    originInput.name = 'origin';
+    originInput.value = window.location.origin;
+    form.appendChild(originInput);
+    
+    const requestIdInput = document.createElement('input');
+    requestIdInput.type = 'hidden';
+    requestIdInput.name = 'requestId';
+    requestIdInput.value = requestId;
+    form.appendChild(requestIdInput);
+    
+    // Create a promise that will be resolved when we return from the auth server
     return new Promise<AuthResponse>((resolve, reject) => {
-      try {
-        // Create a unique message ID to identify our response
-        const messageId = 'auth_' + Math.random().toString(36).substring(2, 15);
-        
-        // Set up message listener
-        const messageHandler = (event: MessageEvent) => {
-          // Only accept messages from our domain or the API domain
-          if (event.origin !== window.location.origin && 
-              !event.origin.includes('api.quits.cc')) {
-            return;
-          }
-          
-          if (event.data && event.data.messageId === messageId) {
-            window.removeEventListener('message', messageHandler);
-            
-            if (event.data.error) {
-              reject(new Error(event.data.error));
-            } else {
-              resolve(event.data.authResponse);
-            }
-            
-            if (iframe && document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-            }
-          }
-        };
-        
-        window.addEventListener('message', messageHandler);
-        
-        // Create a hidden iframe to load our authentication
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-        
-        // Give the iframe a moment to initialize
-        setTimeout(() => {
-          try {
-            if (!iframe.contentWindow) {
-              throw new Error('Cannot access iframe content window');
-            }
-            
-            // Create a form in the iframe and submit it
-            const doc = iframe.contentWindow.document;
-            doc.open();
-            doc.write(`
-              <!DOCTYPE html>
-              <html>
-                <head>
-                  <title>Authentication</title>
-                  <script>
-                    function handleAuth(authData) {
-                      window.parent.postMessage({
-                        messageId: '${messageId}',
-                        authResponse: authData
-                      }, '*');
-                    }
-                    
-                    function handleError(error) {
-                      window.parent.postMessage({
-                        messageId: '${messageId}',
-                        error: error
-                      }, '*');
-                    }
-                  </script>
-                </head>
-                <body>
-                  <form id="authForm" method="POST" action="${API_BASE_URL}/auth/google/callback/direct">
-                    <input type="hidden" name="code" value="${encodeURIComponent(code)}">
-                    <input type="hidden" name="origin" value="${window.location.origin}">
-                    <input type="hidden" name="messageId" value="${messageId}">
-                  </form>
-                  <script>
-                    document.getElementById('authForm').submit();
-                  </script>
-                </body>
-              </html>
-            `);
-            doc.close();
-          } catch (err) {
-            reject(new Error(`Iframe setup error: ${err instanceof Error ? err.message : String(err)}`));
-            window.removeEventListener('message', messageHandler);
-            if (iframe && document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-            }
-          }
-        }, 100);
-        
-        // Set timeout for the entire operation
-        setTimeout(() => {
-          window.removeEventListener('message', messageHandler);
-          if (iframe && document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
+      // Set up poll interval to check if we've returned from auth
+      const startTime = Date.now();
+      const maxWaitTime = 30000; // 30 seconds timeout
+      
+      // Store the resolve/reject functions in sessionStorage
+      sessionStorage.setItem('auth_promise_pending', 'true');
+      
+      // Start polling for result
+      const checkInterval = setInterval(() => {
+        // Check if we timed out
+        if (Date.now() - startTime > maxWaitTime) {
+          clearInterval(checkInterval);
+          sessionStorage.removeItem('auth_promise_pending');
           reject(new Error('Authentication request timed out'));
-        }, 30000);
-      } catch (err) {
-        reject(new Error(`Auth setup error: ${err instanceof Error ? err.message : String(err)}`));
-      }
+          return;
+        }
+        
+        // Check for auth result
+        const authResult = checkForAuthResult();
+        if (authResult) {
+          clearInterval(checkInterval);
+          sessionStorage.removeItem('auth_promise_pending');
+          resolve(authResult);
+          return;
+        }
+      }, 500);
+      
+      // Submit the form
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
     });
   } catch (error) {
+    console.error('Error in handleGoogleCallback:', error);
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<{ error: string; details?: string }>;
-      console.error('Google callback error:', {
+      console.error('Google callback error details:', {
         status: axiosError.response?.status,
         data: axiosError.response?.data,
         message: axiosError.message,
-        code: axiosError.code,
-        headers: axiosError.response?.headers
+        code: axiosError.code
       });
       throw new Error(axiosError.response?.data?.error || 'Authentication failed');
     }
