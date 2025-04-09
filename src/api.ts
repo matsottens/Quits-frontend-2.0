@@ -10,8 +10,11 @@ interface AuthResponse {
   };
 }
 
+// Always use api.quits.cc for auth operations, regardless of environment
+const API_BASE_URL = 'https://api.quits.cc';
+
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -20,7 +23,8 @@ const api = axios.create({
 
 export const handleGoogleCallback = async (code: string): Promise<AuthResponse> => {
   try {
-    const response = await api.get<AuthResponse>('/auth/callback', {
+    // The URL should use /auth/google/callback not /auth/callback
+    const response = await api.get<AuthResponse>('/auth/google/callback', {
       params: { code },
     });
     
