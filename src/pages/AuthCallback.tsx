@@ -1,28 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../services/api';
 import axios from 'axios';
 
-// Create a standalone authApi instance for fallback with correct URL structure
-const authApi = axios.create({
-  baseURL: 'https://api.quits.cc',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Add interceptor to fix any incorrect paths
-authApi.interceptors.request.use(config => {
-  // Remove /api prefix if present - the authApi URL is already correct
-  if (config.url?.startsWith('/api/')) {
-    config.url = config.url.replace('/api/', '/');
-    console.log(`Fixed URL path in AuthCallback, now requesting: ${config.baseURL}${config.url}`);
-  }
-  return config;
-});
-
+// ONLY use direct axios calls, avoid importing the api service entirely
 const AuthCallback = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -30,70 +11,68 @@ const AuthCallback = () => {
   const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
-    const handleCallback = async () => {
+    // Define the function inside the effect to avoid any closure issues
+    const handleOAuthCallback = async () => {
       try {
+        // Get code from URL
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
-        const errorParam = urlParams.get('error');
         
-        // Enhanced debugging information
-        const debugDetails = {
+        // Log debug info
+        const debugObj = {
+          url: window.location.href,
+          code: code ? `${code.substring(0, 15)}...` : 'none',
           hostname: window.location.hostname,
-          origin: window.location.origin,
-          code: code ? `${code.substring(0, 10)}...` : 'none',
-          errorParam,
-          isProd: window.location.hostname !== 'localhost',
+          time: new Date().toISOString()
         };
-        
-        setDebugInfo(JSON.stringify(debugDetails, null, 2));
-        console.log('Auth callback details:', debugDetails);
-        
-        if (errorParam) {
-          console.error('Error in callback URL:', errorParam);
-          setError(`Authentication error: ${errorParam}`);
-          setTimeout(() => navigate('/login'), 3000);
-          return;
-        }
+        console.log('Auth callback debug:', debugObj);
+        setDebugInfo(JSON.stringify(debugObj, null, 2));
         
         if (!code) {
-          console.error('No authorization code found in callback URL');
-          setError('Missing authorization code');
+          setError('No authorization code found');
           setTimeout(() => navigate('/login'), 3000);
           return;
         }
-
-        // Skip the api service and make direct call to the correct endpoint
-        console.log('Making direct API call to the auth endpoint');
-        const endpoint = `/auth/google/callback?code=${code}`;
-        console.log(`Requesting: https://api.quits.cc${endpoint}`);
         
-        try {
-          const response = await authApi.get(endpoint);
-          
-          if (response.data?.token) {
-            console.log('Authentication succeeded, logging in...');
-            await login(response.data.token);
-            navigate('/dashboard');
-            return;
-          } else {
-            console.error('No token received in response:', response.data);
-            setError('Authentication failed: No token received');
-            setTimeout(() => navigate('/login'), 3000);
+        // Make direct call to the production API
+        console.log('Making direct API call to production endpoint');
+        const apiUrl = 'https://api.quits.cc/auth/google/callback';
+        const fullUrl = `${apiUrl}?code=${code}`;
+        console.log('Requesting:', fullUrl);
+        
+        const response = await axios({
+          method: 'GET',
+          url: fullUrl,
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           }
-        } catch (apiError) {
-          console.error('Auth API call failed:', apiError);
-          setError(`Authentication failed: ${apiError instanceof Error ? apiError.message : 'API error'}`);
-          setTimeout(() => navigate('/login'), 5000);
+        });
+        
+        console.log('Auth response:', response.data);
+        
+        if (response.data?.token) {
+          // Success! Log the user in
+          await login(response.data.token);
+          navigate('/dashboard');
+        } else {
+          console.error('No token in response:', response.data);
+          setError('Authentication failed: No token received');
+          setTimeout(() => navigate('/login'), 3000);
         }
-      } catch (error: unknown) {
-        console.error('Auth callback error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setError(`Authentication failed: ${errorMessage}`);
+      } catch (err) {
+        // Handle the error
+        console.error('Auth callback error:', err);
+        setError(`Authentication failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        
+        // Always redirect to login after error
         setTimeout(() => navigate('/login'), 5000);
       }
     };
 
-    handleCallback();
+    // Call the function
+    handleOAuthCallback();
   }, [navigate, login]);
 
   return (
@@ -107,9 +86,9 @@ const AuthCallback = () => {
         <p className="mt-4 text-gray-600">
           {error ? 'Redirecting to login...' : 'Completing authentication...'}
         </p>
-        {(error || debugInfo) && (
+        {debugInfo && (
           <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left overflow-auto max-h-48">
-            <pre>{debugInfo || ''}</pre>
+            <pre>{debugInfo}</pre>
           </div>
         )}
       </div>

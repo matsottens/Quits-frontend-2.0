@@ -48,18 +48,34 @@ const SignUp = () => {
     }
   };
 
-  const handleGoogleSignUp = async () => {
+  const handleGoogleSignup = async () => {
     try {
-      setError(null);
       setIsLoading(true);
-      const { url } = await api.auth.getGoogleAuthUrl();
-      if (url) {
-        window.location.href = url;
-      } else {
-        throw new Error('No redirect URL received');
-      }
-    } catch (err) {
-      setError('Failed to initialize Google sign up. Please try again.');
+      
+      // Don't use the API service, construct the URL directly
+      const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      const isProd = window.location.hostname !== 'localhost';
+      const REDIRECT_URI = isProd 
+        ? 'https://quits.cc/auth/callback'
+        : `${window.location.origin}/auth/callback`;
+      
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
+        response_type: 'code',
+        access_type: 'offline',
+        prompt: 'consent'
+      });
+      
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      console.log('Redirecting to Google OAuth URL:', url);
+      
+      // Redirect to Google sign-in
+      window.location.href = url;
+    } catch (error) {
+      console.error('Google signup error:', error);
+      setError('Failed to initiate Google signup');
       setIsLoading(false);
     }
   };
@@ -195,7 +211,7 @@ const SignUp = () => {
 
               <div className="mt-6">
                 <button
-                  onClick={handleGoogleSignUp}
+                  onClick={handleGoogleSignup}
                   disabled={isLoading}
                   className="w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A] transition-colors duration-200"
                 >

@@ -32,16 +32,32 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      setError(null);
       setIsLoading(true);
-      const { url } = await api.auth.getGoogleAuthUrl();
-      if (url) {
-        window.location.href = url;
-      } else {
-        throw new Error('No redirect URL received');
-      }
-    } catch (err) {
-      setError('Failed to initialize Google login. Please try again.');
+      
+      // Don't use the API service, construct the URL directly
+      const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      const isProd = window.location.hostname !== 'localhost';
+      const REDIRECT_URI = isProd 
+        ? 'https://quits.cc/auth/callback'
+        : `${window.location.origin}/auth/callback`;
+      
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
+        response_type: 'code',
+        access_type: 'offline',
+        prompt: 'consent'
+      });
+      
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      console.log('Redirecting to Google OAuth URL:', url);
+      
+      // Redirect to Google sign-in
+      window.location.href = url;
+    } catch (error) {
+      console.error('Google login error:', error);
+      setError('Failed to initiate Google login');
       setIsLoading(false);
     }
   };
