@@ -28,58 +28,105 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
   try {
     console.log(`Attempting Google auth callback with code: ${code.substring(0, 10)}...`);
     
-    // Use JSONP as the primary approach since it bypasses CORS
-    console.log('Using JSONP approach to bypass CORS issues');
+    // Using the window.postMessage approach which typically bypasses CORS restrictions
     return new Promise<AuthResponse>((resolve, reject) => {
       try {
-        // Generate a unique callback function name
-        const callbackName = 'googleCallback_' + Math.random().toString(36).substring(2, 15);
+        // Create a unique message ID to identify our response
+        const messageId = 'auth_' + Math.random().toString(36).substring(2, 15);
         
-        // Set up global callback function
-        window[callbackName] = (data: any) => {
-          console.log('JSONP callback received data:', data.token ? 'token present' : 'no token');
-          if (data.error) {
-            reject(new Error(data.error));
-          } else {
-            resolve(data);
+        // Set up message listener
+        const messageHandler = (event: MessageEvent) => {
+          // Only accept messages from our domain or the API domain
+          if (event.origin !== window.location.origin && 
+              !event.origin.includes('api.quits.cc')) {
+            return;
           }
           
-          // Clean up
-          if (document.body.contains(script)) {
-            document.body.removeChild(script);
+          if (event.data && event.data.messageId === messageId) {
+            window.removeEventListener('message', messageHandler);
+            
+            if (event.data.error) {
+              reject(new Error(event.data.error));
+            } else {
+              resolve(event.data.authResponse);
+            }
+            
+            if (iframe && document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
           }
-          delete window[callbackName];
         };
         
-        // Create script element
-        const script = document.createElement('script');
-        script.src = `${API_BASE_URL}/auth/google/callback/jsonp?code=${encodeURIComponent(code)}&callback=${callbackName}`;
+        window.addEventListener('message', messageHandler);
         
-        // Handle errors
-        script.onerror = (e) => {
-          console.error('JSONP script failed to load:', e);
-          if (document.body.contains(script)) {
-            document.body.removeChild(script);
-          }
-          delete window[callbackName];
-          reject(new Error('JSONP request failed'));
-        };
+        // Create a hidden iframe to load our authentication
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
         
-        console.log('Adding JSONP script to page:', script.src);
-        
-        // Add script to page
-        document.body.appendChild(script);
-        
-        // Set timeout to clean up if no response
+        // Give the iframe a moment to initialize
         setTimeout(() => {
-          if (document.body.contains(script)) {
-            document.body.removeChild(script);
-            delete window[callbackName];
-            reject(new Error('JSONP request timed out'));
+          try {
+            if (!iframe.contentWindow) {
+              throw new Error('Cannot access iframe content window');
+            }
+            
+            // Create a form in the iframe and submit it
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <title>Authentication</title>
+                  <script>
+                    function handleAuth(authData) {
+                      window.parent.postMessage({
+                        messageId: '${messageId}',
+                        authResponse: authData
+                      }, '*');
+                    }
+                    
+                    function handleError(error) {
+                      window.parent.postMessage({
+                        messageId: '${messageId}',
+                        error: error
+                      }, '*');
+                    }
+                  </script>
+                </head>
+                <body>
+                  <form id="authForm" method="POST" action="${API_BASE_URL}/auth/google/callback/direct">
+                    <input type="hidden" name="code" value="${encodeURIComponent(code)}">
+                    <input type="hidden" name="origin" value="${window.location.origin}">
+                    <input type="hidden" name="messageId" value="${messageId}">
+                  </form>
+                  <script>
+                    document.getElementById('authForm').submit();
+                  </script>
+                </body>
+              </html>
+            `);
+            doc.close();
+          } catch (err) {
+            reject(new Error(`Iframe setup error: ${err instanceof Error ? err.message : String(err)}`));
+            window.removeEventListener('message', messageHandler);
+            if (iframe && document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
           }
+        }, 100);
+        
+        // Set timeout for the entire operation
+        setTimeout(() => {
+          window.removeEventListener('message', messageHandler);
+          if (iframe && document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          reject(new Error('Authentication request timed out'));
         }, 30000);
       } catch (err) {
-        reject(new Error(`JSONP setup error: ${err instanceof Error ? err.message : String(err)}`));
+        reject(new Error(`Auth setup error: ${err instanceof Error ? err.message : String(err)}`));
       }
     });
   } catch (error) {
