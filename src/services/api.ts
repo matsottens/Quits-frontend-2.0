@@ -43,8 +43,39 @@ authApi.interceptors.request.use(config => {
 // Add response interceptor for better error handling
 authApi.interceptors.response.use(
   response => response,
-  error => {
+  async error => {
     console.error('Auth API error:', error);
+    
+    // If we get a network error on auth calls, try an alternative approach
+    if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
+      const originalRequest = error.config;
+      if (originalRequest && originalRequest.url) {
+        try {
+          console.log('Trying fetch fallback for auth request:', originalRequest.url);
+          
+          // Extract the full URL including any query parameters
+          const fullUrl = originalRequest.baseURL + originalRequest.url;
+          
+          // Attempt with fetch API as a fallback
+          const fetchResponse = await fetch(fullUrl, {
+            method: originalRequest.method?.toUpperCase() || 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (fetchResponse.ok) {
+            const data = await fetchResponse.json();
+            return { data, status: fetchResponse.status, headers: fetchResponse.headers };
+          }
+        } catch (fetchError) {
+          console.error('Fetch fallback also failed:', fetchError);
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -113,54 +144,118 @@ const apiService = {
       return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` };
     },
     
-    // Handle Google OAuth callback
+    // Handle Google OAuth callback with multiple fallback methods
     handleGoogleCallback: async (code: string) => {
-      try {
-        // Always use the correct path format with the auth API
-        const endpoint = `/auth/google/callback?code=${code}`;
-        console.log(`Sending callback request to: ${AUTH_API_URL}${endpoint}`);
-        
-        // Make direct request with axios to ensure correct URL
-        const response = await axios({
-          method: 'get',
-          url: `${AUTH_API_URL}${endpoint}`,
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          timeout: 30000 // 30-second timeout for callbacks
-        });
-        
-        console.log('Google auth callback response:', response.data);
-        return response.data;
-      } catch (error) {
-        console.error('Google callback error:', error);
-        
-        // Try alternative approach with fetch if axios fails
-        if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
-          try {
-            console.log('Trying alternative approach with fetch API');
-            const response = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${code}`, {
-              method: 'GET',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              }
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              return data;
-            }
-          } catch (fetchError) {
-            console.error('Fetch fallback also failed:', fetchError);
+      const tryApproaches = async () => {
+        // Attempt 1: Use authApi with normal content type
+        try {
+          console.log('Attempt 1: Using authApi with JSON content type');
+          const endpoint = `/auth/google/callback?code=${code}`;
+          const response = await authApi.get(endpoint);
+          if (response.data?.token) {
+            return response.data;
           }
+        } catch (err) {
+          console.error('Standard auth API approach failed:', err);
         }
         
-        throw error; // Rethrow the original error if fetch also fails
-      }
+        // Attempt 2: Try direct axios call
+        try {
+          console.log('Attempt 2: Using direct axios call');
+          const response = await axios({
+            method: 'get',
+            url: `${AUTH_API_URL}/auth/google/callback?code=${code}`,
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            timeout: 30000
+          });
+          
+          if (response.data?.token) {
+            return response.data;
+          }
+        } catch (err) {
+          console.error('Direct axios approach failed:', err);
+        }
+        
+        // Attempt 3: Try fetch API
+        try {
+          console.log('Attempt 3: Using fetch API');
+          const response = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${code}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data?.token) {
+              return data;
+            }
+          }
+        } catch (err) {
+          console.error('Fetch API approach failed:', err);
+        }
+        
+        // Attempt 4: Try JSONP approach
+        try {
+          console.log('Attempt 4: Using JSONP approach');
+          const jsonpData = await new Promise((resolve, reject) => {
+            const callbackName = 'googleCallback_' + Math.random().toString(36).substring(2, 15);
+            
+            // Set up global callback function
+            window[callbackName] = (data) => {
+              resolve(data);
+              // Clean up
+              document.body.removeChild(script);
+              delete window[callbackName];
+            };
+            
+            // Create script element
+            const script = document.createElement('script');
+            script.src = `${AUTH_API_URL}/auth/google/callback/jsonp?code=${code}&callback=${callbackName}`;
+            
+            // Handle errors
+            script.onerror = () => {
+              reject(new Error('JSONP script failed to load'));
+              document.body.removeChild(script);
+              delete window[callbackName];
+            };
+            
+            // Add timeout
+            const timeoutId = setTimeout(() => {
+              reject(new Error('JSONP request timed out'));
+              if (document.body.contains(script)) {
+                document.body.removeChild(script);
+                delete window[callbackName];
+              }
+            }, 10000);
+            
+            // Cleanup on success
+            script.onload = () => clearTimeout(timeoutId);
+            
+            // Add to document
+            document.body.appendChild(script);
+          });
+          
+          if (jsonpData && jsonpData.token) {
+            return jsonpData;
+          }
+        } catch (err) {
+          console.error('JSONP approach failed:', err);
+        }
+        
+        // If we got here, all attempts failed
+        throw new Error('All authentication approaches failed');
+      };
+      
+      // Try all approaches
+      return await tryApproaches();
     },
     
     // Get current user info
