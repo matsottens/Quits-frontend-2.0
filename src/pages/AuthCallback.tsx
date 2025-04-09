@@ -13,11 +13,11 @@ const AuthCallback = () => {
   useEffect(() => {
     // Define the function inside the effect to avoid any closure issues
     const handleOAuthCallback = async () => {
+      // Move urlParams here so it's accessible throughout the function
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      
       try {
-        // Get code from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        
         // Log debug info
         const debugObj = {
           url: window.location.href,
@@ -75,7 +75,7 @@ const AuthCallback = () => {
             try {
               console.log('Trying alternative approach with fetch API');
               const apiUrl = 'https://api.quits.cc/auth/google/callback';
-              const fullUrl = `${apiUrl}?code=${urlParams.get('code')}`;
+              const fullUrl = `${apiUrl}?code=${code}`; // Now code is accessible here
               
               const fetchResponse = await fetch(fullUrl, {
                 method: 'GET',
