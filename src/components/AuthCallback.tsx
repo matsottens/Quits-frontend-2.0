@@ -20,6 +20,7 @@ const AuthCallback = () => {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     const timeoutIds: NodeJS.Timeout[] = [];
@@ -39,7 +40,10 @@ const AuthCallback = () => {
           timestamp: new Date().toISOString()
         };
         
-        if (isMounted) setDebugInfo(JSON.stringify(debugObj, null, 2));
+        if (isMounted) {
+          setDebugInfo(JSON.stringify(debugObj, null, 2));
+          setProgress(10);
+        }
         console.log('Auth callback debug:', debugObj);
         
         if (!code) {
@@ -53,10 +57,20 @@ const AuthCallback = () => {
           return;
         }
 
+        // Update progress
+        if (isMounted) setProgress(25);
+
         // Try to get token from server
         try {
           console.log('Attempting to get token using handleGoogleCallback');
+          
+          // Update progress
+          if (isMounted) setProgress(50);
+          
           const response = await handleGoogleCallback(code) as AuthResponse;
+          
+          // Update progress
+          if (isMounted) setProgress(75);
           
           if (response?.token) {
             console.log('Successfully received auth token');
@@ -65,9 +79,13 @@ const AuthCallback = () => {
               // Try to login with the token
               await login(response.token);
               
+              // Update progress
+              if (isMounted) setProgress(100);
+              
               // Redirect to scanning page on success
               if (isMounted) {
-                navigate('/scanning');
+                // Short delay to show completion
+                setTimeout(() => navigate('/scanning'), 500);
               }
             } catch (loginErr) {
               console.error('Login error after successful token retrieval:', loginErr);
@@ -106,6 +124,12 @@ const AuthCallback = () => {
             }
           } else if (error.message?.includes('Content Security Policy')) {
             errorMessage = 'Security policy error. Please try again or contact support.';
+          } else if (error.message?.includes('JSONP')) {
+            errorMessage = 'JSONP error occurred. Please try again or contact support.';
+          } else if (error.message?.includes('timed out')) {
+            errorMessage = 'Authentication request timed out. Please try again or contact support.';
+          } else if (error.message?.includes('Failed to fetch')) {
+            errorMessage = 'Network error or CORS issue. Please try again or contact support.';
           }
           
           if (isMounted) {
@@ -163,6 +187,14 @@ const AuthCallback = () => {
           <>
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mx-auto mb-4"></div>
             <h1 className="text-xl font-bold text-gray-800 mb-2">Completing Authentication</h1>
+            
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4 mb-6">
+              <div 
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
           </>
         )}
         <p className="mt-4 text-gray-600">
