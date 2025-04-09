@@ -33,11 +33,9 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     // Make a direct fetch request to the server endpoint
     console.log('Making direct fetch request to auth endpoint');
     
-    // Always use the authorized redirect URI in the body
-    // This should match exactly what's registered in Google Console
-    const redirectUri = window.location.origin.includes('www.') 
-      ? window.location.origin.replace('www.', '') + '/auth/callback'
-      : window.location.origin + '/auth/callback';
+    // ALWAYS use https://quits.cc/auth/callback as the redirect URI
+    // This must match exactly what's registered in Google Console
+    const redirectUri = 'https://quits.cc/auth/callback';
     
     console.log('Using redirect URI for token exchange:', redirectUri);
     
