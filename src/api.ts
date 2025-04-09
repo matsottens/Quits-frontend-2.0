@@ -36,6 +36,7 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
       },
       credentials: 'include', // Important to include cookies
       body: new URLSearchParams({
