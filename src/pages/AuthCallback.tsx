@@ -4,6 +4,15 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import axios from 'axios';
 
+// Create a standalone authApi instance for fallback
+const authApi = axios.create({
+  baseURL: 'https://api.quits.cc',
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
 const AuthCallback = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -67,14 +76,20 @@ const AuthCallback = () => {
           const code = urlParams.get('code');
           if (code) {
             console.log('Attempting direct API call as fallback...');
-            const response = await axios.get(`https://api.quits.cc/auth/google/callback?code=${code}`, {
-              withCredentials: true
-            });
+            
+            const endpoint = `/auth/google/callback?code=${code}`;
+            console.log(`Making fallback request to: https://api.quits.cc${endpoint}`);
+            
+            // Use the standalone authApi
+            const response = await authApi.get(endpoint);
+            
             if (response.data?.token) {
               console.log('Fallback succeeded, logging in...');
               await login(response.data.token);
               navigate('/dashboard');
               return;
+            } else {
+              console.error('Fallback API call returned no token:', response.data);
             }
           }
         } catch (fallbackError) {

@@ -1,13 +1,17 @@
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
-// API base URL
+// API base URL - ALWAYS use api.quits.cc for auth in both prod and dev
 const isProd = window.location.hostname !== 'localhost';
 const API_URL = isProd 
   ? 'https://api.quits.cc' 
   : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
 
+// Auth-specific API URL (always use production)
+const AUTH_API_URL = 'https://api.quits.cc';
+
 console.log(`Using API URL: ${API_URL} in ${isProd ? 'production' : 'development'} mode`);
+console.log(`Using AUTH_API_URL: ${AUTH_API_URL} for all auth operations`);
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -16,6 +20,22 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Missing Supabase environment variables');
 }
 
+// Create a separate axios instance for auth that always uses the production API
+const authApi = axios.create({
+  baseURL: AUTH_API_URL,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Add debugging for auth API
+authApi.interceptors.request.use(config => {
+  console.log(`Auth API request to: ${config.baseURL}${config.url}`);
+  return config;
+});
+
+// Regular API for non-auth endpoints
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
@@ -74,18 +94,11 @@ const apiService = {
     // Handle Google OAuth callback
     handleGoogleCallback: async (code: string) => {
       try {
-        // Always use the production API for auth callbacks
+        // Always use the auth API instance
         const endpoint = `/auth/google/callback?code=${code}`;
-        const apiUrl = 'https://api.quits.cc';
-        console.log(`Sending callback request to: ${apiUrl}${endpoint}`);
+        console.log(`Sending callback request to: ${AUTH_API_URL}${endpoint}`);
         
-        // Use direct axios call to ensure we're using the production API
-        const response = await axios.get(`${apiUrl}${endpoint}`, {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await authApi.get(endpoint);
         return response.data;
       } catch (error) {
         console.error('Google callback error:', error);
@@ -95,13 +108,15 @@ const apiService = {
     
     // Get current user info
     getMe: async () => {
-      const response = await api.get('/auth/me');
+      console.log(`Getting user info`);
+      const response = await authApi.get('/auth/me');
       return response.data;
     },
     
     // Logout the user
     logout: async () => {
-      const response = await api.post('/auth/logout');
+      console.log(`Logging out`);
+      const response = await authApi.post('/auth/logout');
       return response.data;
     },
     
