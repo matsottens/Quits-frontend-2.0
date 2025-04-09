@@ -30,8 +30,9 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
   try {
     console.log(`Attempting Google auth callback with code: ${code.substring(0, 10)}...`);
     
-    // Make a direct fetch request to the server endpoint
-    console.log('Making direct fetch request to auth endpoint');
+    // Use the local proxy to avoid CORS issues
+    // The proxy will forward the request to the API server
+    console.log('Making direct fetch request to auth endpoint via proxy');
     
     // ALWAYS use https://quits.cc/auth/callback as the redirect URI
     // This must match exactly what's registered in Google Console
@@ -39,7 +40,9 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     console.log('Using redirect URI for token exchange:', redirectUri);
     
-    const response = await fetch(`${API_BASE_URL}/api/auth/google/callback/direct2`, {
+    // Use the local proxy URL instead of the API URL directly
+    // This avoids CORS issues because the request stays on the same origin
+    const response = await fetch(`/auth/google/callback/direct2`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
