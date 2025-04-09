@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 // Extend Window interface to allow for dynamic property assignment
 declare global {
@@ -85,7 +85,7 @@ const AuthCallback = () => {
           const success = await approach();
           if (success) return; // Stop if we succeed
         } catch (err) {
-          console.error('Approach failed, trying next one:', err);
+          console.error('Approach failed, trying next one:', err instanceof Error ? err.message : String(err));
           // Continue to next approach
         }
       }
@@ -142,7 +142,7 @@ const AuthCallback = () => {
               return true;
             }
           } catch (verifyErr) {
-            console.error('Failed to verify auth status:', verifyErr);
+            console.error('Failed to verify auth status:', verifyErr instanceof Error ? verifyErr.message : String(verifyErr));
           }
           
           // If we couldn't verify but the original request was successful,
@@ -155,7 +155,11 @@ const AuthCallback = () => {
         return false;
       } catch (err) {
         console.error('Direct API approach failed:', err);
-        console.error('Error details:', err.response?.data || err.message || err);
+        if (axios.isAxiosError(err)) {
+          console.error('Error details:', err.response?.data || err.message || String(err));
+        } else {
+          console.error('Error details:', err instanceof Error ? err.message : String(err));
+        }
         return false;
       }
     };
@@ -183,7 +187,7 @@ const AuthCallback = () => {
         }
         return false;
       } catch (err) {
-        console.error('Different content type approach failed:', err);
+        console.error('Different content type approach failed:', err instanceof Error ? err.message : String(err));
         return false;
       }
     };
@@ -212,7 +216,7 @@ const AuthCallback = () => {
         }
         return false;
       } catch (err) {
-        console.error('Fetch approach failed:', err);
+        console.error('Fetch approach failed:', err instanceof Error ? err.message : String(err));
         return false;
       }
     };
@@ -246,7 +250,7 @@ const AuthCallback = () => {
         }
         return false;
       } catch (err) {
-        console.error('Proxy fetch approach failed:', err);
+        console.error('Proxy fetch approach failed:', err instanceof Error ? err.message : String(err));
         return false;
       }
     };
@@ -275,11 +279,11 @@ const AuthCallback = () => {
             }
             resolve(true);
           }).catch(err => {
-            console.error('No-cors fetch fallback failed:', err);
+            console.error('No-cors fetch fallback failed:', err instanceof Error ? err.message : String(err));
             resolve(false);
           });
         } catch (err) {
-          console.error('Error setting up no-cors fetch:', err);
+          console.error('Error setting up no-cors fetch:', err instanceof Error ? err.message : String(err));
           resolve(false);
         }
       });
@@ -292,7 +296,7 @@ const AuthCallback = () => {
           await login(token);
           navigate('/scanning');
         } catch (err) {
-          console.error('Error during login after successful auth:', err);
+          console.error('Error during login after successful auth:', err instanceof Error ? err.message : String(err));
           setError('Error during login process. Please try again.');
           setIsProcessing(false);
           const timeoutId = setTimeout(() => navigate('/login'), 3000);
