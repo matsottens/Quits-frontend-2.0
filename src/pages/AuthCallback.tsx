@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import axios from 'axios';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -16,8 +17,8 @@ const AuthCallback = () => {
         const code = urlParams.get('code');
         const errorParam = urlParams.get('error');
         
-        // Log debugging information
-        setDebugInfo(`Using origin: ${window.location.origin}, API origin: ${api.defaults?.baseURL}, Code: ${code?.substring(0, 10)}...`);
+        // Log debugging information without using api.defaults that doesn't exist
+        setDebugInfo(`Using origin: ${window.location.origin}, Code: ${code?.substring(0, 10)}...`);
         console.log(`Auth callback initiated. Host: ${window.location.hostname}, Origin: ${window.location.origin}`);
         
         if (errorParam) {
@@ -49,9 +50,11 @@ const AuthCallback = () => {
         console.log('Token received, logging in...');
         await login(token);
         navigate('/dashboard');
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Auth callback error:', error);
-        setError(`Authentication failed: ${error.message || 'Unknown error'}`);
+        // Properly type check and handle the unknown error
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        setError(`Authentication failed: ${errorMessage}`);
         setTimeout(() => navigate('/login'), 5000);
       }
     };
