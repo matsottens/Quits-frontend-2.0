@@ -4,13 +4,23 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import axios from 'axios';
 
-// Create a standalone authApi instance for fallback
+// Create a standalone authApi instance for fallback with correct URL structure
 const authApi = axios.create({
   baseURL: 'https://api.quits.cc',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }
+});
+
+// Add interceptor to fix any incorrect paths
+authApi.interceptors.request.use(config => {
+  // Remove /api prefix if present - the authApi URL is already correct
+  if (config.url?.startsWith('/api/')) {
+    config.url = config.url.replace('/api/', '/');
+    console.log(`Fixed URL path in AuthCallback, now requesting: ${config.baseURL}${config.url}`);
+  }
+  return config;
 });
 
 const AuthCallback = () => {
@@ -52,51 +62,31 @@ const AuthCallback = () => {
           return;
         }
 
-        // Exchange the code for a token using the auth service
-        console.log('Attempting to exchange code for token...');
-        const response = await api.auth.handleGoogleCallback(code);
-        const { token } = response;
-
-        if (!token) {
-          console.error('No token received from server');
-          setError('Authentication failed: No token received');
-          setTimeout(() => navigate('/login'), 3000);
-          return;
+        // Skip the api service and make direct call to the correct endpoint
+        console.log('Making direct API call to the auth endpoint');
+        const endpoint = `/auth/google/callback?code=${code}`;
+        console.log(`Requesting: https://api.quits.cc${endpoint}`);
+        
+        try {
+          const response = await authApi.get(endpoint);
+          
+          if (response.data?.token) {
+            console.log('Authentication succeeded, logging in...');
+            await login(response.data.token);
+            navigate('/dashboard');
+            return;
+          } else {
+            console.error('No token received in response:', response.data);
+            setError('Authentication failed: No token received');
+            setTimeout(() => navigate('/login'), 3000);
+          }
+        } catch (apiError) {
+          console.error('Auth API call failed:', apiError);
+          setError(`Authentication failed: ${apiError instanceof Error ? apiError.message : 'API error'}`);
+          setTimeout(() => navigate('/login'), 5000);
         }
-
-        console.log('Token received, logging in...');
-        await login(token);
-        navigate('/dashboard');
       } catch (error: unknown) {
         console.error('Auth callback error:', error);
-        
-        // Attempt direct API call as a backup
-        try {
-          const urlParams = new URLSearchParams(window.location.search);
-          const code = urlParams.get('code');
-          if (code) {
-            console.log('Attempting direct API call as fallback...');
-            
-            const endpoint = `/auth/google/callback?code=${code}`;
-            console.log(`Making fallback request to: https://api.quits.cc${endpoint}`);
-            
-            // Use the standalone authApi
-            const response = await authApi.get(endpoint);
-            
-            if (response.data?.token) {
-              console.log('Fallback succeeded, logging in...');
-              await login(response.data.token);
-              navigate('/dashboard');
-              return;
-            } else {
-              console.error('Fallback API call returned no token:', response.data);
-            }
-          }
-        } catch (fallbackError) {
-          console.error('Fallback API call also failed:', fallbackError);
-        }
-        
-        // If we got here, both attempts failed
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         setError(`Authentication failed: ${errorMessage}`);
         setTimeout(() => navigate('/login'), 5000);

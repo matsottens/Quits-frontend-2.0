@@ -29,8 +29,13 @@ const authApi = axios.create({
   }
 });
 
-// Add debugging for auth API
+// Add special interceptor to debug all requests
 authApi.interceptors.request.use(config => {
+  // Remove /api prefix if present - the URL is already correct in AUTH_API_URL
+  if (config.url?.startsWith('/api/')) {
+    config.url = config.url.replace('/api/', '/');
+    console.log(`Corrected API path, now requesting: ${config.baseURL}${config.url}`);
+  }
   console.log(`Auth API request to: ${config.baseURL}${config.url}`);
   return config;
 });
@@ -71,15 +76,20 @@ api.interceptors.response.use(
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Google OAuth configuration
+// Google OAuth configuration for different environments
 const GOOGLE_OAUTH_CONFIG = {
   client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  redirect_uri: `${window.location.origin}/auth/callback`,
+  redirect_uri: isProd 
+    ? 'https://quits.cc/auth/callback'  // Production: hard-coded to avoid any issues
+    : `${window.location.origin}/auth/callback`,  // Development: based on origin
   scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
   response_type: 'code',
   access_type: 'offline',
   prompt: 'consent',
 };
+
+// Log the redirect URI for debugging
+console.log(`Using Google OAuth redirect_uri: ${GOOGLE_OAUTH_CONFIG.redirect_uri}`);
 
 // API service with methods for different API calls
 const apiService = {
@@ -94,11 +104,22 @@ const apiService = {
     // Handle Google OAuth callback
     handleGoogleCallback: async (code: string) => {
       try {
-        // Always use the auth API instance
+        // Always use the correct path format with the auth API
+        // CRITICAL FIX: Remove the /api prefix - API backend expects /auth/... not /api/auth/...
         const endpoint = `/auth/google/callback?code=${code}`;
         console.log(`Sending callback request to: ${AUTH_API_URL}${endpoint}`);
         
-        const response = await authApi.get(endpoint);
+        // Make direct request with axios to ensure correct URL
+        const response = await axios({
+          method: 'get',
+          url: `${AUTH_API_URL}${endpoint}`,
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('Google auth callback response:', response.data);
         return response.data;
       } catch (error) {
         console.error('Google callback error:', error);
