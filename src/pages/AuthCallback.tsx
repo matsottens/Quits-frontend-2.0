@@ -29,35 +29,45 @@ const AuthCallback = () => {
     const timeoutIds: NodeJS.Timeout[] = []; // Track timeouts to clean up on unmount
 
     const processAuthCode = async () => {
-      // Get code from URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      
-      // Log debug info
-      const debugObj = {
-        url: window.location.href,
-        code: code ? `${code.substring(0, 15)}...` : 'none',
-        hostname: window.location.hostname,
-        isProd: isProd,
-        apiBase: API_BASE_URL,
-        time: new Date().toISOString()
-      };
-      
-      console.log('Auth callback debug:', debugObj);
-      if (isMounted) setDebugInfo(JSON.stringify(debugObj, null, 2));
-      
-      if (!code) {
+      try {
+        // Get code from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        
+        // Log debug info
+        const debugObj = {
+          url: window.location.href,
+          code: code ? `${code.substring(0, 15)}...` : 'none',
+          hostname: window.location.hostname,
+          isProd: isProd,
+          apiBase: API_BASE_URL,
+          time: new Date().toISOString()
+        };
+        
+        console.log('Auth callback debug:', debugObj);
+        if (isMounted) setDebugInfo(JSON.stringify(debugObj, null, 2));
+        
+        if (!code) {
+          if (isMounted) {
+            setError('No authorization code found');
+            setIsProcessing(false);
+            const timeoutId = setTimeout(() => navigate('/login'), 3000);
+            timeoutIds.push(timeoutId);
+          }
+          return;
+        }
+        
+        // Try multiple approaches for maximum reliability
+        await tryMultipleApproaches(code);
+      } catch (err) {
+        console.error('Auth callback error:', err);
         if (isMounted) {
-          setError('No authorization code found');
+          setError('Authentication process failed unexpectedly');
           setIsProcessing(false);
           const timeoutId = setTimeout(() => navigate('/login'), 3000);
           timeoutIds.push(timeoutId);
         }
-        return;
       }
-      
-      // Try multiple approaches for maximum reliability
-      await tryMultipleApproaches(code);
     };
 
     const tryMultipleApproaches = async (code: string) => {
@@ -200,7 +210,7 @@ const AuthCallback = () => {
           // For opaque responses, we'll have to assume success and redirect to dashboard
           // In production, you'd want to validate the session in another way
           if (isMounted) {
-            navigate('/dashboard');
+            navigate('/scanning');
           }
           return true;
         }
@@ -267,7 +277,7 @@ const AuthCallback = () => {
         try {
           console.log('Authentication successful, logging in');
           await login(token);
-          navigate('/dashboard');
+          navigate('/scanning');
         } catch (err) {
           console.error('Error during login after successful auth:', err);
           setError('Error during login process. Please try again.');

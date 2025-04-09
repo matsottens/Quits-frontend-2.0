@@ -51,7 +51,7 @@ authApi.interceptors.request.use(config => {
 authApi.interceptors.response.use(
   response => response,
   async error => {
-    console.error('Auth API error:', error);
+    console.log('Google callback error:', error);
     
     // If we get a network error on auth calls, try an alternative approach
     if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
@@ -62,6 +62,7 @@ authApi.interceptors.response.use(
           
           // Extract the full URL including any query parameters
           const fullUrl = originalRequest.baseURL + originalRequest.url;
+          console.log('Full URL for fetch fallback:', fullUrl);
           
           // Attempt with fetch API as a fallback
           const fetchResponse = await fetch(fullUrl, {
@@ -75,7 +76,12 @@ authApi.interceptors.response.use(
           
           if (fetchResponse.ok) {
             const data = await fetchResponse.json();
+            console.log('Fetch fallback succeeded:', data);
             return { data, status: fetchResponse.status, headers: fetchResponse.headers };
+          } else {
+            console.error('Fetch fallback failed with status:', fetchResponse.status);
+            const errorText = await fetchResponse.text().catch(() => 'No error text available');
+            console.error('Error response:', errorText);
           }
         } catch (fetchError) {
           console.error('Fetch fallback also failed:', fetchError);
