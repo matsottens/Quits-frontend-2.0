@@ -74,13 +74,22 @@ const apiService = {
     // Handle Google OAuth callback
     handleGoogleCallback: async (code: string) => {
       try {
+        // Always use the production API for auth callbacks
         const endpoint = `/auth/google/callback?code=${code}`;
-        console.log(`Sending callback request to: ${API_URL}${endpoint}`);
-        const response = await api.get(endpoint);
+        const apiUrl = 'https://api.quits.cc';
+        console.log(`Sending callback request to: ${apiUrl}${endpoint}`);
+        
+        // Use direct axios call to ensure we're using the production API
+        const response = await axios.get(`${apiUrl}${endpoint}`, {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
         return response.data;
       } catch (error) {
         console.error('Google callback error:', error);
-        throw error;
+        throw new Error('Authentication failed');
       }
     },
     

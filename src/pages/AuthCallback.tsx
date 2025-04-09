@@ -17,9 +17,17 @@ const AuthCallback = () => {
         const code = urlParams.get('code');
         const errorParam = urlParams.get('error');
         
-        // Log debugging information without using api.defaults that doesn't exist
-        setDebugInfo(`Using origin: ${window.location.origin}, Code: ${code?.substring(0, 10)}...`);
-        console.log(`Auth callback initiated. Host: ${window.location.hostname}, Origin: ${window.location.origin}`);
+        // Enhanced debugging information
+        const debugDetails = {
+          hostname: window.location.hostname,
+          origin: window.location.origin,
+          code: code ? `${code.substring(0, 10)}...` : 'none',
+          errorParam,
+          isProd: window.location.hostname !== 'localhost',
+        };
+        
+        setDebugInfo(JSON.stringify(debugDetails, null, 2));
+        console.log('Auth callback details:', debugDetails);
         
         if (errorParam) {
           console.error('Error in callback URL:', errorParam);
@@ -52,7 +60,28 @@ const AuthCallback = () => {
         navigate('/dashboard');
       } catch (error: unknown) {
         console.error('Auth callback error:', error);
-        // Properly type check and handle the unknown error
+        
+        // Attempt direct API call as a backup
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const code = urlParams.get('code');
+          if (code) {
+            console.log('Attempting direct API call as fallback...');
+            const response = await axios.get(`https://api.quits.cc/auth/google/callback?code=${code}`, {
+              withCredentials: true
+            });
+            if (response.data?.token) {
+              console.log('Fallback succeeded, logging in...');
+              await login(response.data.token);
+              navigate('/dashboard');
+              return;
+            }
+          }
+        } catch (fallbackError) {
+          console.error('Fallback API call also failed:', fallbackError);
+        }
+        
+        // If we got here, both attempts failed
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         setError(`Authentication failed: ${errorMessage}`);
         setTimeout(() => navigate('/login'), 5000);
@@ -64,9 +93,9 @@ const AuthCallback = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
+      <div className="text-center max-w-md w-full p-6 bg-white shadow-md rounded-lg">
         {error ? (
-          <div className="text-red-500 mb-4">{error}</div>
+          <div className="text-red-500 mb-4 font-semibold">{error}</div>
         ) : (
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
         )}
@@ -74,7 +103,7 @@ const AuthCallback = () => {
           {error ? 'Redirecting to login...' : 'Completing authentication...'}
         </p>
         {(error || debugInfo) && (
-          <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left overflow-auto max-w-md max-h-32">
+          <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left overflow-auto max-h-48">
             <pre>{debugInfo || ''}</pre>
           </div>
         )}
