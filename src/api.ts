@@ -30,34 +30,41 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
   try {
     console.log(`Attempting Google auth callback with code: ${code.substring(0, 10)}...`);
     
-    // ALWAYS use https://quits.cc/auth/callback as the redirect URI
-    // This must match exactly what's registered in Google Console
-    const redirectUri = 'https://quits.cc/auth/callback';
+    // Use the emergency proxy endpoint
+    const proxyUrl = `${API_BASE_URL}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
     
-    console.log('Using redirect URI for token exchange:', redirectUri);
+    console.log('Using proxy URL for token exchange:', proxyUrl);
     
-    // Just go straight to the server side approach
-    // Create a URL with the code as a query parameter
-    console.log('Using direct server redirect approach');
+    // Use fetch for simplicity
+    const response = await fetch(proxyUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
     
-    // The simplest solution: redirect to the backend server directly
-    // The server will process the code and redirect back to the frontend
-    const serverRedirectUrl = `${API_BASE_URL}/api/auth/google/callback?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
+    if (!response.ok) {
+      // If the response is not OK, throw an error
+      throw new Error(`Failed to exchange code: ${response.status} ${response.statusText}`);
+    }
     
-    console.log('Redirecting to server:', serverRedirectUrl);
+    const data = await response.json();
+    console.log('Proxy response:', data);
     
-    // Redirect the browser directly to the server
-    window.location.href = serverRedirectUrl;
-    
-    // Return a placeholder response
-    // This code won't actually execute due to the redirect
-    return {
-      token: 'pending-redirect',
-      success: true
-    };
+    if (data.token) {
+      // Success! Return the token and user
+      return {
+        token: data.token,
+        user: data.user,
+        success: true
+      };
+    } else {
+      // No token in the response
+      throw new Error('No token received from authentication server');
+    }
   } catch (error) {
     console.error('Error in handleGoogleCallback:', error);
-    throw new Error('Authentication redirect failed');
+    throw error;
   }
 };
 
