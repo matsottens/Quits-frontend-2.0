@@ -34,49 +34,47 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     console.log('Using proxy URL for token exchange:', proxyUrl);
     
-    // Use fetch with no credentials to avoid CORS preflight
+    // Try direct fetch first, with simplified options to avoid preflight
     try {
       const response = await fetch(proxyUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
-        }
-        // No credentials to avoid CORS preflight issues
+        },
+        // No credentials to avoid CORS preflight
+        // No mode specification to use default cors mode
       });
       
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Proxy response data:', data);
+        
+        if (data.token) {
+          // Success! Return the token and user
+          return {
+            token: data.token,
+            user: data.user,
+            success: true
+          };
+        }
+      } else {
         console.warn(`Fetch response not OK: ${response.status} ${response.statusText}`);
-        throw new Error(`Failed to exchange code: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('Proxy response data:', data);
-      
-      if (data.token) {
-        // Success! Return the token and user
-        return {
-          token: data.token,
-          user: data.user,
-          success: true
-        };
+        // Don't throw here - we'll try the fallback approaches
       }
     } catch (fetchError) {
-      console.warn('Fetch failed, trying direct browser navigation:', fetchError);
-      
-      // As a last resort, redirect directly to the backend endpoint
-      const directUrl = `${API_BASE_URL}/api/auth/google/callback?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
-      console.log('Redirecting directly to backend:', directUrl);
-      window.location.href = directUrl;
-      
-      // Return placeholder to avoid errors
-      return {
-        token: 'pending-redirect',
-        success: true
-      };
+      console.warn('Standard fetch approach failed, trying direct redirect:', fetchError);
     }
     
-    // If we got here, we didn't get a token
-    throw new Error('No token received from authentication server');
+    // As a fallback, redirect directly to the backend
+    console.log('Redirecting directly to backend');
+    const directUrl = `${API_BASE_URL}/api/auth/google/callback?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
+    window.location.href = directUrl;
+    
+    // Return placeholder to avoid errors
+    return {
+      token: 'pending-redirect',
+      success: true
+    };
   } catch (error) {
     console.error('Error in handleGoogleCallback:', error);
     throw error;
