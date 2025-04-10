@@ -39,60 +39,50 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     console.log('Using redirect URI for token exchange:', redirectUri);
     
-    // Try multiple endpoints in sequence if needed
-    const endpoints = [
-      // First try the standard endpoint
-      `${API_BASE_URL}/api/auth/google/callback/direct2`,
-      // Then try the test endpoint
-      `${API_BASE_URL}/api/auth/google/callback/direct2-test`,
-      // Then try the alternative endpoint
-      `${API_BASE_URL}/api/auth/google/callback/direct-alt`
-    ];
-    
-    // Track errors to report if all endpoints fail
-    const errors = [];
-    
-    // Try each endpoint in sequence
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Attempting to use endpoint: ${endpoint}`);
-        
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          credentials: 'include', // Important to include cookies
-          body: new URLSearchParams({
-            code,
-            origin: window.location.origin,
-            redirectUri, // Add the exact redirect URI used in Google OAuth
-            requestId: 'req_' + Math.random().toString(36).substring(2)
-          })
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
-          throw new Error(errorData.error || `HTTP error ${response.status}`);
-        }
-        
-        // Parse the response
-        const authData = await response.json();
-        console.log('Received successful auth response from endpoint:', endpoint);
-        
-        return authData;
-      } catch (error) {
-        console.error(`Error with endpoint ${endpoint}:`, error);
-        errors.push({ endpoint, error });
-        // Continue to the next endpoint
-      }
+    try {
+      console.log('Attempting no-cors fetch as last resort');
+      
+      // First make a cookie-setting request
+      const noCorsResponse = await fetch(`${API_BASE_URL}/api/auth/google/callback/direct2`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        mode: 'no-cors', // This will make the request succeed but you won't be able to read the response
+        credentials: 'include',
+        body: new URLSearchParams({
+          code,
+          origin: window.location.origin,
+          redirectUri,
+          requestId: 'req_' + Math.random().toString(36).substring(2)
+        })
+      });
+      
+      console.log('No-cors request completed');
+      
+      // As a fallback, we'll try a server-side approach
+      // Create a URL with the code as a query parameter
+      console.log('Trying server-side redirect as final fallback');
+      // Redirect to the server directly and let it handle the token exchange
+      // The user will be redirected back to our frontend afterward
+      const serverRedirectUrl = `${API_BASE_URL}/api/auth/google/callback?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
+      
+      // Save current progress in sessionStorage
+      sessionStorage.setItem('auth_in_progress', 'true');
+      sessionStorage.setItem('auth_redirect_time', Date.now().toString());
+      
+      // Redirect to the server
+      window.location.href = serverRedirectUrl;
+      
+      // Return a placeholder response - the actual auth will happen after the redirect
+      return {
+        token: 'pending-token',
+        success: true
+      };
+    } catch (error) {
+      console.error('All authentication approaches failed:', error);
+      throw new Error('Authentication failed after trying all possible methods');
     }
-    
-    // If we've tried all endpoints and none worked, throw a combined error
-    throw new Error(`All authentication endpoints failed: ${JSON.stringify(errors)}`);
-    
   } catch (error) {
     console.error('Error in handleGoogleCallback:', error);
     if (axios.isAxiosError(error)) {
