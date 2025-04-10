@@ -52,6 +52,19 @@ export default defineConfig(({ command, mode }) => {
     },
     preview: {
       port: 4173,
+      proxy: {
+        '/api': {
+          target: env.VITE_API_URL || 'https://api.quits.cc',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
+        '/auth/google/callback/direct2': {
+          target: 'https://api.quits.cc',
+          changeOrigin: true,
+          secure: true,
+          rewrite: (path) => path.replace(/^\/auth\/google\/callback\/direct2/, '/api/auth/google/callback/direct2'),
+        },
+      },
     },
   }
 })
