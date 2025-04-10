@@ -39,39 +39,60 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     console.log('Using redirect URI for token exchange:', redirectUri);
     
-    // In production, use the full API URL to avoid CORS issues
-    // In development, use the proxy
-    const apiUrl = isProd 
-      ? `${API_BASE_URL}/api/auth/google/callback/direct2`
-      : `/auth/google/callback/direct2`;
+    // Try multiple endpoints in sequence if needed
+    const endpoints = [
+      // First try the standard endpoint
+      `${API_BASE_URL}/api/auth/google/callback/direct2`,
+      // Then try the test endpoint
+      `${API_BASE_URL}/api/auth/google/callback/direct2-test`,
+      // Then try the alternative endpoint
+      `${API_BASE_URL}/api/auth/google/callback/direct-alt`
+    ];
     
-    console.log(`Making request to: ${apiUrl}`);
+    // Track errors to report if all endpoints fail
+    const errors = [];
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-      },
-      credentials: 'include', // Important to include cookies
-      body: new URLSearchParams({
-        code,
-        origin: window.location.origin,
-        redirectUri, // Add the exact redirect URI used in Google OAuth
-        requestId: 'req_' + Math.random().toString(36).substring(2)
-      })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Authentication failed');
+    // Try each endpoint in sequence
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Attempting to use endpoint: ${endpoint}`);
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'include', // Important to include cookies
+          body: new URLSearchParams({
+            code,
+            origin: window.location.origin,
+            redirectUri, // Add the exact redirect URI used in Google OAuth
+            requestId: 'req_' + Math.random().toString(36).substring(2)
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+          throw new Error(errorData.error || `HTTP error ${response.status}`);
+        }
+        
+        // Parse the response
+        const authData = await response.json();
+        console.log('Received successful auth response from endpoint:', endpoint);
+        
+        return authData;
+      } catch (error) {
+        console.error(`Error with endpoint ${endpoint}:`, error);
+        errors.push({ endpoint, error });
+        // Continue to the next endpoint
+      }
     }
     
-    // Parse the response
-    const authData = await response.json();
-    console.log('Received successful auth response');
+    // If we've tried all endpoints and none worked, throw a combined error
+    throw new Error(`All authentication endpoints failed: ${JSON.stringify(errors)}`);
     
-    return authData;
   } catch (error) {
     console.error('Error in handleGoogleCallback:', error);
     if (axios.isAxiosError(error)) {
