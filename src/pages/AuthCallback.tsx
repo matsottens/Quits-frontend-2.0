@@ -32,15 +32,39 @@ const AuthCallback = () => {
         const debugObj = {
           url: window.location.href,
           origin: window.location.origin,
+          host: window.location.host,
+          fullUrl: window.location.toString(),
           code: code ? `${code.substring(0, 15)}...` : 'none',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          usingApi: 'https://api.quits.cc'
         };
         
         if (isMounted) {
           setDebugInfo(JSON.stringify(debugObj, null, 2));
         }
         
-        console.log('Auth callback debug:', debugObj);
+        // First check connectivity to API server
+        try {
+          const testUrl = 'https://api.quits.cc/api/health';
+          console.log('Testing API connectivity to:', testUrl);
+          const testResponse = await fetch(testUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (testResponse.ok) {
+            const healthData = await testResponse.json();
+            console.log('API health check successful:', healthData);
+          } else {
+            console.warn('API health check failed with status:', testResponse.status);
+          }
+        } catch (healthError) {
+          console.error('API health check error:', healthError);
+        }
+        
+        console.log('Auth callback debug info:', debugObj);
         
         if (!code) {
           console.error('No authorization code found');
@@ -76,13 +100,40 @@ const AuthCallback = () => {
         
         console.log('Calling proxy endpoint:', proxyUrl);
         
+        // Try with fetch first which has better error handling for CORS
+        try {
+          const fetchResponse = await fetch(proxyUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            },
+            // Don't use credentials to avoid preflight CORS issues
+          });
+          
+          if (fetchResponse.ok) {
+            const data = await fetchResponse.json();
+            console.log('Fetch proxy response:', data);
+            
+            if (data.token) {
+              await login(data.token);
+              if (isMounted) navigate('/dashboard');
+              return;
+            }
+          } else {
+            console.warn('Fetch failed, status:', fetchResponse.status);
+          }
+        } catch (fetchError) {
+          console.warn('Fetch approach failed, trying axios:', fetchError);
+        }
+        
+        // Fall back to axios as a second attempt
         const response = await axios.get(proxyUrl, {
           headers: {
             'Accept': 'application/json'
           }
         });
         
-        console.log('Proxy response:', response.data);
+        console.log('Axios proxy response:', response.data);
         
         if (response.data.token) {
           // Success! Log in with the token
