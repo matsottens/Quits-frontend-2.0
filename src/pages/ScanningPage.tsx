@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Header from '../components/Header';
 
+// Define the ScanningStatus type
+type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'analyzing' | 'complete' | 'error';
+
 interface SubscriptionSuggestion {
   id: string;
   name: string;

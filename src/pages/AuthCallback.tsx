@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { apiService } from '../services/apiService';
+import apiService from '../services/api';
 
 // Extend Window interface to allow for dynamic property assignment
 declare global {
