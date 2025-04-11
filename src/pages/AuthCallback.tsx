@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 
 // Extend Window interface to allow for dynamic property assignment
 declare global {
@@ -77,8 +77,23 @@ const AuthCallback = () => {
           return;
         }
 
-        // Try both the proxy endpoint and the regular endpoint
-        await tryWithProxy(code);
+        // Try both approaches in parallel - the proxy and direct API endpoints
+        const successfulAuth = await Promise.any([
+          tryWithProxy(code),
+          tryWithDirectUrl(code)
+        ]).catch(err => {
+          console.error('All auth approaches failed:', err);
+          return false;
+        });
+        
+        if (successfulAuth && isMounted) {
+          navigate('/dashboard');
+        } else if (isMounted) {
+          setError('Authentication failed. Please try again.');
+          setIsProcessing(false);
+          const timeoutId = setTimeout(() => navigate('/login'), 5000);
+          timeoutIds.push(timeoutId);
+        }
       } catch (err) {
         console.error('Auth callback error:', err);
         if (isMounted) {
@@ -89,75 +104,97 @@ const AuthCallback = () => {
         }
       }
     };
-
-    const tryWithProxy = async (code: string) => {
+    
+    // Try the direct URL approach - useful if we have CORS issues with the proxy
+    const tryWithDirectUrl = async (code: string): Promise<boolean> => {
       try {
-        console.log('Using emergency proxy endpoint');
+        console.log('Trying direct URL approach');
+        const directUrl = `https://api.quits.cc/api/auth/google/callback?code=${encodeURIComponent(code)}`;
+        console.log('Redirecting to:', directUrl);
         
-        // Use the new proxy endpoint
-        const API_BASE_URL = 'https://api.quits.cc';
-        const proxyUrl = `${API_BASE_URL}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
+        // Redirect to the backend directly (with no return)
+        window.location.href = directUrl;
         
-        console.log('Calling proxy endpoint:', proxyUrl);
-        
-        // Try with fetch first which has better error handling for CORS
-        try {
-          const fetchResponse = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json'
-            },
-            // Don't use credentials to avoid preflight CORS issues
-          });
-          
-          if (fetchResponse.ok) {
-            const data = await fetchResponse.json();
-            console.log('Fetch proxy response:', data);
-            
-            if (data.token) {
-              await login(data.token);
-              if (isMounted) navigate('/dashboard');
-              return;
-            }
-          } else {
-            console.warn('Fetch failed, status:', fetchResponse.status);
-          }
-        } catch (fetchError) {
-          console.warn('Fetch approach failed, trying axios:', fetchError);
-        }
-        
-        // Fall back to axios as a second attempt
-        const response = await axios.get(proxyUrl, {
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-        
-        console.log('Axios proxy response:', response.data);
-        
-        if (response.data.token) {
-          // Success! Log in with the token
-          await login(response.data.token);
-          
-          if (isMounted) {
-            // Navigate to dashboard
-            navigate('/dashboard');
-          }
-          return;
-        }
-        
-        // Fall back to manual navigation if we got a response but no token
-        if (isMounted) {
-          navigate('/dashboard');
-        }
+        // Return a promise that never resolves since we're redirecting
+        return new Promise<boolean>(() => {});
       } catch (error) {
-        console.error('Error with proxy endpoint:', error);
+        console.error('Error with direct URL approach:', error);
+        return false;
+      }
+    };
+
+    const tryWithProxy = async (code: string): Promise<boolean> => {
+      try {
+        console.log('Using Google proxy endpoint');
         
-        // Try force navigate to dashboard anyway
-        if (isMounted) {
-          const timeoutId = setTimeout(() => navigate('/dashboard?fallback=true'), 1000);
-          timeoutIds.push(timeoutId);
+        // Try multiple endpoints to increase chances of success
+        const endpoints = [
+          'https://api.quits.cc/api/google-proxy',
+          'https://api.quits.cc/google-proxy'
+        ];
+        
+        // Parameter to include in all requests
+        const params = `code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
+        
+        // Try each endpoint
+        for (const baseEndpoint of endpoints) {
+          const proxyUrl = `${baseEndpoint}?${params}`;
+          console.log('Trying endpoint:', proxyUrl);
+          
+          try {
+            // Try with fetch for better CORS handling
+            const fetchResponse = await fetch(proxyUrl, {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (fetchResponse.ok) {
+              const data = await fetchResponse.json();
+              console.log('Successfully got response from proxy:', data);
+              
+              if (data.token) {
+                await login(data.token);
+                return true;
+              }
+            } else {
+              console.warn(`Fetch failed for ${baseEndpoint}, status:`, fetchResponse.status);
+              try {
+                const errorText = await fetchResponse.text();
+                console.warn('Error response:', errorText);
+              } catch (e) {
+                // Ignore error parsing failures
+              }
+            }
+          } catch (fetchError) {
+            console.warn(`Fetch failed for ${baseEndpoint}:`, fetchError);
+          }
+          
+          try {
+            // Fall back to axios
+            const response = await axios.get(proxyUrl, {
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+            
+            console.log('Axios response from proxy:', response.data);
+            
+            if (response.data?.token) {
+              await login(response.data.token);
+              return true;
+            }
+          } catch (axiosError) {
+            console.warn(`Axios failed for ${baseEndpoint}:`, axiosError);
+          }
         }
+        
+        // None of the endpoints worked
+        return false;
+      } catch (error) {
+        console.error('General error in proxy attempts:', error);
+        return false;
       }
     };
 
