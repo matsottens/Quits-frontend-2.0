@@ -67,16 +67,27 @@ const ScanningPage = () => {
       pollScanStatus();
     } catch (err) {
       console.error('Error starting scan:', err);
-      setError('Failed to start email scanning. Please try again.');
-      setScanningStatus('error');
-      scanInitiatedRef.current = false;
+      setError('Failed to start email scanning. Please try again or check if Gmail API access is properly authorized.');
+          setScanningStatus('error');
       
-      // Retry automatically a limited number of times
-      if (retryCount < maxRetries) {
-        setRetryCount(prev => prev + 1);
-        console.log(`Retrying scan initiation... Attempt ${retryCount + 1}/${maxRetries}`);
-        setTimeout(startScanning, 2000); // Retry after 2 seconds
+      // Only allow manual retries after multiple automatic attempts fail
+      if (retryCount >= maxRetries) {
+        console.log(`Maximum retry attempts (${maxRetries}) reached. Waiting for manual retry.`);
+        scanInitiatedRef.current = false;
+        return;
       }
+      
+      // Increment retry count
+      const currentRetryCount = retryCount + 1;
+      setRetryCount(currentRetryCount);
+      console.log(`Retrying scan initiation... Attempt ${currentRetryCount}/${maxRetries}`);
+      
+      // Use exponential backoff for retries (2s, 4s, 8s)
+      const delay = Math.pow(2, currentRetryCount) * 1000;
+      setTimeout(() => {
+        scanInitiatedRef.current = false; // Allow retry
+        startScanning();
+      }, delay);
     }
   };
 
@@ -84,6 +95,7 @@ const ScanningPage = () => {
   const pollScanStatus = () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
     
     // Set initial poll immediately
@@ -134,22 +146,45 @@ const ScanningPage = () => {
     }
   };
 
-  // Start scanning when component mounts
-  useEffect(() => {
-    // Only start if not already scanning
-    if (scanningStatus === 'idle' && !scanInitiatedRef.current) {
-      startScanning();
-    }
-  }, [scanningStatus]);
-
+  // Handle manual retry
   const handleRetry = () => {
+    console.log('Manual retry requested');
     setIsRetrying(true);
     setRetryCount(0);
     setProgress(0);
     setReconnectAttempt(0);
     setStatusCheckFailures(0);
-    setTimeout(() => setIsRetrying(false), 100); // This triggers the useEffect to run again
+    scanInitiatedRef.current = false;
+    
+    // Stop any existing polling
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    
+    setTimeout(() => {
+      setIsRetrying(false);
+      startScanning();
+    }, 500);
   };
+
+  // Start scanning when component mounts, only once
+  useEffect(() => {
+    const initiateScanning = () => {
+      if (scanningStatus === 'idle' && !scanInitiatedRef.current) {
+        startScanning();
+      }
+    };
+    
+    initiateScanning();
+    
+    // Cleanup on unmount
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);  // Empty dependency array ensures this runs only once on mount
 
   const handleSuggestionAction = async (suggestionId: string, confirmed: boolean) => {
     try {
@@ -277,7 +312,7 @@ const ScanningPage = () => {
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                         <div className="space-y-3">
                           <div className="flex items-center">
-                            <h3 className="text-lg font-medium text-gray-900">{suggestion.name}</h3>
+                          <h3 className="text-lg font-medium text-gray-900">{suggestion.name}</h3>
                             {suggestion.confidence > 0.8 && (
                               <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 High Confidence

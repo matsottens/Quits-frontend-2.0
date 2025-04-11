@@ -181,6 +181,25 @@ interface SubscriptionSuggestion {
   [key: string]: any; // Allow for additional fields
 }
 
+// Function to safely extract the Gmail token from JWT
+function getGmailToken() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    
+    // JWT tokens have 3 parts separated by periods
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    // Decode the payload (middle part)
+    const payload = JSON.parse(atob(parts[1]));
+    return payload.gmail_token || null;
+  } catch (error) {
+    console.error('Error extracting Gmail token:', error);
+    return null;
+  }
+}
+
 // API service with methods for different API calls
 const apiService = {
   // Auth endpoints
@@ -306,9 +325,22 @@ const apiService = {
       try {
         console.log('Initiating email scanning process');
         
+        // Check if we have Gmail token
+        const gmailToken = getGmailToken();
+        if (!gmailToken) {
+          console.warn('No Gmail token found in JWT - might use mock data');
+        } else {
+          console.log('Gmail token found in JWT - will use real data');
+        }
+        
         // Use the correct endpoint and a longer timeout
-        const response = await api.post('/email/scan', {}, {
-          timeout: 60000 // 60 second timeout
+        const response = await api.post('/email/scan', {
+          useRealData: !!gmailToken
+        }, {
+          timeout: 60000, // 60 second timeout
+          headers: {
+            'X-Gmail-Token': gmailToken || ''
+          }
         });
         
         console.log('Email scan response:', response.data);
@@ -319,13 +351,16 @@ const apiService = {
         // Only try fetch fallback if there's a network error
         if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
           try {
+            const gmailToken = getGmailToken();
             const fetchResponse = await fetch(`${API_URL}/email/scan`, {
               method: 'POST',
               credentials: 'include',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              }
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'X-Gmail-Token': gmailToken || ''
+              },
+              body: JSON.stringify({ useRealData: !!gmailToken })
             });
             
             if (fetchResponse.ok) {
