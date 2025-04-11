@@ -77,11 +77,18 @@ const AuthCallback = () => {
           return;
         }
 
-        // Try both approaches in parallel - the proxy and direct API endpoints
-        const successfulAuth = await Promise.any([
-          tryWithProxy(code),
-          tryWithDirectUrl(code)
-        ]).catch(err => {
+        // Try both approaches as a race - the proxy and direct API endpoints
+        // Using Promise.race instead of Promise.any for better compatibility
+        const successfulAuth = await Promise.race([
+          tryWithProxy(code).catch(e => {
+            console.warn('Proxy approach failed:', e);
+            return false;
+          }),
+          tryWithDirectUrl(code).catch(e => {
+            console.warn('Direct URL approach failed:', e);
+            return false;
+          })
+        ]).catch((err: Error) => {
           console.error('All auth approaches failed:', err);
           return false;
         });
