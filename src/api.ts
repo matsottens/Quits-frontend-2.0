@@ -30,70 +30,42 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
   try {
     console.log(`Attempting Google auth callback with code: ${code.substring(0, 10)}...`);
     
-    // Try multiple possible endpoint formats to improve chances of success
-    const endpoints = [
-      `${API_BASE_URL}/api/google-proxy`,
-      `${API_BASE_URL}/google-proxy`
-    ];
+    // Add timestamp to prevent caching and ensure unique requests
+    const timestamp = Date.now();
+    // Use direct backend API URL for most consistent behavior
+    const endpoint = `${API_BASE_URL}/api/auth/google/callback`;
+    const proxyUrl = `${endpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${timestamp}`;
     
-    // Log all attempts
-    console.log('Will try these endpoints in sequence:', endpoints);
+    console.log('Calling backend endpoint directly:', proxyUrl);
     
-    // Use the proxy endpoint (handled by our serverless function)
-    let success = false;
-    let data = null;
-    
-    // Try each endpoint until one works
-    for (const endpoint of endpoints) {
-      try {
-        const proxyUrl = `${endpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
-        console.log('Trying endpoint:', proxyUrl);
-        
-        // Simple fetch with minimal options to avoid CORS issues
-        const response = await fetch(proxyUrl, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' }
-        });
-        
-        if (response.ok) {
-          data = await response.json();
-          console.log('Success with endpoint:', endpoint);
-          console.log('Response data:', data);
-          success = true;
-          break;
-        } else {
-          console.warn(`Endpoint ${endpoint} failed with status: ${response.status}`);
-          try {
-            const errorText = await response.text();
-            console.warn('Error response:', errorText);
-          } catch (e) {
-            console.warn('Could not parse error response');
-          }
-        }
-      } catch (error) {
-        console.warn(`Error with endpoint ${endpoint}:`, error);
+    // Simple fetch with headers to prevent caching
+    const response = await fetch(proxyUrl, {
+      method: 'GET',
+      headers: { 
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
       }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Success with direct backend call');
+      
+      if (data?.token) {
+        // Success! Return the token and user
+        return {
+          token: data.token,
+          user: data.user,
+          success: true
+        };
+      } else {
+        throw new Error('No token received from backend');
+      }
+    } else {
+      const errorText = await response.text().catch(() => 'Could not parse error response');
+      console.error(`Backend auth failed with status: ${response.status}`, errorText);
+      throw new Error(`Authentication failed with status ${response.status}`);
     }
-    
-    if (success && data?.token) {
-      // Success! Return the token and user
-      return {
-        token: data.token,
-        user: data.user,
-        success: true
-      };
-    }
-    
-    // As fallback, redirect directly to the callback endpoint
-    console.log('All endpoints failed, redirecting directly to backend callback');
-    const directUrl = `${API_BASE_URL}/api/auth/google/callback?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}`;
-    window.location.href = directUrl;
-    
-    // Return placeholder for the redirect case
-    return {
-      token: 'pending-redirect',
-      success: true
-    };
   } catch (error) {
     console.error('Error in handleGoogleCallback:', error);
     throw error;

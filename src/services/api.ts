@@ -219,45 +219,36 @@ const apiService = {
       console.log(`Attempting Google auth callback with code: ${safeCode.substring(0, 12)}...`);
       
       try {
-        // Use a single endpoint for stability
-        const endpoint = `/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}`;
-        const response = await authApi.get(endpoint, {
-          timeout: 20000, // 20 second timeout
+        // Add a timestamp to prevent browser caching issues
+        const timestamp = Date.now();
+        // Use a single endpoint directly to the backend API
+        const endpoint = `${AUTH_API_URL}/api/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
+        
+        console.log(`Calling backend endpoint directly: ${endpoint}`);
+        
+        const response = await fetch(endpoint, {
+          method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Cache-Control': 'no-cache'
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
           }
         });
         
-        if (response.data?.token) {
-          return response.data;
+        if (!response.ok) {
+          throw new Error(`Auth failed with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.token) {
+          console.log('Successfully received auth token from backend');
+          return data;
         } else {
           throw new Error('No token received from auth endpoint');
         }
       } catch (error) {
         console.error('Auth API error:', error);
-        
-        // Single fallback with fetch API if axios fails
-        try {
-          console.log('Trying fetch fallback for auth');
-          const fetchResponse = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}`, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json'
-            }
-          });
-          
-          if (fetchResponse.ok) {
-            const data = await fetchResponse.json();
-            if (data?.token) {
-              return data;
-            }
-          }
-        } catch (fetchError) {
-          console.error('Fetch fallback also failed:', fetchError);
-        }
-        
-        throw new Error('All authentication attempts failed');
+        throw error;
       }
     },
     
@@ -391,173 +382,4 @@ const apiService = {
           const response = await api.get('/email/status');
           return response.data;
         } catch (error) {
-          console.error(`Error getting scan status (attempt ${retries + 1}/${maxRetries}):`, error);
-          
-          if (retries < maxRetries - 1) {
-            retries++;
-            // Exponential backoff: 1s, 2s, 4s...
-            const delay = Math.pow(2, retries) * 1000;
-            console.log(`Retrying after ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return tryGetStatus();
-          }
-          
-          return { 
-            error: 'Failed to retrieve scanning status', 
-            status: 'error', 
-            progress: 0 
-          };
-        }
-      };
-      
-      return tryGetStatus();
-    },
-
-    // Alias for getScanStatus to maintain backward compatibility
-    getScanningStatus: async () => {
-      return await apiService.email.getScanStatus();
-    },
-
-    // Get subscription suggestions from scanned emails
-    getSubscriptionSuggestions: async () => {
-      try {
-        const response = await api.get('/email/suggestions');
-        
-        // Map the response data to make it more consistent
-        if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
-          // Ensure all fields are present with consistent naming
-          response.data.suggestions = response.data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
-            ...suggestion,
-            // Ensure consistent property names (frontend uses camelCase)
-            price: suggestion.price || 0,
-            currency: suggestion.currency || 'USD',
-            confidence: suggestion.confidence || 0.5,
-            // Maintain both billing_frequency (backend) and billingFrequency (frontend) for compatibility
-            billingFrequency: suggestion.billing_frequency || 'monthly',
-            // Ensure email metadata is present
-            email_subject: suggestion.email_subject || 'No Subject',
-            email_from: suggestion.email_from || 'Unknown Sender',
-            email_date: suggestion.email_date || new Date().toISOString()
-          }));
-        }
-        
-        return response.data;
-      } catch (error) {
-        console.error('Error getting subscription suggestions:', error);
-        
-        // Try the fetch API as a fallback
-        if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
-          try {
-            console.log('Trying fetch fallback for getting suggestions');
-            const fetchResponse = await fetch(`${API_URL}/email/suggestions`, {
-              method: 'GET',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              }
-            });
-            
-            if (fetchResponse.ok) {
-              const data = await fetchResponse.json();
-              return data;
-            }
-          } catch (fetchError) {
-            console.error('Fetch fallback for suggestions failed:', fetchError);
-          }
-        }
-        
-        return { error: 'Failed to retrieve suggestions', suggestions: [] };
-      }
-    },
-
-    // Confirm or reject a subscription suggestion
-    confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
-      try {
-        const response = await api.post(`/email/suggestions/${suggestionId}/confirm`, {
-          confirmed
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Error confirming suggestion:', error);
-        
-        // Try fetch API fallback
-        if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
-          try {
-            console.log('Trying fetch fallback for confirming suggestion');
-            const fetchResponse = await fetch(`${API_URL}/email/suggestions/${suggestionId}/confirm`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify({ confirmed })
-            });
-            
-            if (fetchResponse.ok) {
-              const data = await fetchResponse.json();
-              return data;
-            }
-          } catch (fetchError) {
-            console.error('Fetch fallback for confirming suggestion failed:', fetchError);
-          }
-        }
-        
-        throw error;
-      }
-    },
-    
-    // Test connectivity to the email API endpoint
-    testConnection: async () => {
-      try {
-        const response = await api.get('/email/test-connection', { timeout: 5000 });
-        return { success: true, data: response.data };
-      } catch (error) {
-        console.error('API connectivity test failed:', error);
-        return { 
-          success: false, 
-          error: axios.isAxiosError(error) && error.code === 'ERR_NETWORK' 
-            ? 'Network connectivity issue' 
-            : 'API connection failed'
-        };
-      }
-    }
-  },
-  
-  // Subscription endpoints
-  subscriptions: {
-    // Get all subscriptions
-    getAll: async () => {
-      const response = await api.get('/subscription');
-      return response.data;
-    },
-    
-    // Get a single subscription
-    getById: async (id: string) => {
-      const response = await api.get(`/subscription/${id}`);
-      return response.data;
-    },
-    
-    // Create a new subscription
-    create: async (data: any) => {
-      const response = await api.post('/subscription', data);
-      return response.data;
-    },
-    
-    // Update a subscription
-    update: async (id: string, data: any) => {
-      const response = await api.put(`/subscription/${id}`, data);
-      return response.data;
-    },
-    
-    // Delete a subscription
-    delete: async (id: string) => {
-      const response = await api.delete(`/subscription/${id}`);
-      return response.data;
-    },
-  },
-};
-
-export default apiService; 
+          console.error(`

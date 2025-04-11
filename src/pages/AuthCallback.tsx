@@ -10,14 +10,16 @@ declare global {
   }
 }
 
-// ONLY use direct login, avoid any API calls
+// Global flag to prevent multiple auth attempts across renders
+let hasProcessedAuth = false;
+
 const AuthCallback = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const processedRef = useRef(false); // Add ref to track if we've already processed this callback
+  const processedRef = useRef(false); // Local ref to track if we've already processed this callback
   const [logMessages, setLogMessages] = useState<string[]>([]);
 
   // Custom logging function
@@ -27,15 +29,20 @@ const AuthCallback = () => {
   };
 
   useEffect(() => {
-    // Only process the callback once
-    if (processedRef.current) {
+    // Check both local and global processed flags to prevent multiple calls
+    if (processedRef.current || hasProcessedAuth) {
+      log('Auth callback already processed, skipping');
       return; // Skip if already processed
     }
     
     const processGoogleCallback = async () => {
       try {
+        // Set both local and global processed flags immediately
+        processedRef.current = true;
+        hasProcessedAuth = true;
         setIsProcessing(true);
-        processedRef.current = true; // Mark as processed immediately
+        
+        log('Starting Google callback processing');
         
         // Get the code from URL query params
         const urlParams = new URLSearchParams(location.search);
@@ -55,14 +62,14 @@ const AuthCallback = () => {
           timestamp: new Date().toISOString()
         };
         
-        console.log('Auth callback debug:', debugInfo);
+        log(`Auth callback with code: ${code.substring(0, 8)}...`);
         
         // Attempt to get token
-        console.log('Attempting to get token using handleGoogleCallback');
+        log('Requesting token from API');
         const result = await apiService.auth.handleGoogleCallback(code);
         
         if (result && result.token) {
-          console.log('Successfully received auth token');
+          log('Successfully received auth token');
           login(result.token);
           navigate('/dashboard');
         } else {
@@ -77,7 +84,12 @@ const AuthCallback = () => {
     };
     
     processGoogleCallback();
-  }, [location.search, login, navigate]);
+    
+    // Cleanup function
+    return () => {
+      log('AuthCallback component unmounting');
+    };
+  }, [login, navigate, location.search]); // Only include dependencies that should trigger a rerun
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -87,7 +99,7 @@ const AuthCallback = () => {
         ) : (
           <>
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mx-auto mb-4"></div>
-            <h1 className="text-xl font-bold text-gray-800 mb-2">Authentication Successful!</h1>
+            <h1 className="text-xl font-bold text-gray-800 mb-2">Authentication Processing...</h1>
           </>
         )}
         <p className="mt-4 text-gray-600">
