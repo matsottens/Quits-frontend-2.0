@@ -8,10 +8,12 @@ interface SubscriptionSuggestion {
   name: string;
   price: number;
   currency: string;
-  billingFrequency: string;
+  billing_frequency: string;
   confidence: number;
-  emailSubject: string;
-  emailDate: string;
+  email_subject: string;
+  email_from: string;
+  email_date: string;
+  next_billing_date: string | null;
 }
 
 const ScanningPage = () => {
@@ -25,67 +27,73 @@ const ScanningPage = () => {
   const [statusCheckFailures, setStatusCheckFailures] = useState(0);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
-  // Memoize the status polling function to prevent unnecessary recreations
-  const pollScanningStatus = useCallback(async (intervalId: NodeJS.Timeout) => {
+  const MAX_STATUS_CHECK_FAILURES = 5;
+
+  const pollScanningStatus = async (interval: NodeJS.Timeout) => {
     try {
-      const status = await api.email.getScanningStatus();
-      console.log('Scan status update:', status);
-      
-      // Reset failure counter on successful response
-      if (statusCheckFailures > 0) {
-        setStatusCheckFailures(0);
-      }
-      
-      if (status.error) {
-        if (statusCheckFailures > 5) {
-          clearInterval(intervalId);
-          setError(status.error);
-          setScanningStatus('error');
-          return;
-        }
-        
-        console.warn(`Status check returned error: ${status.error}. Continuing polling.`);
+      setStatusCheckFailures(prev => {
+        // If we've already hit the failure limit, don't keep incrementing
+        if (prev >= MAX_STATUS_CHECK_FAILURES) return prev;
+        return prev;
+      });
+
+      const response = await api.email.getScanStatus();
+      console.log('Scan status response:', response);
+
+      if (response.error) {
+        console.error('Error in scan status:', response.error);
         setStatusCheckFailures(prev => prev + 1);
+        
+        if (statusCheckFailures >= MAX_STATUS_CHECK_FAILURES) {
+          clearInterval(interval);
+          setScanningStatus('error');
+          setError(`Failed to check scan status: ${response.error}`);
+        }
         return;
       }
-      
-      setProgress(status.progress || 0);
-      
-      if (status.status === 'analyzing') {
-        setScanningStatus('analyzing');
-      }
-      
-      if (status.status === 'complete') {
-        clearInterval(intervalId);
+
+      // Reset failures counter on successful response
+      setStatusCheckFailures(0);
+
+      // Update progress bar
+      setProgress(response.progress || 0);
+
+      // Handle completion
+      if (response.status === 'completed') {
+        clearInterval(interval);
         setScanningStatus('complete');
+        setError(null);
         
-        try {
-          const suggestionsResponse = await api.email.getSubscriptionSuggestions();
-          console.log('Suggestions received:', suggestionsResponse);
-          
-          if (suggestionsResponse.error) {
-            throw new Error(suggestionsResponse.error);
-          }
-          
-          setSuggestions(suggestionsResponse.suggestions || []);
-        } catch (suggestionErr) {
-          console.error('Error fetching suggestions:', suggestionErr);
-          setError('Failed to retrieve subscription suggestions. Please try again.');
-          setScanningStatus('error');
-        }
+        // Navigate to suggestions or dashboard
+        console.log('Scan completed, checking for suggestions...');
+        loadSuggestions();
+      } 
+      // Handle errors
+      else if (response.status === 'failed') {
+        clearInterval(interval);
+        setScanningStatus('error');
+        setError('Email scan failed. ' + (response.error || 'Please try again.'));
       }
-    } catch (statusErr) {
-      console.error('Error checking scan status:', statusErr);
+      // Otherwise, we're still in progress
+    } catch (error: any) {
+      console.error('Error polling scan status:', error);
       setStatusCheckFailures(prev => prev + 1);
       
-      // After several failures, stop and show error
-      if (statusCheckFailures > 5) {
-        clearInterval(intervalId);
-        setError('Failed to communicate with the server. Please check your internet connection and try again.');
+      if (statusCheckFailures >= MAX_STATUS_CHECK_FAILURES) {
+        clearInterval(interval);
         setScanningStatus('error');
+        
+        // Show appropriate message based on error
+        if (error.message?.includes('Network') || error.message?.includes('ECONNREFUSED')) {
+          setError('Network connection error. Please check your internet connection and try again.');
+        } else if (error.message?.includes('Authentication') || error.message?.includes('401')) {
+          setError('Your session has expired. Please log out and log in again.');
+        } else {
+          setError(`Failed to check scan status: ${error.message}`);
+        }
       }
     }
-  }, [statusCheckFailures]);
+  };
 
   useEffect(() => {
     let statusInterval: NodeJS.Timeout;
@@ -208,6 +216,23 @@ const ScanningPage = () => {
     }
   };
 
+  const loadSuggestions = async () => {
+    try {
+      const suggestionsResponse = await api.email.getSubscriptionSuggestions();
+      console.log('Suggestions received:', suggestionsResponse);
+      
+      if (suggestionsResponse.error) {
+        throw new Error(suggestionsResponse.error);
+      }
+      
+      setSuggestions(suggestionsResponse.suggestions || []);
+    } catch (suggestionErr) {
+      console.error('Error fetching suggestions:', suggestionErr);
+      setError('Failed to retrieve subscription suggestions. Please try again.');
+      setScanningStatus('error');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -294,35 +319,55 @@ const ScanningPage = () => {
                   Found {suggestions.length} subscription{suggestions.length === 1 ? '' : 's'}
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
-                  Please confirm these subscriptions we found in your emails.
+                  We detected these subscriptions in your emails. Review and confirm them to add to your dashboard.
                 </p>
                 <div className="mt-8 space-y-6">
                   {suggestions.map((suggestion) => (
                     <div key={suggestion.id} className="bg-white shadow rounded-lg p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">{suggestion.name}</h3>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {suggestion.price} {suggestion.currency} / {suggestion.billingFrequency}
-                          </p>
-                          <p className="mt-1 text-xs text-gray-400">
-                            Found in email: {suggestion.emailSubject}
-                            <br />
-                            Date: {new Date(suggestion.emailDate).toLocaleDateString()}
-                          </p>
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                        <div className="space-y-3">
+                          <div className="flex items-center">
+                            <h3 className="text-lg font-medium text-gray-900">{suggestion.name}</h3>
+                            {suggestion.confidence > 0.8 && (
+                              <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                High Confidence
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600 space-y-1">
+                            <p className="font-medium">
+                              {suggestion.price} {suggestion.currency} / {suggestion.billing_frequency}
+                            </p>
+                            {suggestion.next_billing_date && (
+                              <p>
+                                Next billing: {new Date(suggestion.next_billing_date).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 space-y-1">
+                            <p>
+                              <span className="font-medium">From:</span> {suggestion.email_from}
+                            </p>
+                            <p>
+                              <span className="font-medium">Subject:</span> {suggestion.email_subject}
+                            </p>
+                            <p>
+                              <span className="font-medium">Date:</span> {new Date(suggestion.email_date).toLocaleDateString()}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex space-x-3">
-                          <button
-                            onClick={() => handleSuggestionAction(suggestion.id, false)}
-                            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                          >
-                            Ignore
-                          </button>
+                        <div className="mt-4 md:mt-0 flex flex-row md:flex-col space-x-3 md:space-x-0 md:space-y-3">
                           <button
                             onClick={() => handleSuggestionAction(suggestion.id, true)}
-                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                            className="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                           >
-                            Add
+                            Add Subscription
+                          </button>
+                          <button
+                            onClick={() => handleSuggestionAction(suggestion.id, false)}
+                            className="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            Ignore
                           </button>
                         </div>
                       </div>

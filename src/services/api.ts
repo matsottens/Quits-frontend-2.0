@@ -113,30 +113,39 @@ const api = axios.create({
   }
 });
 
-// Add request interceptor to include JWT token
-api.interceptors.request.use(async (config) => {
-  console.log(`Making request to: ${config.baseURL}${config.url}`);
-  const session = await supabase.auth.getSession();
-  if (session?.data?.session?.access_token) {
-    config.headers.Authorization = `Bearer ${session.data.session.access_token}`;
-  }
-  return config;
-}, (error) => {
-  console.error('Request interceptor error:', error);
-  return Promise.reject(error);
-});
+// Add request interceptor to add token to every request
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-// Add response interceptor to handle auth errors and network issues
+// Add response interceptor to handle common errors
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized error (e.g., redirect to login)
-      window.location.href = '/login';
-    } else if (error.code === 'ERR_NETWORK') {
-      console.error('Network error in API call:', error);
-      // You could implement retry logic here if needed
+  (error) => {
+    if (axios.isAxiosError(error)) {
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        console.error('Authentication failed - clearing token');
+        localStorage.removeItem('token');
+        // Optionally redirect to login
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login?error=session_expired';
+        }
+      }
+      
+      // Handle CORS errors with more debug info
+      if (error.code === 'ERR_NETWORK') {
+        console.error('Network error - possible CORS issue:', error);
+      }
     }
+    
     return Promise.reject(error);
   }
 );
@@ -347,7 +356,8 @@ const apiService = {
               method: 'POST',
               credentials: 'include',
               headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
               }
             });
             
@@ -365,7 +375,7 @@ const apiService = {
     },
 
     // Get scanning status with retry mechanism
-    getScanningStatus: async () => {
+    getScanStatus: async () => {
       const maxRetries = 3;
       let retries = 0;
       
@@ -396,10 +406,34 @@ const apiService = {
       return tryGetStatus();
     },
 
+    // Alias for getScanStatus to maintain backward compatibility
+    getScanningStatus: async () => {
+      return await apiService.email.getScanStatus();
+    },
+
     // Get subscription suggestions from scanned emails
     getSubscriptionSuggestions: async () => {
       try {
         const response = await api.get('/email/suggestions');
+        
+        // Map the response data to make it more consistent
+        if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
+          // Ensure all fields are present with consistent naming
+          response.data.suggestions = response.data.suggestions.map(suggestion => ({
+            ...suggestion,
+            // Ensure consistent property names (frontend uses camelCase)
+            price: suggestion.price || 0,
+            currency: suggestion.currency || 'USD',
+            confidence: suggestion.confidence || 0.5,
+            // Maintain both billing_frequency (backend) and billingFrequency (frontend) for compatibility
+            billingFrequency: suggestion.billing_frequency || 'monthly',
+            // Ensure email metadata is present
+            email_subject: suggestion.email_subject || 'No Subject',
+            email_from: suggestion.email_from || 'Unknown Sender',
+            email_date: suggestion.email_date || new Date().toISOString()
+          }));
+        }
+        
         return response.data;
       } catch (error) {
         console.error('Error getting subscription suggestions:', error);
@@ -413,7 +447,8 @@ const apiService = {
               credentials: 'include',
               headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
               }
             });
             
