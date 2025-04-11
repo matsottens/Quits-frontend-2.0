@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Header from '../components/Header';
@@ -18,7 +18,7 @@ interface SubscriptionSuggestion {
 
 const ScanningPage = () => {
   const navigate = useNavigate();
-  const [scanningStatus, setScanningStatus] = useState<'initial' | 'scanning' | 'analyzing' | 'complete' | 'error'>('initial');
+  const [scanningStatus, setScanningStatus] = useState<ScanningStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SubscriptionSuggestion[]>([]);
@@ -26,154 +26,118 @@ const ScanningPage = () => {
   const [isRetrying, setIsRetrying] = useState(false);
   const [statusCheckFailures, setStatusCheckFailures] = useState(0);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const scanInitiatedRef = useRef(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const maxRetries = 3;
 
   const MAX_STATUS_CHECK_FAILURES = 5;
 
-  const pollScanningStatus = async (interval: NodeJS.Timeout) => {
+  // Clear any active polling when component unmounts
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Start email scanning process
+  const startScanning = async () => {
+    if (scanInitiatedRef.current) {
+      console.log('Scan already initiated, skipping');
+      return;
+    }
+
     try {
-      setStatusCheckFailures(prev => {
-        // If we've already hit the failure limit, don't keep incrementing
-        if (prev >= MAX_STATUS_CHECK_FAILURES) return prev;
-        return prev;
-      });
-
-      const response = await api.email.getScanStatus();
-      console.log('Scan status response:', response);
-
-      if (response.error) {
-        console.error('Error in scan status:', response.error);
-        setStatusCheckFailures(prev => prev + 1);
-        
-        if (statusCheckFailures >= MAX_STATUS_CHECK_FAILURES) {
-          clearInterval(interval);
-          setScanningStatus('error');
-          setError(`Failed to check scan status: ${response.error}`);
-        }
-        return;
-      }
-
-      // Reset failures counter on successful response
-      setStatusCheckFailures(0);
-
-      // Update progress bar
-      setProgress(response.progress || 0);
-
-      // Handle completion
-      if (response.status === 'completed') {
-        clearInterval(interval);
-        setScanningStatus('complete');
-        setError(null);
-        
-        // Navigate to suggestions or dashboard
-        console.log('Scan completed, checking for suggestions...');
-        loadSuggestions();
-      } 
-      // Handle errors
-      else if (response.status === 'failed') {
-        clearInterval(interval);
-        setScanningStatus('error');
-        setError('Email scan failed. ' + (response.error || 'Please try again.'));
-      }
-      // Otherwise, we're still in progress
-    } catch (error: any) {
-      console.error('Error polling scan status:', error);
-      setStatusCheckFailures(prev => prev + 1);
+      setError(null);
+      setScanningStatus('scanning');
+      scanInitiatedRef.current = true;
+      console.log('Starting email scanning process');
       
-      if (statusCheckFailures >= MAX_STATUS_CHECK_FAILURES) {
-        clearInterval(interval);
-        setScanningStatus('error');
-        
-        // Show appropriate message based on error
-        if (error.message?.includes('Network') || error.message?.includes('ECONNREFUSED')) {
-          setError('Network connection error. Please check your internet connection and try again.');
-        } else if (error.message?.includes('Authentication') || error.message?.includes('401')) {
-          setError('Your session has expired. Please log out and log in again.');
-        } else {
-          setError(`Failed to check scan status: ${error.message}`);
-        }
+      const response = await api.email.scanEmails();
+      
+      if (response.error) {
+        throw new Error(response.message || 'Failed to start scanning');
+      }
+      
+      // Start polling for status updates
+      pollScanStatus();
+    } catch (err) {
+      console.error('Error starting scan:', err);
+      setError('Failed to start email scanning. Please try again.');
+      setScanningStatus('error');
+      scanInitiatedRef.current = false;
+      
+      // Retry automatically a limited number of times
+      if (retryCount < maxRetries) {
+        setRetryCount(prev => prev + 1);
+        console.log(`Retrying scan initiation... Attempt ${retryCount + 1}/${maxRetries}`);
+        setTimeout(startScanning, 2000); // Retry after 2 seconds
       }
     }
   };
 
+  // Poll for scan status
+  const pollScanStatus = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+    
+    // Set initial poll immediately
+    checkScanStatus();
+    
+    // Then poll every 3 seconds
+    pollingIntervalRef.current = setInterval(checkScanStatus, 3000);
+  };
+
+  // Check the scanning status
+  const checkScanStatus = async () => {
+    try {
+      const statusResponse = await api.email.getScanStatus();
+      
+      if (statusResponse.error) {
+        throw new Error(statusResponse.error);
+      }
+      
+      const { status, progress: scanProgress } = statusResponse;
+      
+      // Update state based on status
+      setScanningStatus(status);
+      setProgress(scanProgress || 0);
+      
+      // If complete, stop polling and get suggestions
+      if (status === 'complete') {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        
+        // Get subscription suggestions
+        const suggestionsResponse = await api.email.getSubscriptionSuggestions();
+        setSuggestions(suggestionsResponse.suggestions || []);
+      }
+      
+      // If error, stop polling
+      if (status === 'error') {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        setError('An error occurred during email scanning.');
+      }
+    } catch (err) {
+      console.error('Error checking scan status:', err);
+      // Don't update status here - just log the error and continue polling
+    }
+  };
+
+  // Start scanning when component mounts
   useEffect(() => {
-    let statusInterval: NodeJS.Timeout;
-
-    const startScanning = async () => {
-      try {
-        setError(null);
-        setScanningStatus('scanning');
-        setStatusCheckFailures(0);
-        console.log('Starting email scanning process');
-        
-        // Try to initiate email scanning
-        try {
-          const scanResponse = await api.email.scanEmails();
-          console.log('Scan initiated response:', scanResponse);
-          
-          if (scanResponse.error) {
-            throw new Error(scanResponse.error);
-          }
-        } catch (scanErr: any) {
-          console.error('Initial scan request failed:', scanErr);
-          
-          // Specific handling for common errors
-          if (scanErr.message?.includes('Authentication')) {
-            throw new Error('Authentication failed. Please log out and log in again to reconnect your Google account.');
-          } else if (scanErr.message?.includes('permission') || scanErr.message?.includes('scope')) {
-            throw new Error('Gmail access permission is required. Please log out and log in again with full permissions.');
-          } else if (scanErr.message?.includes('Network')) {
-            throw new Error('Network connection error. Please check your internet connection and try again.');
-          } else {
-            // Retry once for general errors
-            if (reconnectAttempt === 0) {
-              console.log('Retrying scan initiation...');
-              setReconnectAttempt(1);
-              const retryResponse = await api.email.scanEmails();
-              if (retryResponse.error) {
-                throw new Error(retryResponse.error);
-              }
-            } else {
-              throw scanErr;
-            }
-          }
-        }
-        
-        // Poll for scanning status
-        statusInterval = setInterval(() => {
-          pollScanningStatus(statusInterval);
-        }, 2000);
-
-      } catch (err: any) {
-        console.error('Scanning error:', err);
-        
-        let errorMessage = 'Failed to start email scanning';
-        
-        // More user-friendly error messages
-        if (err.message?.includes('Network')) {
-          errorMessage = 'Network connection error. Please check your internet connection and try again.';
-        } else if (err.message?.includes('Authentication')) {
-          errorMessage = 'Authentication failed. Please log out and log in again.';
-        } else if (err.message?.includes('permission') || err.message?.includes('scope')) {
-          errorMessage = 'Missing Gmail access permission. Please log in again with required permissions.';
-        } else if (err.message?.includes('timeout')) {
-          errorMessage = 'Request timed out. The server might be busy, please try again.';
-        } else if (err.message) {
-          errorMessage = err.message;
-        }
-        
-        setError(errorMessage);
-        setScanningStatus('error');
-      }
-    };
-
-    startScanning();
-
-    return () => {
-      if (statusInterval) {
-        clearInterval(statusInterval);
-      }
-    };
-  }, [isRetrying, pollScanningStatus, reconnectAttempt]);
+    // Only start if not already scanning
+    if (scanningStatus === 'idle' && !scanInitiatedRef.current) {
+      startScanning();
+    }
+  }, [scanningStatus]);
 
   const handleRetry = () => {
     setIsRetrying(true);
@@ -213,23 +177,6 @@ const ScanningPage = () => {
       }
       
       setError(errorMessage);
-    }
-  };
-
-  const loadSuggestions = async () => {
-    try {
-      const suggestionsResponse = await api.email.getSubscriptionSuggestions();
-      console.log('Suggestions received:', suggestionsResponse);
-      
-      if (suggestionsResponse.error) {
-        throw new Error(suggestionsResponse.error);
-      }
-      
-      setSuggestions(suggestionsResponse.suggestions || []);
-    } catch (suggestionErr) {
-      console.error('Error fetching suggestions:', suggestionErr);
-      setError('Failed to retrieve subscription suggestions. Please try again.');
-      setScanningStatus('error');
     }
   };
 

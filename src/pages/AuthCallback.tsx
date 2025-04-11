@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/apiService';
 
 // Extend Window interface to allow for dynamic property assignment
 declare global {
@@ -12,9 +13,11 @@ declare global {
 // ONLY use direct login, avoid any API calls
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const processedRef = useRef(false); // Add ref to track if we've already processed this callback
   const [logMessages, setLogMessages] = useState<string[]>([]);
 
   // Custom logging function
@@ -24,84 +27,57 @@ const AuthCallback = () => {
   };
 
   useEffect(() => {
-    log('AuthCallback component mounted');
-    const timeoutIds: NodeJS.Timeout[] = [];
-    let isMounted = true;
-
-    const processAuthCode = async () => {
+    // Only process the callback once
+    if (processedRef.current) {
+      return; // Skip if already processed
+    }
+    
+    const processGoogleCallback = async () => {
       try {
-        // Get code from URL
-        const urlParams = new URLSearchParams(window.location.search);
+        setIsProcessing(true);
+        processedRef.current = true; // Mark as processed immediately
+        
+        // Get the code from URL query params
+        const urlParams = new URLSearchParams(location.search);
         const code = urlParams.get('code');
-        log(`Authorization code received: ${code ? 'Yes (first 10 chars: ' + code.substring(0, 10) + '...)' : 'No'}`);
-
+        
         if (!code) {
-          log('No authorization code found in URL parameters');
-          if (isMounted) {
-            setError('No authorization code found');
-            setIsProcessing(false);
-            const timeoutId = setTimeout(() => navigate('/login'), 3000);
-            timeoutIds.push(timeoutId);
-          }
+          setError('No authorization code found');
           return;
         }
-
-        // Create a simple token - this is all we need, no API calls required
-        const simpleToken = `quits-token-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-        log('Created a mock token: ' + simpleToken);
-
-        // Check if the token is already in localStorage (set by auth-callback.js)
-        const existingToken = localStorage.getItem('quits_auth_token');
-        if (existingToken) {
-          log('Found existing token in localStorage: ' + existingToken.substring(0, 20) + '...');
-          try {
-            await login(existingToken);
-            log('Login successful with existing token');
-            if (isMounted) {
-              navigate('/dashboard');
-            }
-            return;
-          } catch (error) {
-            log('Error using existing token: ' + error);
-          }
-        }
-
-        // Use our generated token if no existing token works
-        try {
-          log('Logging in with generated token');
-          await login(simpleToken);
-          log('Login successful, redirecting to dashboard');
-          if (isMounted) {
-            navigate('/dashboard');
-          }
-        } catch (loginError) {
-          log('Login failed: ' + loginError);
-          if (isMounted) {
-            setError('Login failed. Please try again.');
-            setIsProcessing(false);
-          }
+        
+        // Debug info
+        const debugInfo = {
+          url: window.location.href,
+          origin: window.location.origin,
+          hostname: window.location.hostname,
+          code: code.substring(0, 12) + '...',
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('Auth callback debug:', debugInfo);
+        
+        // Attempt to get token
+        console.log('Attempting to get token using handleGoogleCallback');
+        const result = await apiService.auth.handleGoogleCallback(code);
+        
+        if (result && result.token) {
+          console.log('Successfully received auth token');
+          login(result.token);
+          navigate('/dashboard');
+        } else {
+          setError('Failed to authenticate with Google');
         }
       } catch (err) {
-        log('Unexpected error: ' + err);
-        if (isMounted) {
-          setError('Authentication failed. Please try again.');
-          setIsProcessing(false);
-          const timeoutId = setTimeout(() => navigate('/login'), 5000);
-          timeoutIds.push(timeoutId);
-        }
+        console.error('Google callback error:', err);
+        setError('Authentication failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      } finally {
+        setIsProcessing(false);
       }
     };
-
-    // Start the auth process immediately
-    processAuthCode();
-
-    // Clean up timeouts
-    return () => {
-      log('AuthCallback component unmounting');
-      isMounted = false;
-      timeoutIds.forEach(id => clearTimeout(id));
-    };
-  }, [navigate, login]);
+    
+    processGoogleCallback();
+  }, [location.search, login, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

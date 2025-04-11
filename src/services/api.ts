@@ -193,104 +193,53 @@ const apiService = {
     
     // Handle Google OAuth callback with multiple fallback methods
     handleGoogleCallback: async (code: string) => {
-      const tryApproaches = async () => {
-        // Attempt 1: Use authApi with normal content type
-        try {
-          console.log('Attempt 1: Using authApi with JSON content type');
-          const endpoint = `/auth/google/callback?code=${code}`;
-          const response = await authApi.get(endpoint);
-          if (response.data?.token) {
-            return response.data;
+      // Only attempt once, using URLSearchParams for proper encoding
+      const safeCode = encodeURIComponent(code);
+      const redirectUrl = encodeURIComponent(window.location.origin + '/dashboard');
+      
+      console.log(`Attempting Google auth callback with code: ${safeCode.substring(0, 12)}...`);
+      
+      try {
+        // Use a single endpoint for stability
+        const endpoint = `/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}`;
+        const response = await authApi.get(endpoint, {
+          timeout: 20000, // 20 second timeout
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
           }
-        } catch (err) {
-          console.error('Standard auth API approach failed:', err);
-        }
+        });
         
-        // Attempt 2: Try direct axios call
-        try {
-          console.log('Attempt 2: Using direct axios call');
-          const response = await axios({
-            method: 'get',
-            url: `${AUTH_API_URL}/auth/google/callback?code=${code}`,
-            withCredentials: true,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            timeout: 30000
-          });
-          
-          if (response.data?.token) {
-            return response.data;
-          }
-        } catch (err) {
-          console.error('Direct axios approach failed:', err);
+        if (response.data?.token) {
+          return response.data;
+        } else {
+          throw new Error('No token received from auth endpoint');
         }
+      } catch (error) {
+        console.error('Auth API error:', error);
         
-        // Attempt 3: Try fetch API
+        // Single fallback with fetch API if axios fails
         try {
-          console.log('Attempt 3: Using fetch API');
-          const response = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${code}`, {
+          console.log('Trying fetch fallback for auth');
+          const fetchResponse = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}`, {
             method: 'GET',
-            credentials: 'include',
             headers: {
-              'Content-Type': 'application/json',
               'Accept': 'application/json'
             }
           });
           
-          if (response.ok) {
-            const data = await response.json();
+          if (fetchResponse.ok) {
+            const data = await fetchResponse.json();
             if (data?.token) {
               return data;
             }
           }
-        } catch (err) {
-          console.error('Fetch API approach failed:', err);
+        } catch (fetchError) {
+          console.error('Fetch fallback also failed:', fetchError);
         }
         
-        // Attempt 4: Try alternate no-cors approach
-        try {
-          console.log('Attempt 4: Using fetch with no-cors mode');
-          
-          // We'll use a fetch with no-cors mode instead of JSONP to avoid CSP issues
-          const fetchResponse = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${code}`, {
-            method: 'GET',
-            mode: 'no-cors',
-            credentials: 'include',
-            headers: {
-              'Accept': '*/*'
-            }
-          });
-          
-          console.log('No-cors fetch response:', fetchResponse);
-          // We can't actually read the response in no-cors mode,
-          // but if we didn't get an error, we can try to proceed
-          
-          // Try a follow-up request to /auth/me to get the user info
-          try {
-            const meResponse = await authApi.get('/auth/me');
-            if (meResponse.data) {
-              console.log('Successfully authenticated user:', meResponse.data);
-              return { token: meResponse.data.token || 'placeholder-token' };
-            }
-          } catch (meErr) {
-            console.error('Error checking authentication status:', meErr);
-          }
-          
-          // If we can't verify, return a placeholder token that the UI can use
-          // The real token will be in the cookie anyway
-          return { token: 'auth-placeholder-token' };
-        } catch (err) {
-          console.error('No-cors fetch approach failed:', err);
-        }
-        
-        // If we got here, all attempts failed
-        throw new Error('All authentication approaches failed');
-      };
-      
-      // Try all approaches
-      return await tryApproaches();
+        throw new Error('All authentication attempts failed');
+      }
     },
     
     // Get current user info
@@ -356,18 +305,20 @@ const apiService = {
     scanEmails: async () => {
       try {
         console.log('Initiating email scanning process');
+        
+        // Use the correct endpoint and a longer timeout
         const response = await api.post('/email/scan', {}, {
-          timeout: 60000 // 60 second timeout for scanning initialization
+          timeout: 60000 // 60 second timeout
         });
+        
         console.log('Email scan response:', response.data);
         return response.data;
       } catch (error) {
         console.error('Email scanning error:', error);
         
-        // If network error, try alternative approach with fetch
+        // Only try fetch fallback if there's a network error
         if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
           try {
-            console.log('Trying alternative approach with fetch API for email scanning');
             const fetchResponse = await fetch(`${API_URL}/email/scan`, {
               method: 'POST',
               credentials: 'include',
@@ -382,11 +333,16 @@ const apiService = {
               return data;
             }
           } catch (fetchError) {
-            console.error('Fetch fallback for email scanning failed:', fetchError);
+            console.error('Fetch fallback failed:', fetchError);
           }
         }
         
-        throw new Error('Failed to start email scanning. Please try again later.');
+        // Return a consistent error object rather than throwing
+        return { 
+          error: true, 
+          message: 'Failed to start email scanning',
+          details: axios.isAxiosError(error) ? error.message : String(error)
+        };
       }
     },
 
