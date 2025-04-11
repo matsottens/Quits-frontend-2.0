@@ -165,6 +165,22 @@ const GOOGLE_OAUTH_CONFIG = {
 // Log the redirect URI for debugging
 console.log(`Using Google OAuth redirect_uri: ${GOOGLE_OAUTH_CONFIG.redirect_uri}`);
 
+// Define interfaces for API responses
+interface SubscriptionSuggestion {
+  id?: string;
+  service_name?: string;
+  price?: number;
+  currency?: string;
+  billing_frequency?: string;
+  confidence?: number;
+  email_subject?: string;
+  email_from?: string;
+  email_date?: string;
+  next_billing_date?: string;
+  // Add any other fields that might be in the suggestion object
+  [key: string]: any; // Allow for additional fields
+}
+
 // API service with methods for different API calls
 const apiService = {
   // Auth endpoints
@@ -419,7 +435,7 @@ const apiService = {
         // Map the response data to make it more consistent
         if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
           // Ensure all fields are present with consistent naming
-          response.data.suggestions = response.data.suggestions.map(suggestion => ({
+          response.data.suggestions = response.data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
             ...suggestion,
             // Ensure consistent property names (frontend uses camelCase)
             price: suggestion.price || 0,
