@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import api, { supabase } from '../services/api';
 
@@ -16,22 +16,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for existing token in localStorage
-    const storedToken = localStorage.getItem('token');
+    // Check for existing token in various localStorage keys
+    const storedToken = localStorage.getItem('token') || localStorage.getItem('quits_auth_token');
+    
     if (storedToken) {
+      console.log('Found existing auth token, setting authenticated state');
       setToken(storedToken);
       setIsAuthenticated(true);
+      
+      // Copy token to both storage locations for consistency
+      localStorage.setItem('token', storedToken);
+      localStorage.setItem('quits_auth_token', storedToken);
+    } else {
+      console.log('No existing auth token found');
     }
   }, []);
 
-  const login = async (token: string) => {
-    localStorage.setItem('token', token);
-    setToken(token);
+  const login = async (newToken: string) => {
+    console.log('Logging in with token:', newToken.substring(0, 10) + '...');
+    
+    // Store in both locations for maximum compatibility
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('quits_auth_token', newToken);
+    
+    setToken(newToken);
     setIsAuthenticated(true);
   };
 
   const logout = async () => {
+    console.log('Logging out, clearing auth tokens');
     localStorage.removeItem('token');
+    localStorage.removeItem('quits_auth_token');
     setToken(null);
     setIsAuthenticated(false);
   };
