@@ -15,7 +15,9 @@ const API_URL = isProd
   : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
 
 // Auth-specific API URL (always use production)
-const AUTH_API_URL = 'https://api.quits.cc';
+const AUTH_API_URL = isProd
+  ? 'https://api.quits.cc'
+  : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
 
 console.log(`Using API URL: ${API_URL} in ${isProd ? 'production' : 'development'} mode`);
 console.log(`Using AUTH_API_URL: ${AUTH_API_URL} for all auth operations`);
@@ -155,7 +157,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Google OAuth configuration for different environments
 const GOOGLE_OAUTH_CONFIG = {
   client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  redirect_uri: 'https://quits.cc/auth/callback',  // Always use production URL to avoid issues
+  redirect_uri: isProd 
+    ? 'https://quits.cc/auth/callback'
+    : 'http://localhost:5173/auth/callback',
   scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
   response_type: 'code',
   access_type: 'offline',
@@ -221,17 +225,18 @@ const apiService = {
       try {
         // Add a timestamp to prevent browser caching issues
         const timestamp = Date.now();
-        // Use a single endpoint directly to the backend API
+        // Use the environment-specific API URL
         const endpoint = `${AUTH_API_URL}/api/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
         
-        console.log(`Calling backend endpoint directly: ${endpoint}`);
+        console.log(`Calling backend endpoint: ${endpoint}`);
         
         const response = await fetch(endpoint, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
+          },
+          credentials: 'include' // Include cookies for better auth handling
         });
         
         if (!response.ok) {
