@@ -38,7 +38,7 @@ const Login = () => {
       const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
       const isProd = window.location.hostname !== 'localhost';
       const REDIRECT_URI = isProd 
-        ? 'https://quits.cc/auth/callback'
+        ? 'https://www.quits.cc/auth/callback'
         : `${window.location.origin}/auth/callback`;
       
       const params = new URLSearchParams({
