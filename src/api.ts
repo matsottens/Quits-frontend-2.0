@@ -32,11 +32,10 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     // Add timestamp to prevent caching and ensure unique requests
     const timestamp = Date.now();
-    // Use direct backend API URL for most consistent behavior
-    const endpoint = `${API_BASE_URL}/api/auth/google/callback`;
-    const proxyUrl = `${endpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${timestamp}`;
+    // Use proxy endpoint to avoid CORS issues
+    const proxyUrl = `${API_BASE_URL}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${timestamp}`;
     
-    console.log('Calling backend endpoint directly:', proxyUrl);
+    console.log('Calling backend proxy endpoint:', proxyUrl);
     
     // Simple fetch with headers to prevent caching
     const response = await fetch(proxyUrl, {
@@ -49,7 +48,7 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     if (response.ok) {
       const data = await response.json();
-      console.log('Success with direct backend call');
+      console.log('Success with proxy backend call');
       
       if (data?.token) {
         // Success! Return the token and user

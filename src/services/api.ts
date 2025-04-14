@@ -225,10 +225,10 @@ const apiService = {
       try {
         // Add a timestamp to prevent browser caching issues
         const timestamp = Date.now();
-        // Use the environment-specific API URL
-        const endpoint = `${AUTH_API_URL}/api/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
+        // Use the proxy endpoint instead of direct callback to avoid CORS issues
+        const endpoint = `${AUTH_API_URL}/api/google-proxy?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
         
-        console.log(`Calling backend endpoint: ${endpoint}`);
+        console.log(`Calling backend proxy endpoint: ${endpoint}`);
         
         const response = await fetch(endpoint, {
           method: 'GET',
@@ -249,7 +249,7 @@ const apiService = {
         const data = await response.json();
         
         if (data.token) {
-          console.log('Successfully received auth token from backend');
+          console.log('Successfully received auth token from backend proxy');
           return data;
         } else {
           throw new Error('No token received from auth endpoint');
