@@ -234,12 +234,15 @@ const apiService = {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Origin': window.location.origin
           },
           credentials: 'include' // Include cookies for better auth handling
         });
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Auth failed with status: ${response.status}`, errorText);
           throw new Error(`Auth failed with status: ${response.status}`);
         }
         
