@@ -37,34 +37,61 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     console.log('Calling backend proxy endpoint:', proxyUrl);
     
-    // Simple fetch with headers to prevent caching
-    const response = await fetch(proxyUrl, {
-      method: 'GET',
-      headers: { 
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('Success with proxy backend call');
+    // First try: Simple fetch with minimal headers to avoid CORS issues
+    try {
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: { 
+          'Accept': 'application/json'
+        }
+      });
       
-      if (data?.token) {
-        // Success! Return the token and user
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Success with proxy backend call');
+        
+        if (data?.token) {
+          // Success! Return the token and user
+          return {
+            token: data.token,
+            user: data.user,
+            success: true
+          };
+        }
+      }
+    } catch (fetchError) {
+      console.warn('First fetch attempt failed:', fetchError);
+      // Continue to fallback methods
+    }
+    
+    // Second try: Use axios instead of fetch
+    try {
+      console.log('Trying axios as fallback');
+      const axiosResponse = await api.get(proxyUrl);
+      
+      if (axiosResponse.data?.token) {
         return {
-          token: data.token,
-          user: data.user,
+          token: axiosResponse.data.token,
+          user: axiosResponse.data.user,
           success: true
         };
-      } else {
-        throw new Error('No token received from backend');
       }
-    } else {
-      const errorText = await response.text().catch(() => 'Could not parse error response');
-      console.error(`Backend auth failed with status: ${response.status}`, errorText);
-      throw new Error(`Authentication failed with status ${response.status}`);
+    } catch (axiosError) {
+      console.warn('Axios fallback failed:', axiosError);
+      // Continue to JSONP fallback
     }
+    
+    // Last resort: Try JSONP approach by redirecting
+    console.log('All API attempts failed, redirecting to backend directly');
+    window.location.href = proxyUrl;
+    
+    // Return a pending promise since we're redirecting
+    return new Promise<AuthResponse>((resolve) => {
+      setTimeout(() => {
+        resolve({ token: '', error: 'Redirecting to backend' });
+      }, 5000);
+    });
+    
   } catch (error) {
     console.error('Error in handleGoogleCallback:', error);
     throw error;

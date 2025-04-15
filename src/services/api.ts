@@ -230,30 +230,70 @@ const apiService = {
         
         console.log(`Calling backend proxy endpoint: ${endpoint}`);
         
-        const response = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Origin': window.location.origin
-          },
-          credentials: 'include' // Include cookies for better auth handling
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Auth failed with status: ${response.status}`, errorText);
-          throw new Error(`Auth failed with status: ${response.status}`);
+        // First try: simple fetch with minimal headers
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Successfully received auth token from backend proxy');
+            if (data.token) {
+              return data;
+            }
+          }
+        } catch (fetchError) {
+          console.warn('Initial fetch attempt failed:', fetchError);
+          // Continue to next approach
         }
         
-        const data = await response.json();
-        
-        if (data.token) {
-          console.log('Successfully received auth token from backend proxy');
-          return data;
-        } else {
-          throw new Error('No token received from auth endpoint');
+        // Second try: Add credentials but still keep headers minimal
+        try {
+          console.log('Trying second fetch approach with credentials');
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Second fetch approach succeeded');
+            if (data.token) {
+              return data;
+            }
+          }
+        } catch (fetchError2) {
+          console.warn('Second fetch attempt failed:', fetchError2);
+          // Continue to next approach
         }
+        
+        // Third try: Use axios
+        try {
+          console.log('Trying axios as fallback');
+          const axiosResponse = await authApi.get(endpoint.replace(AUTH_API_URL, ''));
+          if (axiosResponse?.data?.token) {
+            console.log('Axios approach succeeded');
+            return axiosResponse.data;
+          }
+        } catch (axiosError) {
+          console.warn('Axios attempt failed:', axiosError);
+          // Continue to last resort
+        }
+        
+        // Last resort: Redirect directly to the proxy URL
+        console.log('All API attempts failed, redirecting to backend directly');
+        window.location.href = endpoint;
+        
+        // Return a temporary response since we're redirecting
+        return { token: '', user: null, redirecting: true };
+        
       } catch (error) {
         console.error('Auth API error:', error);
         throw error;
