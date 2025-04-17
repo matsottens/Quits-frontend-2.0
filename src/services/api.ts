@@ -232,6 +232,7 @@ const apiService = {
         
         // First try: simple fetch with minimal headers
         try {
+          console.log('[apiService] Attempt 1: Basic fetch');
           const response = await fetch(endpoint, {
             method: 'GET',
             headers: {
@@ -241,19 +242,37 @@ const apiService = {
           
           if (response.ok) {
             const data = await response.json();
-            console.log('Successfully received auth token from backend proxy');
+            console.log('[apiService] First fetch succeeded:', data);
             if (data.token) {
               return data;
+            } else {
+              console.warn('[apiService] Response OK but no token:', data);
+            }
+          } else {
+            // Log the error response
+            try {
+              const errorText = await response.text();
+              console.error(`[apiService] Error response (${response.status}):`, errorText);
+              
+              // Try to parse as JSON
+              try {
+                const errorJson = JSON.parse(errorText);
+                console.error('[apiService] Error details:', errorJson);
+              } catch (e) {
+                // Not JSON
+              }
+            } catch (e) {
+              console.error('[apiService] Could not read error response:', e);
             }
           }
         } catch (fetchError) {
-          console.warn('Initial fetch attempt failed:', fetchError);
+          console.warn('[apiService] Initial fetch attempt failed:', fetchError);
           // Continue to next approach
         }
         
         // Second try: Add credentials but still keep headers minimal
         try {
-          console.log('Trying second fetch approach with credentials');
+          console.log('[apiService] Attempt 2: Fetch with credentials');
           const response = await fetch(endpoint, {
             method: 'GET',
             credentials: 'include',
@@ -264,38 +283,69 @@ const apiService = {
           
           if (response.ok) {
             const data = await response.json();
-            console.log('Second fetch approach succeeded');
+            console.log('[apiService] Second fetch approach succeeded:', data);
             if (data.token) {
               return data;
+            } else {
+              console.warn('[apiService] Response OK but no token (attempt 2):', data);
             }
+          } else {
+            console.error(`[apiService] Second fetch failed with status: ${response.status}`);
           }
         } catch (fetchError2) {
-          console.warn('Second fetch attempt failed:', fetchError2);
+          console.warn('[apiService] Second fetch attempt failed:', fetchError2);
           // Continue to next approach
         }
         
         // Third try: Use axios
         try {
-          console.log('Trying axios as fallback');
+          console.log('[apiService] Attempt 3: Axios call');
           const axiosResponse = await authApi.get(endpoint.replace(AUTH_API_URL, ''));
           if (axiosResponse?.data?.token) {
-            console.log('Axios approach succeeded');
+            console.log('[apiService] Axios approach succeeded:', axiosResponse.data);
             return axiosResponse.data;
+          } else {
+            console.warn('[apiService] Axios response without token:', axiosResponse.data);
           }
         } catch (axiosError) {
-          console.warn('Axios attempt failed:', axiosError);
-          // Continue to last resort
+          console.warn('[apiService] Axios attempt failed:', axiosError);
+          
+          // Log more details if it's an axios error
+          if (axios.isAxiosError(axiosError) && axiosError.response) {
+            console.error('[apiService] Axios error details:', {
+              status: axiosError.response.status,
+              data: axiosError.response.data
+            });
+          }
+        }
+        
+        // Fourth try: Use no-cors mode
+        try {
+          console.log('[apiService] Attempt 4: Fetch with no-cors mode');
+          await fetch(endpoint, {
+            method: 'GET',
+            mode: 'no-cors'
+          });
+          console.log('[apiService] no-cors request didn\'t throw but response is opaque');
+        } catch (noCorsError) {
+          console.warn('[apiService] no-cors attempt failed:', noCorsError);
         }
         
         // Last resort: Redirect directly to the proxy URL
-        console.log('All API attempts failed, redirecting to backend directly');
+        console.log('[apiService] All API attempts failed, redirecting to backend directly');
+        
+        // Save state in sessionStorage
+        sessionStorage.setItem('auth_redirect_attempted', 'true');
+        sessionStorage.setItem('auth_redirect_time', Date.now().toString());
+        sessionStorage.setItem('auth_code_prefix', safeCode.substring(0, 10) + '...');
+        
         window.location.href = endpoint;
         
         // Return a temporary response since we're redirecting
         return { token: '', user: null, redirecting: true };
         
       } catch (error) {
-        console.error('Auth API error:', error);
+        console.error('[apiService] Auth API error:', error);
         throw error;
       }
     },
