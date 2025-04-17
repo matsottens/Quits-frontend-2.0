@@ -478,87 +478,88 @@ const apiService = {
         }
         
         throw new Error('Failed to start email scanning');
-      },
-
-      // Get scanning status with retry mechanism
-      getScanStatus: async () => {
-        const maxRetries = 3;
-        let retries = 0;
-        
-        const tryGetStatus = async () => {
-          try {
-            const response = await api.get('/email/status');
-            return response.data;
-          } catch (error) {
-            console.error('Error getting scan status:', error);
-             
-            if (retries < maxRetries - 1) {
-              retries++;
-              // Exponential backoff: 1s, 2s, 4s...
-              const delay = Math.pow(2, retries) * 1000;
-              console.log(`Retrying after ${delay}ms...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              return tryGetStatus();
-            }
-             
-            return { 
-              error: 'Failed to retrieve scanning status', 
-              status: 'error', 
-              progress: 0 
-            };
-          }
-        };
-         
-        return tryGetStatus();
-      },
-
-      // Alias for getScanStatus to maintain backward compatibility
-      getScanningStatus: async () => {
-        return await apiService.email.getScanStatus();
-      },
-
-      // Get subscription suggestions from scanned emails
-      getSubscriptionSuggestions: async () => {
-        try {
-          const response = await api.get('/email/suggestions');
-          
-          // Map the response data to make it more consistent
-          if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
-            // Ensure all fields are present with consistent naming
-            response.data.suggestions = response.data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
-              ...suggestion,
-              // Ensure consistent property names (frontend uses camelCase)
-              price: suggestion.price || 0,
-              currency: suggestion.currency || 'USD',
-              confidence: suggestion.confidence || 0.5,
-              // Maintain both billing_frequency (backend) and billingFrequency (frontend) for compatibility
-              billingFrequency: suggestion.billing_frequency || 'monthly',
-              // Ensure email metadata is present
-              email_subject: suggestion.email_subject || 'No Subject',
-              email_from: suggestion.email_from || 'Unknown Sender',
-              email_date: suggestion.email_date || new Date().toISOString()
-            }));
-          }
-          
-          return response.data;
-        } catch (error) {
-          console.error('Error getting subscription suggestions:', error);
-          return { error: 'Failed to retrieve suggestions', suggestions: [] };
-        }
-      },
-
-      // Confirm or reject a subscription suggestion
-      confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
-        try {
-          const response = await api.post(`/email/suggestions/${suggestionId}/confirm`, {
-            confirmed
-          });
-          return response.data;
-        } catch (error) {
-          console.error('Error confirming suggestion:', error);
-          throw error;
-        }
       }
+    },
+
+    // Get scanning status with retry mechanism
+    getScanStatus: async () => {
+      const maxRetries = 3;
+      let retries = 0;
+      
+      const tryGetStatus = async () => {
+        try {
+          const response = await api.get('/email/status');
+          return response.data;
+        } catch (error) {
+          console.error('Error getting scan status:', error);
+           
+          if (retries < maxRetries - 1) {
+            retries++;
+            // Exponential backoff: 1s, 2s, 4s...
+            const delay = Math.pow(2, retries) * 1000;
+            console.log(`Retrying after ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return tryGetStatus();
+          }
+           
+          return { 
+            error: 'Failed to retrieve scanning status', 
+            status: 'error', 
+            progress: 0 
+          };
+        }
+      };
+       
+      return tryGetStatus();
+    },
+
+    // Alias for getScanStatus to maintain backward compatibility
+    getScanningStatus: async () => {
+      return await apiService.email.getScanStatus();
+    },
+
+    // Get subscription suggestions from scanned emails
+    getSubscriptionSuggestions: async () => {
+      try {
+        const response = await api.get('/email/suggestions');
+        
+        // Map the response data to make it more consistent
+        if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
+          // Ensure all fields are present with consistent naming
+          response.data.suggestions = response.data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
+            ...suggestion,
+            // Ensure consistent property names (frontend uses camelCase)
+            price: suggestion.price || 0,
+            currency: suggestion.currency || 'USD',
+            confidence: suggestion.confidence || 0.5,
+            // Maintain both billing_frequency (backend) and billingFrequency (frontend) for compatibility
+            billingFrequency: suggestion.billing_frequency || 'monthly',
+            // Ensure email metadata is present
+            email_subject: suggestion.email_subject || 'No Subject',
+            email_from: suggestion.email_from || 'Unknown Sender',
+            email_date: suggestion.email_date || new Date().toISOString()
+          }));
+        }
+        
+        return response.data;
+      } catch (error) {
+        console.error('Error getting subscription suggestions:', error);
+        return { error: 'Failed to retrieve suggestions', suggestions: [] };
+      }
+    },
+
+    // Confirm or reject a subscription suggestion
+    confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
+      try {
+        const response = await api.post(`/email/suggestions/${suggestionId}/confirm`, {
+          confirmed
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Error confirming suggestion:', error);
+        throw error;
+      }
+    }
   },
   
   // Subscription endpoints
