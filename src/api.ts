@@ -10,6 +10,7 @@ interface AuthResponse {
   };
   error?: string;
   success?: boolean;
+  redirecting?: boolean;
 }
 
 // Always use api.quits.cc for auth operations, regardless of environment
