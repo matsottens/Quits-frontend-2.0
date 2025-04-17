@@ -102,7 +102,18 @@ const AuthCallback = () => {
             if (axiosError.response?.status === 500) {
               errorMessage = 'Server error. Please try again later.';
             } else if (axiosError.response?.status === 400) {
-              errorMessage = 'Invalid request. Please try again.';
+              const responseData = axiosError.response?.data as any;
+              
+              // Check for invalid_grant error from Google OAuth
+              if (responseData?.details?.error === 'invalid_grant') {
+                errorMessage = 'Authorization code expired or already used. Please try logging in again.';
+                // Clear any session storage state related to the auth attempt
+                sessionStorage.removeItem('auth_redirect_attempted');
+                sessionStorage.removeItem('auth_redirect_time');
+                sessionStorage.removeItem('auth_code_prefix');
+              } else {
+                errorMessage = 'Invalid request. Please try again.';
+              }
             } else if (axiosError.code === 'ERR_NETWORK') {
               errorMessage = 'Network error. Please check your connection.';
             } else if (axiosError.message.includes('blocked by CORS')) {
@@ -116,6 +127,8 @@ const AuthCallback = () => {
             errorMessage = 'Authentication request timed out. Please try again or contact support.';
           } else if (error.message?.includes('Failed to fetch')) {
             errorMessage = 'Network error or CORS issue. Please try again or contact support.';
+          } else if (error.message?.includes('expired or already used')) {
+            errorMessage = 'Authentication code has expired. Please try logging in again.';
           } else if (typeof error.message === 'string') {
             errorMessage = error.message;
           }

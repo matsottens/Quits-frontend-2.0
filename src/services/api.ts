@@ -230,49 +230,12 @@ const apiService = {
         
         console.log(`Calling backend proxy endpoint: ${endpoint}`);
         
-        // First try: simple fetch with minimal headers
-        try {
-          console.log('[apiService] Attempt 1: Basic fetch');
-          const response = await fetch(endpoint, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json'
-            }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log('[apiService] First fetch succeeded:', data);
-            if (data.token) {
-              return data;
-            } else {
-              console.warn('[apiService] Response OK but no token:', data);
-            }
-          } else {
-            // Log the error response
-            try {
-              const errorText = await response.text();
-              console.error(`[apiService] Error response (${response.status}):`, errorText);
-              
-              // Try to parse as JSON
-              try {
-                const errorJson = JSON.parse(errorText);
-                console.error('[apiService] Error details:', errorJson);
-              } catch (e) {
-                // Not JSON
-              }
-            } catch (e) {
-              console.error('[apiService] Could not read error response:', e);
-            }
-          }
-        } catch (fetchError) {
-          console.warn('[apiService] Initial fetch attempt failed:', fetchError);
-          // Continue to next approach
-        }
+        // Add a small delay to ensure Vercel's serverless functions are ready
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Second try: Add credentials but still keep headers minimal
+        // Attempt once with the most reliable method - full fetch with credentials
         try {
-          console.log('[apiService] Attempt 2: Fetch with credentials');
+          console.log('[apiService] Making OAuth code exchange request');
           const response = await fetch(endpoint, {
             method: 'GET',
             credentials: 'include',
@@ -281,69 +244,40 @@ const apiService = {
             }
           });
           
+          // Handle response appropriately
           if (response.ok) {
             const data = await response.json();
-            console.log('[apiService] Second fetch approach succeeded:', data);
+            console.log('[apiService] OAuth exchange succeeded:', data);
             if (data.token) {
               return data;
             } else {
-              console.warn('[apiService] Response OK but no token (attempt 2):', data);
+              console.warn('[apiService] Response OK but no token:', data);
+              throw new Error('Valid response but no token returned');
             }
           } else {
-            console.error(`[apiService] Second fetch failed with status: ${response.status}`);
+            // Log the error response
+            const errorText = await response.text();
+            console.error(`[apiService] Error response (${response.status}):`, errorText);
+            
+            // Try to parse as JSON
+            try {
+              const errorJson = JSON.parse(errorText);
+              console.error('[apiService] Error details:', errorJson);
+              
+              // If it's invalid_grant, provide a more helpful message
+              if (errorJson?.details?.error === 'invalid_grant') {
+                throw new Error('OAuth code expired or already used. Please try logging in again.');
+              }
+            } catch (e) {
+              // Not JSON
+            }
+            
+            throw new Error(`OAuth exchange failed with status ${response.status}`);
           }
-        } catch (fetchError2) {
-          console.warn('[apiService] Second fetch attempt failed:', fetchError2);
-          // Continue to next approach
+        } catch (error) {
+          console.error('[apiService] OAuth exchange failed:', error);
+          throw error;
         }
-        
-        // Third try: Use axios
-        try {
-          console.log('[apiService] Attempt 3: Axios call');
-          const axiosResponse = await authApi.get(endpoint.replace(AUTH_API_URL, ''));
-          if (axiosResponse?.data?.token) {
-            console.log('[apiService] Axios approach succeeded:', axiosResponse.data);
-            return axiosResponse.data;
-          } else {
-            console.warn('[apiService] Axios response without token:', axiosResponse.data);
-          }
-        } catch (axiosError) {
-          console.warn('[apiService] Axios attempt failed:', axiosError);
-          
-          // Log more details if it's an axios error
-          if (axios.isAxiosError(axiosError) && axiosError.response) {
-            console.error('[apiService] Axios error details:', {
-              status: axiosError.response.status,
-              data: axiosError.response.data
-            });
-          }
-        }
-        
-        // Fourth try: Use no-cors mode
-        try {
-          console.log('[apiService] Attempt 4: Fetch with no-cors mode');
-          await fetch(endpoint, {
-            method: 'GET',
-            mode: 'no-cors'
-          });
-          console.log('[apiService] no-cors request didn\'t throw but response is opaque');
-        } catch (noCorsError) {
-          console.warn('[apiService] no-cors attempt failed:', noCorsError);
-        }
-        
-        // Last resort: Redirect directly to the proxy URL
-        console.log('[apiService] All API attempts failed, redirecting to backend directly');
-        
-        // Save state in sessionStorage
-        sessionStorage.setItem('auth_redirect_attempted', 'true');
-        sessionStorage.setItem('auth_redirect_time', Date.now().toString());
-        sessionStorage.setItem('auth_code_prefix', safeCode.substring(0, 10) + '...');
-        
-        window.location.href = endpoint;
-        
-        // Return a temporary response since we're redirecting
-        return { token: '', user: null, redirecting: true };
-        
       } catch (error) {
         console.error('[apiService] Auth API error:', error);
         throw error;
