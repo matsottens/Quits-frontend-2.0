@@ -414,20 +414,28 @@ const apiService = {
       try {
         console.log('Initiating email scanning process');
         
+        // Get auth token
+        const authToken = localStorage.getItem('token');
+        if (!authToken) {
+          console.error('No authentication token found');
+          throw new Error('Authentication required to scan emails');
+        }
+        
         // Check if we have Gmail token
         const gmailToken = getGmailToken();
         if (!gmailToken) {
-          console.warn('No Gmail token found in JWT - might use mock data');
+          console.warn('No Gmail token found in JWT - will use mock data');
         } else {
           console.log('Gmail token found in JWT - will use real data');
         }
         
-        // Use the correct endpoint and a longer timeout
+        // Use the correct endpoint with explicit Authorization header
         const response = await api.post('/email/scan', {
           useRealData: !!gmailToken
         }, {
           timeout: 60000, // 60 second timeout
           headers: {
+            'Authorization': `Bearer ${authToken}`,
             'X-Gmail-Token': gmailToken || ''
           }
         });
@@ -438,117 +446,119 @@ const apiService = {
         console.error('Email scanning error:', error);
         
         // Only try fetch fallback if there's a network error
-        if (axios.isAxiosError(error) && error.code === 'ERR_NETWORK') {
+        if (axios.isAxiosError(error) && (error.code === 'ERR_NETWORK' || error.response?.status === 400)) {
           try {
+            console.log('Trying fetch fallback method');
+            const authToken = localStorage.getItem('token');
             const gmailToken = getGmailToken();
+            
             const fetchResponse = await fetch(`${API_URL}/email/scan`, {
               method: 'POST',
               credentials: 'include',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Authorization': `Bearer ${authToken}`,
                 'X-Gmail-Token': gmailToken || ''
               },
               body: JSON.stringify({ useRealData: !!gmailToken })
             });
             
-            if (fetchResponse.ok) {
-              const data = await fetchResponse.json();
-              return data;
+            if (!fetchResponse.ok) {
+              console.error('Fetch fallback failed:', await fetchResponse.text());
+              throw new Error('Failed to fetch');
             }
+            
+            const data = await fetchResponse.json();
+            console.log('Fetch fallback succeeded:', data);
+            return data;
           } catch (fetchError) {
             console.error('Fetch fallback failed:', fetchError);
+            throw new Error('Failed to start email scanning');
           }
         }
         
-        // Return a consistent error object rather than throwing
-        return { 
-          error: true, 
-          message: 'Failed to start email scanning',
-          details: axios.isAxiosError(error) ? error.message : String(error)
-        };
-      }
-    },
+        throw new Error('Failed to start email scanning');
+      },
 
-    // Get scanning status with retry mechanism
-    getScanStatus: async () => {
-      const maxRetries = 3;
-      let retries = 0;
-      
-      const tryGetStatus = async () => {
+      // Get scanning status with retry mechanism
+      getScanStatus: async () => {
+        const maxRetries = 3;
+        let retries = 0;
+        
+        const tryGetStatus = async () => {
+          try {
+            const response = await api.get('/email/status');
+            return response.data;
+          } catch (error) {
+            console.error('Error getting scan status:', error);
+             
+            if (retries < maxRetries - 1) {
+              retries++;
+              // Exponential backoff: 1s, 2s, 4s...
+              const delay = Math.pow(2, retries) * 1000;
+              console.log(`Retrying after ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return tryGetStatus();
+            }
+             
+            return { 
+              error: 'Failed to retrieve scanning status', 
+              status: 'error', 
+              progress: 0 
+            };
+          }
+        };
+         
+        return tryGetStatus();
+      },
+
+      // Alias for getScanStatus to maintain backward compatibility
+      getScanningStatus: async () => {
+        return await apiService.email.getScanStatus();
+      },
+
+      // Get subscription suggestions from scanned emails
+      getSubscriptionSuggestions: async () => {
         try {
-          const response = await api.get('/email/status');
+          const response = await api.get('/email/suggestions');
+          
+          // Map the response data to make it more consistent
+          if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
+            // Ensure all fields are present with consistent naming
+            response.data.suggestions = response.data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
+              ...suggestion,
+              // Ensure consistent property names (frontend uses camelCase)
+              price: suggestion.price || 0,
+              currency: suggestion.currency || 'USD',
+              confidence: suggestion.confidence || 0.5,
+              // Maintain both billing_frequency (backend) and billingFrequency (frontend) for compatibility
+              billingFrequency: suggestion.billing_frequency || 'monthly',
+              // Ensure email metadata is present
+              email_subject: suggestion.email_subject || 'No Subject',
+              email_from: suggestion.email_from || 'Unknown Sender',
+              email_date: suggestion.email_date || new Date().toISOString()
+            }));
+          }
+          
           return response.data;
         } catch (error) {
-          console.error('Error getting scan status:', error);
-           
-          if (retries < maxRetries - 1) {
-            retries++;
-            // Exponential backoff: 1s, 2s, 4s...
-            const delay = Math.pow(2, retries) * 1000;
-            console.log(`Retrying after ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return tryGetStatus();
-          }
-           
-          return { 
-            error: 'Failed to retrieve scanning status', 
-            status: 'error', 
-            progress: 0 
-          };
+          console.error('Error getting subscription suggestions:', error);
+          return { error: 'Failed to retrieve suggestions', suggestions: [] };
         }
-      };
-       
-      return tryGetStatus();
-    },
+      },
 
-    // Alias for getScanStatus to maintain backward compatibility
-    getScanningStatus: async () => {
-      return await apiService.email.getScanStatus();
-    },
-
-    // Get subscription suggestions from scanned emails
-    getSubscriptionSuggestions: async () => {
-      try {
-        const response = await api.get('/email/suggestions');
-        
-        // Map the response data to make it more consistent
-        if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
-          // Ensure all fields are present with consistent naming
-          response.data.suggestions = response.data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
-            ...suggestion,
-            // Ensure consistent property names (frontend uses camelCase)
-            price: suggestion.price || 0,
-            currency: suggestion.currency || 'USD',
-            confidence: suggestion.confidence || 0.5,
-            // Maintain both billing_frequency (backend) and billingFrequency (frontend) for compatibility
-            billingFrequency: suggestion.billing_frequency || 'monthly',
-            // Ensure email metadata is present
-            email_subject: suggestion.email_subject || 'No Subject',
-            email_from: suggestion.email_from || 'Unknown Sender',
-            email_date: suggestion.email_date || new Date().toISOString()
-          }));
+      // Confirm or reject a subscription suggestion
+      confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
+        try {
+          const response = await api.post(`/email/suggestions/${suggestionId}/confirm`, {
+            confirmed
+          });
+          return response.data;
+        } catch (error) {
+          console.error('Error confirming suggestion:', error);
+          throw error;
         }
-        
-        return response.data;
-      } catch (error) {
-        console.error('Error getting subscription suggestions:', error);
-        return { error: 'Failed to retrieve suggestions', suggestions: [] };
       }
-    },
-
-    // Confirm or reject a subscription suggestion
-    confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
-      try {
-        const response = await api.post(`/email/suggestions/${suggestionId}/confirm`, {
-          confirmed
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Error confirming suggestion:', error);
-        throw error;
-      }
-    }
   },
   
   // Subscription endpoints
