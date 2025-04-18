@@ -23,8 +23,8 @@ const AuthCallback = () => {
   const [logMessages, setLogMessages] = useState<string[]>([]);
 
   // Custom logging function
-  const log = (message: string) => {
-    console.log(`[AuthCallback] ${message}`);
+  const log = (message: string, ...args: any[]) => {
+    console.log(`[AuthCallback] ${message}`, ...args);
     setLogMessages(prev => [...prev, `${new Date().toISOString().split('T')[1].split('.')[0]} - ${message}`]);
   };
 
