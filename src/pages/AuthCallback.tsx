@@ -48,6 +48,17 @@ const AuthCallback = () => {
         const urlParams = new URLSearchParams(location.search);
         const code = urlParams.get('code');
         
+        // Also check for token in query params (from backend redirect)
+        const token = urlParams.get('token');
+        
+        // If we have a token already, we can skip the code exchange
+        if (token) {
+          log('Token found in URL, using it directly');
+          login(token);
+          navigate('/dashboard');
+          return;
+        }
+        
         if (!code) {
           setError('No authorization code found');
           return;
@@ -62,18 +73,26 @@ const AuthCallback = () => {
           timestamp: new Date().toISOString()
         };
         
-        log(`Auth callback with code: ${code.substring(0, 8)}...`);
+        log('Auth callback debug: ', debugInfo);
         
         // Attempt to get token
         log('Requesting token from API');
         const result = await apiService.auth.handleGoogleCallback(code);
+        
+        if (result.pending) {
+          // The API is handling the redirect, show a loading message
+          log('Pending redirect to backend service');
+          setError('Redirecting to authentication service...');
+          // Don't navigate or complete - the page will be redirected by the API
+          return;
+        }
         
         if (result && result.token) {
           log('Successfully received auth token');
           login(result.token);
           navigate('/dashboard');
         } else {
-          setError('Failed to authenticate with Google');
+          setError('Failed to authenticate with Google: ' + (result.error || 'No token received'));
         }
       } catch (err) {
         console.error('Google callback error:', err);

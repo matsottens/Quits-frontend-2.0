@@ -11,6 +11,8 @@ interface AuthResponse {
   error?: string;
   success?: boolean;
   redirecting?: boolean;
+  pending?: boolean;
+  message?: string;
 }
 
 // Always use api.quits.cc for auth operations, regardless of environment
@@ -44,7 +46,9 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
       const response = await fetch(proxyUrl, {
         method: 'GET',
         headers: { 
-          'Accept': 'application/json'
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
       });
       
@@ -81,68 +85,71 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
       // Continue to fallback methods
     }
     
-    // Second try: Use axios instead of fetch
+    // Second try: Use axios as fallback with different headers
+    console.log('Attempt 2: Using axios as fallback');
     try {
-      console.log('Attempt 2: Using axios as fallback');
-      const axiosResponse = await api.get(proxyUrl);
+      const axiosResponse = await api.get(proxyUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest', 
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       
       if (axiosResponse.data?.token) {
-        console.log('Axios approach succeeded:', axiosResponse.data);
+        console.log('Success with axios backend call');
         return {
           token: axiosResponse.data.token,
           user: axiosResponse.data.user,
           success: true
         };
-      } else {
-        console.warn('Axios response has no token:', axiosResponse.data);
       }
     } catch (axiosError) {
-      console.warn('Axios fallback failed:', axiosError);
-      
-      // Log the detailed error response if available
-      if (axios.isAxiosError(axiosError) && axiosError.response) {
-        console.error('Axios error details:', {
-          status: axiosError.response.status,
-          data: axiosError.response.data
-        });
-      }
-      // Continue to JSONP fallback
+      console.warn('Axios attempt failed:', axiosError);
     }
     
-    // Third try: Try with mode: 'no-cors'
+    // Third try: Attempt with no-cors mode as last resort
+    console.log('Attempt 3: Fetch with no-cors mode');
     try {
-      console.log('Attempt 3: Fetch with no-cors mode');
-      await fetch(proxyUrl, {
+      const noCorsResponse = await fetch(proxyUrl, {
         method: 'GET',
-        mode: 'no-cors'
+        mode: 'no-cors',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
       });
       
-      // If we get here, the request didn't throw, but we likely can't read the response
+      // no-cors mode always returns an opaque response which can't be read
       console.log('no-cors request sent, but response is opaque');
     } catch (noCorsError) {
       console.warn('no-cors attempt failed:', noCorsError);
     }
     
-    // Last resort: Try JSONP approach by redirecting
+    // If all APIs fail, redirect the user to the backend directly
     console.log('All API attempts failed, redirecting to backend directly');
     
-    // Add a flag in sessionStorage to track the redirect
-    sessionStorage.setItem('auth_redirect_attempted', 'true');
-    sessionStorage.setItem('auth_code', code.substring(0, 10) + '...');
+    // Create a full redirect URL that includes the original code
+    const directBackendUrl = `${API_BASE_URL}/api/auth/google/callback?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${timestamp}`;
     
-    // Direct the user to the proxy URL
-    window.location.href = proxyUrl;
+    // Redirect the browser
+    window.location.href = directBackendUrl;
     
-    // Return a pending promise since we're redirecting
-    return new Promise<AuthResponse>((resolve) => {
-      setTimeout(() => {
-        resolve({ token: '', error: 'Redirecting to backend', redirecting: true });
-      }, 5000);
-    });
-    
+    // Return a pending response since we're redirecting
+    return {
+      token: '',
+      success: false,
+      pending: true,
+      message: 'Redirecting to backend authentication service'
+    };
   } catch (error) {
-    console.error('Error in handleGoogleCallback:', error);
-    throw error;
+    console.error('OAuth callback error:', error);
+    return {
+      token: '',
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error during authentication'
+    };
   }
 };
 
