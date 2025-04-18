@@ -216,6 +216,20 @@ const apiService = {
     
     // Handle Google OAuth callback with multiple fallback methods
     handleGoogleCallback: async (code: string) => {
+      // Track if we're processing this code - use a cache to prevent multiple calls with the same code
+      const codeCache = window.sessionStorage.getItem('processed_oauth_codes') || '{}';
+      const processedCodes = JSON.parse(codeCache);
+      
+      // If this code has been processed before, return a pending response
+      if (processedCodes[code]) {
+        console.log('This OAuth code has already been processed, returning pending status');
+        return { pending: true, message: 'Auth code already being processed' };
+      }
+      
+      // Mark this code as being processed
+      processedCodes[code] = Date.now();
+      window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
+      
       // Only attempt once, using URLSearchParams for proper encoding
       const safeCode = encodeURIComponent(code);
       const redirectUrl = encodeURIComponent(window.location.origin + '/dashboard');
@@ -260,27 +274,60 @@ const apiService = {
             console.error(`[apiService] Error response (${response.status}):`, errorText);
             
             // Try to parse as JSON
+            let errorMessage = 'Authentication failed';
+            let errorCode = 'auth_error';
+            
             try {
               const errorJson = JSON.parse(errorText);
-              console.error('[apiService] Error details:', errorJson);
+              console.log('Parsed error details:', errorJson);
               
               // If it's invalid_grant, provide a more helpful message
-              if (errorJson?.details?.error === 'invalid_grant') {
-                throw new Error('OAuth code expired or already used. Please try logging in again.');
+              if (errorJson?.error === 'invalid_grant' || 
+                  errorJson?.details?.error === 'invalid_grant' ||
+                  (errorJson?.message && errorJson.message.includes('invalid_grant'))) {
+                errorMessage = 'Authorization code has expired or already been used';
+                errorCode = 'invalid_grant';
+                
+                // Clear this code from the cache to prevent further attempts
+                delete processedCodes[code];
+                window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
+                
+                return {
+                  success: false,
+                  error: errorCode,
+                  message: errorMessage
+                };
               }
             } catch (e) {
-              // Not JSON
+              // Not JSON, use the raw error text
+              errorMessage = errorText || 'Authentication failed';
             }
             
-            throw new Error(`OAuth exchange failed with status ${response.status}`);
+            throw new Error(errorMessage);
           }
         } catch (error) {
+          // Clear this code from processing cache on error
+          delete processedCodes[code];
+          window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
+          
           console.error('[apiService] OAuth exchange failed:', error);
-          throw error;
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Authentication failed',
+            message: 'Failed to authenticate with Google'
+          };
         }
       } catch (error) {
+        // Clear this code from processing cache on error
+        delete processedCodes[code];
+        window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
+        
         console.error('[apiService] Auth API error:', error);
-        throw error;
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Authentication failed',
+          message: 'Failed to authenticate with Google'
+        };
       }
     },
     

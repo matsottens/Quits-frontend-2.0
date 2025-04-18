@@ -61,6 +61,12 @@ const AuthCallback = () => {
         
         if (!code) {
           setError('No authorization code found');
+          // Try to get error message from URL if available
+          const errorMsg = urlParams.get('error');
+          const errorDescription = urlParams.get('message');
+          if (errorMsg && errorDescription) {
+            setError(`${errorDescription}`);
+          }
           return;
         }
         
@@ -86,6 +92,22 @@ const AuthCallback = () => {
           // Don't navigate or complete - the page will be redirected by the API
           return;
         }
+
+        if (result.success === false) {
+          // Handle specific error cases more gracefully
+          log(`Authentication error: ${result.error}`);
+          
+          if (result.error === 'invalid_grant') {
+            setError('Your authentication session has expired. Please try logging in again.');
+            setTimeout(() => {
+              navigate('/login');
+            }, 3000);
+            return;
+          }
+          
+          setError(result.message || 'Authentication failed');
+          return;
+        }
         
         if (result && result.token) {
           log('Successfully received auth token');
@@ -97,6 +119,11 @@ const AuthCallback = () => {
       } catch (err) {
         console.error('Google callback error:', err);
         setError('Authentication failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        
+        // Redirect to login after a delay
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
       } finally {
         setIsProcessing(false);
       }
