@@ -21,12 +21,26 @@ const AuthCallback = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const processedRef = useRef(false); // Local ref to track if we've already processed this callback
   const [logMessages, setLogMessages] = useState<string[]>([]);
+  const [redirectCountdown, setRedirectCountdown] = useState(5);
 
   // Custom logging function
   const log = (message: string, ...args: any[]) => {
     console.log(`[AuthCallback] ${message}`, ...args);
     setLogMessages(prev => [...prev, `${new Date().toISOString().split('T')[1].split('.')[0]} - ${message}`]);
   };
+
+  // Effect to handle countdown timer for redirects
+  useEffect(() => {
+    if (error && redirectCountdown > 0) {
+      const timer = setTimeout(() => {
+        setRedirectCountdown(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (error && redirectCountdown === 0) {
+      log('Redirect countdown finished, navigating to login');
+      navigate('/login');
+    }
+  }, [error, redirectCountdown, navigate]);
 
   useEffect(() => {
     // Check both local and global processed flags to prevent multiple calls
@@ -51,6 +65,15 @@ const AuthCallback = () => {
         // Also check for token in query params (from backend redirect)
         const token = urlParams.get('token');
         
+        // Handle error parameters directly from URL
+        const errorParam = urlParams.get('error');
+        const errorMessage = urlParams.get('message');
+        if (errorParam) {
+          log(`Error in URL parameters: ${errorParam} - ${errorMessage}`);
+          setError(errorMessage || `Authentication error: ${errorParam}`);
+          return;
+        }
+        
         // If we have a token already, we can skip the code exchange
         if (token) {
           log('Token found in URL, using it directly');
@@ -60,13 +83,7 @@ const AuthCallback = () => {
         }
         
         if (!code) {
-          setError('No authorization code found');
-          // Try to get error message from URL if available
-          const errorMsg = urlParams.get('error');
-          const errorDescription = urlParams.get('message');
-          if (errorMsg && errorDescription) {
-            setError(`${errorDescription}`);
-          }
+          setError('No authorization code found in URL');
           return;
         }
         
@@ -99,9 +116,6 @@ const AuthCallback = () => {
           
           if (result.error === 'invalid_grant') {
             setError('Your authentication session has expired. Please try logging in again.');
-            setTimeout(() => {
-              navigate('/login');
-            }, 3000);
             return;
           }
           
@@ -114,16 +128,14 @@ const AuthCallback = () => {
           login(result.token);
           navigate('/dashboard');
         } else {
-          setError('Failed to authenticate with Google: ' + (result.error || 'No token received'));
+          log('No token received from authentication server');
+          setError('No token received from authentication server. Please try again.');
         }
       } catch (err) {
         console.error('Google callback error:', err);
-        setError('Authentication failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
-        
-        // Redirect to login after a delay
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        log(`Error: ${errorMessage}`);
+        setError('Authentication failed: ' + errorMessage);
       } finally {
         setIsProcessing(false);
       }
@@ -141,16 +153,21 @@ const AuthCallback = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center max-w-md w-full p-8 bg-white shadow-lg rounded-lg">
         {error ? (
-          <div className="text-red-500 mb-6 font-semibold">{error}</div>
+          <>
+            <div className="text-red-500 mb-6 font-semibold">{error}</div>
+            <p className="mt-4 text-gray-600">
+              Redirecting to login in {redirectCountdown} seconds...
+            </p>
+          </>
         ) : (
           <>
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mx-auto mb-4"></div>
             <h1 className="text-xl font-bold text-gray-800 mb-2">Authentication Processing...</h1>
+            <p className="mt-4 text-gray-600">
+              Redirecting to your dashboard...
+            </p>
           </>
         )}
-        <p className="mt-4 text-gray-600">
-          {error ? 'Redirecting to login...' : 'Redirecting to your dashboard...'}
-        </p>
         
         {/* Log display */}
         <details className="mt-6 text-left" open>
@@ -162,10 +179,10 @@ const AuthCallback = () => {
 
         <div className="mt-6">
           <button 
-            onClick={() => navigate('/dashboard')} 
+            onClick={() => error ? navigate('/login') : navigate('/dashboard')} 
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
           >
-            Continue to Dashboard
+            {error ? 'Go to Login' : 'Continue to Dashboard'}
           </button>
         </div>
       </div>

@@ -223,6 +223,18 @@ const apiService = {
       // If this code has been processed before, return a pending response
       if (processedCodes[code]) {
         console.log('This OAuth code has already been processed, returning pending status');
+        
+        // If the code was processed over 10 seconds ago, it's probably stale
+        const processTime = processedCodes[code];
+        if (Date.now() - processTime > 10000) {
+          console.log('Code was processed too long ago, treating as invalid');
+          return {
+            success: false,
+            error: 'invalid_grant',
+            message: 'Authorization code has expired or already been used'
+          };
+        }
+        
         return { pending: true, message: 'Auth code already being processed' };
       }
       
@@ -247,26 +259,31 @@ const apiService = {
         // Add a small delay to ensure Vercel's serverless functions are ready
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Attempt once with the most reliable method - full fetch with credentials
+        // Only make a single attempt with the most reliable method
+        let success = false;
+        let error = null;
+        let data = null;
+        
         try {
           console.log('[apiService] Making OAuth code exchange request');
           const response = await fetch(endpoint, {
             method: 'GET',
             credentials: 'include',
             headers: {
-              'Accept': 'application/json'
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache, no-store'
             }
           });
           
           // Handle response appropriately
           if (response.ok) {
-            const data = await response.json();
+            data = await response.json();
             console.log('[apiService] OAuth exchange succeeded:', data);
             if (data.token) {
-              return data;
+              success = true;
             } else {
               console.warn('[apiService] Response OK but no token:', data);
-              throw new Error('Valid response but no token returned');
+              error = { message: 'Valid response but no token returned' };
             }
           } else {
             // Log the error response
@@ -274,9 +291,6 @@ const apiService = {
             console.error(`[apiService] Error response (${response.status}):`, errorText);
             
             // Try to parse as JSON
-            let errorMessage = 'Authentication failed';
-            let errorCode = 'auth_error';
-            
             try {
               const errorJson = JSON.parse(errorText);
               console.log('Parsed error details:', errorJson);
@@ -285,36 +299,36 @@ const apiService = {
               if (errorJson?.error === 'invalid_grant' || 
                   errorJson?.details?.error === 'invalid_grant' ||
                   (errorJson?.message && errorJson.message.includes('invalid_grant'))) {
-                errorMessage = 'Authorization code has expired or already been used';
-                errorCode = 'invalid_grant';
-                
-                // Clear this code from the cache to prevent further attempts
-                delete processedCodes[code];
-                window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
-                
-                return {
-                  success: false,
-                  error: errorCode,
-                  message: errorMessage
+                error = {
+                  code: 'invalid_grant',
+                  message: 'Authorization code has expired or already been used'
                 };
+              } else {
+                error = errorJson;
               }
             } catch (e) {
               // Not JSON, use the raw error text
-              errorMessage = errorText || 'Authentication failed';
+              error = { message: errorText || 'Authentication failed' };
             }
-            
-            throw new Error(errorMessage);
           }
-        } catch (error) {
-          // Clear this code from processing cache on error
-          delete processedCodes[code];
-          window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
-          
-          console.error('[apiService] OAuth exchange failed:', error);
+        } catch (fetchError) {
+          console.error('[apiService] Fetch error:', fetchError);
+          error = {
+            message: fetchError instanceof Error ? fetchError.message : 'Network error during authentication'
+          };
+        }
+        
+        // Clear this code from the cache
+        delete processedCodes[code];
+        window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
+        
+        if (success && data?.token) {
+          return data;
+        } else {
           return {
             success: false,
-            error: error instanceof Error ? error.message : 'Authentication failed',
-            message: 'Failed to authenticate with Google'
+            error: error?.code || 'auth_failed',
+            message: error?.message || 'Failed to authenticate with Google'
           };
         }
       } catch (error) {
