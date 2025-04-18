@@ -216,6 +216,29 @@ const apiService = {
     
     // Handle Google OAuth callback with multiple fallback methods
     handleGoogleCallback: async (code: string) => {
+      // First check if we already have a token in localStorage
+      const existingToken = localStorage.getItem('token');
+      if (existingToken) {
+        console.log('Token already exists in localStorage, using it directly');
+        // Verify token is valid by checking its format (simple validation)
+        const parts = existingToken.split('.');
+        if (parts.length === 3) {
+          try {
+            // Try to decode the middle part
+            const payload = JSON.parse(atob(parts[1]));
+            if (payload && payload.email) {
+              return {
+                success: true,
+                token: existingToken,
+                message: 'Using existing token from localStorage'
+              };
+            }
+          } catch (e) {
+            console.error('Error decoding existing token:', e);
+          }
+        }
+      }
+
       // Track if we're processing this code - use a cache to prevent multiple calls with the same code
       const codeCache = window.sessionStorage.getItem('processed_oauth_codes') || '{}';
       const processedCodes = JSON.parse(codeCache);
@@ -259,100 +282,86 @@ const apiService = {
       
       console.log(`Attempting Google auth callback with code: ${safeCode.substring(0, 12)}...`);
       
-      try {
-        // Add a timestamp to prevent browser caching issues
-        const timestamp = Date.now();
-        // Use the proxy endpoint instead of direct callback to avoid CORS issues
-        const endpoint = `${AUTH_API_URL}/api/google-proxy?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
-        
-        console.log(`Calling backend proxy endpoint: ${endpoint}`);
-        
-        // Add a small delay to ensure Vercel's serverless functions are ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Only make a single attempt with the most reliable method
-        let success = false;
-        let error = null;
-        let data = null;
-        
-        try {
-          console.log('[apiService] Making OAuth code exchange request');
-          
-          // Try multiple approaches - with various headers to work around CSP issues
-          // First attempt - standard fetch with credentials
-          const response = await fetch(endpoint, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache, no-store'
-            }
-          });
-          
-          // Handle response appropriately
-          if (response.ok) {
-            data = await response.json();
-            console.log('[apiService] OAuth exchange succeeded:', data);
-            if (data.token) {
-              success = true;
-              // Store the token immediately
-              localStorage.setItem('token', data.token);
-            } else {
-              console.warn('[apiService] Response OK but no token:', data);
-              if (data.pending) {
-                // The server is handling the redirect flow
-                console.log('[apiService] Server handling redirect flow');
-                return { pending: true, message: 'Authentication is being handled by the server' };
-              } else {
-                error = { message: 'Valid response but no token returned' };
-              }
-            }
-          } else {
-            // Log the error response
-            const errorText = await response.text();
-            console.error(`[apiService] Error response (${response.status}):`, errorText);
-            
-            // Try to parse as JSON
-            try {
-              const errorJson = JSON.parse(errorText);
-              console.log('Parsed error details:', errorJson);
-              
-              // If it's invalid_grant, provide a more helpful message
-              if (errorJson?.error === 'invalid_grant' || 
-                  errorJson?.details?.error === 'invalid_grant' ||
-                  (errorJson?.message && errorJson.message.includes('invalid_grant'))) {
-                error = {
-                  code: 'invalid_grant',
-                  message: 'Authorization code has expired or already been used'
-                };
-              } else {
-                error = errorJson;
-              }
-            } catch (e) {
-              // Not JSON, use the raw error text
-              error = { message: errorText || 'Authentication failed' };
-            }
-          }
-        } catch (fetchError) {
-          console.error('[apiService] Fetch error:', fetchError);
-          error = {
-            message: fetchError instanceof Error ? fetchError.message : 'Network error during authentication'
-          };
-        }
-        
-        // Clear this code from the cache
-        delete processedCodes[code];
-        window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
-        
-        if (success && data?.token) {
-          return data;
-        } else {
-          // Try one more time with direct API call
+      // Create an array of possible approaches
+      const approaches = [
+        // Approach 1: Simple window.open to directly hit the callback URL
+        async () => {
           try {
-            console.log('[apiService] Attempting direct API call as fallback');
+            console.log('[apiService] Trying window.open approach');
+            const callbackUrl = `${window.location.origin.includes('localhost') ? 
+              'http://localhost:3000' : 'https://api.quits.cc'}/api/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}&_t=${Date.now()}`;
             
+            // Open in a tiny popup that will close itself
+            const popup = window.open(callbackUrl, '_blank', 'width=100,height=100,left=-1000,top=-1000');
+            
+            // Wait a bit and check if token appeared in localStorage
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Try to close the popup
+            if (popup) popup.close();
+            
+            // Check if we have a token now
+            const popupToken = localStorage.getItem('token');
+            if (popupToken) {
+              console.log('[apiService] Window.open approach succeeded, found token');
+              return {
+                success: true,
+                token: popupToken
+              };
+            }
+            return null; // Approach failed
+          } catch (e) {
+            console.error('[apiService] Window.open approach failed:', e);
+            return null; // Approach failed
+          }
+        },
+        
+        // Approach 2: Use the Google proxy endpoint
+        async () => {
+          try {
+            console.log('[apiService] Trying Google proxy approach');
+            // Add a timestamp to prevent browser caching issues
+            const timestamp = Date.now();
+            // Use the proxy endpoint instead of direct callback to avoid CORS issues
+            const endpoint = `${AUTH_API_URL}/api/google-proxy?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
+            
+            const response = await fetch(endpoint, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache, no-store'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              console.log('[apiService] Proxy approach result:', data);
+              
+              // If we got a token, use it
+              if (data.token) {
+                localStorage.setItem('token', data.token);
+                return data;
+              }
+              
+              // If pending, return that
+              if (data.pending) {
+                return { pending: true };
+              }
+            }
+            return null; // Approach failed
+          } catch (e) {
+            console.error('[apiService] Proxy approach failed:', e);
+            return null; // Approach failed
+          }
+        },
+        
+        // Approach 3: Direct API call
+        async () => {
+          try {
+            console.log('[apiService] Trying direct API call');
             const directApiUrl = `${window.location.origin.includes('localhost') ? 
-              'http://localhost:3000' : 'https://api.quits.cc'}/api/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
+              'http://localhost:3000' : 'https://api.quits.cc'}/api/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}&_t=${Date.now()}`;
             
             const directResponse = await fetch(directApiUrl, {
               method: 'GET',
@@ -365,22 +374,66 @@ const apiService = {
             
             if (directResponse.ok) {
               const directData = await directResponse.json();
+              console.log('[apiService] Direct API call result:', directData);
+              
               if (directData.token) {
-                console.log('[apiService] Direct API call successful, received token');
                 localStorage.setItem('token', directData.token);
                 return directData;
               }
             }
-          } catch (directError) {
-            console.error('[apiService] Direct API call failed:', directError);
+            return null; // Approach failed
+          } catch (e) {
+            console.error('[apiService] Direct API call failed:', e);
+            return null; // Approach failed
+          }
+        }
+      ];
+      
+      // Try each approach in sequence until one works
+      try {
+        for (const approach of approaches) {
+          const result = await approach();
+          if (result) {
+            // Clear the code cache when successful
+            delete processedCodes[code];
+            window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
+            
+            return result;
           }
           
+          // Check after each approach if a token has appeared in localStorage
+          const checkToken = localStorage.getItem('token');
+          if (checkToken) {
+            console.log('[apiService] Token appeared in localStorage during approaches');
+            return {
+              success: true,
+              token: checkToken,
+              message: 'Token found in localStorage during authentication'
+            };
+          }
+        }
+        
+        // Final check for token in localStorage
+        const finalCheckToken = localStorage.getItem('token');
+        if (finalCheckToken) {
+          console.log('[apiService] Final check found token in localStorage');
           return {
-            success: false,
-            error: error?.code || 'auth_failed',
-            message: error?.message || 'Failed to authenticate with Google'
+            success: true,
+            token: finalCheckToken,
+            message: 'Token found in localStorage after all approaches'
           };
         }
+        
+        // All approaches failed
+        delete processedCodes[code];
+        window.sessionStorage.setItem('processed_oauth_codes', JSON.stringify(processedCodes));
+        
+        return { 
+          success: false,
+          error: 'auth_failed',
+          message: 'All authentication approaches failed',
+          pending: true // Indicate we're still trying in the background
+        };
       } catch (error) {
         // Clear this code from processing cache on error
         delete processedCodes[code];

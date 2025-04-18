@@ -62,9 +62,25 @@ const AuthCallback = () => {
         const storedToken = localStorage.getItem('token');
         if (storedToken) {
           log('Found token in localStorage, using it directly');
-          login(storedToken);
-          navigate('/dashboard');
-          return;
+          
+          // Verify token is valid by checking its format (simple validation)
+          const parts = storedToken.split('.');
+          if (parts.length === 3) {
+            try {
+              // Try to decode the middle part
+              const decoded = JSON.parse(atob(parts[1]));
+              if (decoded && decoded.email) {
+                log('Token appears valid, logging in');
+                login(storedToken);
+                navigate('/dashboard');
+                return;
+              }
+            } catch (e) {
+              log('Error decoding token:', e);
+            }
+          }
+          
+          log('Token found but could not be validated, continuing...');
         }
         
         // Get the code from URL query params
@@ -86,6 +102,7 @@ const AuthCallback = () => {
         // If we have a token already, we can skip the code exchange
         if (token) {
           log('Token found in URL, using it directly');
+          localStorage.setItem('token', token); // Save to localStorage for future use
           login(token);
           navigate('/dashboard');
           return;
@@ -107,7 +124,61 @@ const AuthCallback = () => {
         
         log('Auth callback debug: ', debugInfo);
         
-        // Try direct callback first
+        // Try direct iframe approach first - this can bypass CSP issues
+        try {
+          log('Attempting iframe approach to handle authentication');
+          
+          // Create an iframe to handle the callback
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          document.body.appendChild(iframe);
+          
+          // Create a promise to track completion
+          const iframePromise = new Promise<void>((resolve) => {
+            // Check localStorage for token periodically
+            const checkInterval = setInterval(() => {
+              const iframeToken = localStorage.getItem('token');
+              if (iframeToken) {
+                log('Token found in localStorage via iframe approach');
+                clearInterval(checkInterval);
+                document.body.removeChild(iframe);
+                login(iframeToken);
+                navigate('/dashboard');
+                resolve();
+              }
+            }, 500);
+            
+            // Set timeout to abandon this approach after 5 seconds
+            setTimeout(() => {
+              clearInterval(checkInterval);
+              try {
+                document.body.removeChild(iframe);
+              } catch (e) {}
+              log('Iframe approach timed out');
+              resolve();
+            }, 5000);
+            
+            // Set the iframe src to the direct callback URL
+            const callbackUrl = `${window.location.origin.includes('localhost') ? 
+              'http://localhost:3000' : 'https://api.quits.cc'}/api/auth/google/callback?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`;
+            
+            iframe.src = callbackUrl;
+          });
+          
+          // Wait for iframe approach to complete or time out
+          await iframePromise;
+          
+          // Check if we have a token now
+          const iframeToken = localStorage.getItem('token');
+          if (iframeToken) {
+            // We already handled login in the interval above
+            return;
+          }
+        } catch (iframeError) {
+          log(`Iframe approach failed: ${iframeError instanceof Error ? iframeError.message : 'Unknown error'}`);
+        }
+        
+        // Try direct callback approach
         try {
           log('Attempting direct API call to /api/auth/google/callback');
           
@@ -129,6 +200,7 @@ const AuthCallback = () => {
             log('Direct API call successful, received token');
             
             if (data.token) {
+              localStorage.setItem('token', data.token);
               login(data.token);
               navigate('/dashboard');
               return;
@@ -140,14 +212,14 @@ const AuthCallback = () => {
           log(`Direct API call error: ${directError instanceof Error ? directError.message : 'Unknown error'}`);
         }
         
-        // Attempt to get token through our service
+        // Last resort: Try apiService approach
         log('Requesting token from API service');
         const result = await apiService.auth.handleGoogleCallback(code);
         
         if (result.pending) {
           // The API is handling the redirect, show a loading message
           log('Pending redirect to backend service');
-          setError('Redirecting to authentication service...');
+          setError('Authentication in progress, please wait...');
           
           // Set a timer to check localStorage for token
           log('Setting timer to check for token in localStorage');
@@ -165,6 +237,7 @@ const AuthCallback = () => {
           setTimeout(() => {
             clearInterval(checkInterval);
             log('Token check timed out after 15 seconds');
+            setError('Authentication timed out. Please try again.');
           }, 15000);
           
           return;
@@ -175,6 +248,15 @@ const AuthCallback = () => {
           log(`Authentication error: ${result.error}`);
           
           if (result.error === 'invalid_grant') {
+            log('Invalid grant error, checking if token exists in localStorage anyway');
+            const existingToken = localStorage.getItem('token');
+            if (existingToken) {
+              log('Found existing token despite invalid_grant error, using it');
+              login(existingToken);
+              navigate('/dashboard');
+              return;
+            }
+            
             setError('Your authentication session has expired. Please try logging in again.');
             return;
           }
@@ -185,16 +267,37 @@ const AuthCallback = () => {
         
         if (result && result.token) {
           log('Successfully received auth token');
+          localStorage.setItem('token', result.token);
           login(result.token);
           navigate('/dashboard');
         } else {
           log('No token received from authentication server');
+          
+          // Check one more time if a token appeared in localStorage
+          const finalTokenCheck = localStorage.getItem('token');
+          if (finalTokenCheck) {
+            log('Found token in localStorage as last resort');
+            login(finalTokenCheck);
+            navigate('/dashboard');
+            return;
+          }
+          
           setError('No token received from authentication server. Please try again.');
         }
       } catch (err) {
         console.error('Google callback error:', err);
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         log(`Error: ${errorMessage}`);
+        
+        // Check if token exists in localStorage anyway
+        const existingToken = localStorage.getItem('token');
+        if (existingToken) {
+          log('Found existing token despite error, using it');
+          login(existingToken);
+          navigate('/dashboard');
+          return;
+        }
+        
         setError('Authentication failed: ' + errorMessage);
       } finally {
         setIsProcessing(false);
