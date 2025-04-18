@@ -57,6 +57,15 @@ const AuthCallback = () => {
         setIsProcessing(true);
         
         log('Starting Google callback processing');
+
+        // First check for token in localStorage (may have been set by a redirect)
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          log('Found token in localStorage, using it directly');
+          login(storedToken);
+          navigate('/dashboard');
+          return;
+        }
         
         // Get the code from URL query params
         const urlParams = new URLSearchParams(location.search);
@@ -98,15 +107,66 @@ const AuthCallback = () => {
         
         log('Auth callback debug: ', debugInfo);
         
-        // Attempt to get token
-        log('Requesting token from API');
+        // Try direct callback first
+        try {
+          log('Attempting direct API call to /api/auth/google/callback');
+          
+          // Create direct API request to bypass CSP issues
+          const directApiUrl = `${window.location.origin.includes('localhost') ? 
+            'http://localhost:3000' : 'https://api.quits.cc'}/api/auth/google/callback`;
+            
+          const response = await fetch(`${directApiUrl}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Cache-Control': 'no-store, no-cache'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            log('Direct API call successful, received token');
+            
+            if (data.token) {
+              login(data.token);
+              navigate('/dashboard');
+              return;
+            }
+          } else {
+            log(`Direct API call failed with status ${response.status}`);
+          }
+        } catch (directError) {
+          log(`Direct API call error: ${directError instanceof Error ? directError.message : 'Unknown error'}`);
+        }
+        
+        // Attempt to get token through our service
+        log('Requesting token from API service');
         const result = await apiService.auth.handleGoogleCallback(code);
         
         if (result.pending) {
           // The API is handling the redirect, show a loading message
           log('Pending redirect to backend service');
           setError('Redirecting to authentication service...');
-          // Don't navigate or complete - the page will be redirected by the API
+          
+          // Set a timer to check localStorage for token
+          log('Setting timer to check for token in localStorage');
+          const checkInterval = setInterval(() => {
+            const tokenCheck = localStorage.getItem('token');
+            if (tokenCheck) {
+              log('Token appeared in localStorage, using it');
+              clearInterval(checkInterval);
+              login(tokenCheck);
+              navigate('/dashboard');
+            }
+          }, 1000);
+          
+          // Clear interval after 15 seconds if no token appears
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            log('Token check timed out after 15 seconds');
+          }, 15000);
+          
           return;
         }
 

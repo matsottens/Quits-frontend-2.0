@@ -224,6 +224,17 @@ const apiService = {
       if (processedCodes[code]) {
         console.log('This OAuth code has already been processed, returning pending status');
         
+        // Check if we have a token in localStorage that might have been set by a redirect
+        const storedToken = localStorage.getItem('token');
+        if (storedToken) {
+          console.log('Found token in localStorage despite detecting duplicate code');
+          return {
+            success: true,
+            token: storedToken,
+            message: 'Using cached token'
+          };
+        }
+        
         // If the code was processed over 10 seconds ago, it's probably stale
         const processTime = processedCodes[code];
         if (Date.now() - processTime > 10000) {
@@ -266,6 +277,9 @@ const apiService = {
         
         try {
           console.log('[apiService] Making OAuth code exchange request');
+          
+          // Try multiple approaches - with various headers to work around CSP issues
+          // First attempt - standard fetch with credentials
           const response = await fetch(endpoint, {
             method: 'GET',
             credentials: 'include',
@@ -281,9 +295,17 @@ const apiService = {
             console.log('[apiService] OAuth exchange succeeded:', data);
             if (data.token) {
               success = true;
+              // Store the token immediately
+              localStorage.setItem('token', data.token);
             } else {
               console.warn('[apiService] Response OK but no token:', data);
-              error = { message: 'Valid response but no token returned' };
+              if (data.pending) {
+                // The server is handling the redirect flow
+                console.log('[apiService] Server handling redirect flow');
+                return { pending: true, message: 'Authentication is being handled by the server' };
+              } else {
+                error = { message: 'Valid response but no token returned' };
+              }
             }
           } else {
             // Log the error response
@@ -325,6 +347,34 @@ const apiService = {
         if (success && data?.token) {
           return data;
         } else {
+          // Try one more time with direct API call
+          try {
+            console.log('[apiService] Attempting direct API call as fallback');
+            
+            const directApiUrl = `${window.location.origin.includes('localhost') ? 
+              'http://localhost:3000' : 'https://api.quits.cc'}/api/auth/google/callback?code=${safeCode}&redirect=${redirectUrl}&_t=${timestamp}`;
+            
+            const directResponse = await fetch(directApiUrl, {
+              method: 'GET',
+              credentials: 'include',
+              headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-store, no-cache'
+              }
+            });
+            
+            if (directResponse.ok) {
+              const directData = await directResponse.json();
+              if (directData.token) {
+                console.log('[apiService] Direct API call successful, received token');
+                localStorage.setItem('token', directData.token);
+                return directData;
+              }
+            }
+          } catch (directError) {
+            console.error('[apiService] Direct API call failed:', directError);
+          }
+          
           return {
             success: false,
             error: error?.code || 'auth_failed',
