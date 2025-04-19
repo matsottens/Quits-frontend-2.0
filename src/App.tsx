@@ -4,7 +4,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import GetStarted from './pages/GetStarted';
-import AuthCallback from './components/AuthCallback';
+import AuthCallback from './pages/AuthCallback';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -16,15 +16,50 @@ import SubscriptionDetails from './pages/SubscriptionDetails';
 import Navigation from './components/Navigation';
 import SubscriptionList from './components/SubscriptionList';
 import AddPhoneNumber from './pages/AddPhoneNumber';
+import { useEffect, useState } from 'react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, validateToken } = useAuth();
+  const [isChecking, setIsChecking] = useState(true);
+  const [isValid, setIsValid] = useState(false);
+  
+  useEffect(() => {
+    // Double-check the token is valid on each protected route access
+    const verifyAuthentication = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        let valid = false;
+        
+        if (token && validateToken(token)) {
+          valid = true;
+        } else if (token) {
+          // If token exists but is invalid, clear it
+          console.log('Invalid token found in localStorage, clearing it');
+          localStorage.removeItem('token');
+          localStorage.removeItem('quits_auth_token');
+        }
+        
+        setIsValid(valid);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+    
+    verifyAuthentication();
+  }, [validateToken]);
+  
+  // Show loading while checking token
+  if (isChecking) {
+    return <LoadingSpinner />;
+  }
 
-  if (!isAuthenticated) {
+  // Use our validated state rather than just the isAuthenticated context value
+  if (!isValid) {
+    console.log('Authentication validation failed, redirecting to login');
     return <Navigate to="/login" />;
   }
 
@@ -101,8 +136,10 @@ const AppContent = () => {
             }
           />
           <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
       </div>
+      <Navigation />
     </div>
   );
 };
