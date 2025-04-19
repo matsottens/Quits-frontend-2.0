@@ -93,7 +93,7 @@ const AuthCallback = () => {
       log(`Error checking auth config: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
-  
+
   useEffect(() => {
     // Check both local and global processed flags to prevent multiple calls
     if (processedRef.current || hasProcessedAuth) {
@@ -134,8 +134,8 @@ const AuthCallback = () => {
         if (storedToken && validateToken(storedToken)) {
           log('Found valid token in localStorage, using it directly');
           await login(storedToken);
-          navigate('/dashboard');
-          return;
+                navigate('/dashboard');
+                return;
         } else if (storedToken) {
           log('Found token in localStorage but it appears invalid, clearing');
           localStorage.removeItem('token');
@@ -169,8 +169,8 @@ const AuthCallback = () => {
             if (safelyStoreToken(token)) {
               log('Token stored successfully');
               await login(token);
-              navigate('/dashboard');
-              return;
+          navigate('/dashboard');
+          return;
             } else {
               log('Failed to store token in localStorage');
               setError('Failed to store authentication token. Please ensure cookies and localStorage are enabled.');
@@ -207,7 +207,7 @@ const AuthCallback = () => {
             if (!validateToken(result.token)) {
               log('Token validation failed');
               setError('Invalid authentication token received. Please try logging in again.');
-              return;
+            return;
             }
             
             if (safelyStoreToken(result.token)) {
@@ -222,37 +222,38 @@ const AuthCallback = () => {
             }
           }
           
-          if (result.pending) {
-            // The API is handling the redirect, show a loading message
-            log('Pending redirect to backend service');
-            setError('Authentication in progress, please wait...');
-            
-            // Set a timer to check localStorage for token
-            log('Setting timer to check for token in localStorage');
-            const checkInterval = setInterval(() => {
-              const tokenCheck = localStorage.getItem('token');
+          // Check for pending property (may not be in the type definition)
+          if ('pending' in result && result.pending) {
+          // The API is handling the redirect, show a loading message
+          log('Pending redirect to backend service');
+          setError('Authentication in progress, please wait...');
+          
+          // Set a timer to check localStorage for token
+          log('Setting timer to check for token in localStorage');
+          const checkInterval = setInterval(() => {
+            const tokenCheck = localStorage.getItem('token');
               if (tokenCheck && validateToken(tokenCheck)) {
                 log('Valid token appeared in localStorage, using it');
-                clearInterval(checkInterval);
-                login(tokenCheck);
-                navigate('/dashboard');
-              }
-            }, 1000);
-            
-            // Clear interval after 15 seconds if no token appears
-            setTimeout(() => {
               clearInterval(checkInterval);
-              log('Token check timed out after 15 seconds');
-              setError('Authentication timed out. Please try again.');
-            }, 15000);
-            
-            return;
-          }
+              login(tokenCheck);
+              navigate('/dashboard');
+            }
+          }, 1000);
+          
+          // Clear interval after 15 seconds if no token appears
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            log('Token check timed out after 15 seconds');
+            setError('Authentication timed out. Please try again.');
+          }, 15000);
+          
+          return;
+        }
 
-          if (result.success === false) {
-            // Handle specific error cases more gracefully
-            log(`Authentication error: ${result.error}`);
-            
+        if (result.success === false) {
+          // Handle specific error cases more gracefully
+          log(`Authentication error: ${result.error}`);
+          
             if (result.error === 'invalid_grant' || result.error === 'auth_code_already_used') {
               // Automatically check auth configuration to help debug
               await checkAuthConfig();
@@ -297,7 +298,7 @@ const AuthCallback = () => {
     };
     
   }, [login, navigate, location]);
-  
+
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md overflow-hidden p-6">
@@ -357,13 +358,13 @@ const AuthCallback = () => {
           <div className="mt-8 p-2 border border-gray-200 rounded-md bg-gray-50">
             <div className="flex justify-between items-center mb-1">
               <p className="text-xs font-bold">Debug Info:</p>
-              <button 
+          <button 
                 onClick={() => navigator.clipboard.writeText(debugMessages.join('\n'))}
                 className="text-xs text-blue-500 hover:text-blue-700"
-              >
+          >
                 Copy
-              </button>
-            </div>
+          </button>
+        </div>
             <div className="max-h-60 overflow-y-auto">
               {debugMessages.map((msg, i) => (
                 <p key={i} className="text-xs font-mono text-gray-700">{msg}</p>
