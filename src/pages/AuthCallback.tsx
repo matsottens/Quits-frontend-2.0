@@ -13,6 +13,40 @@ declare global {
 // Global flag to prevent multiple auth attempts across renders
 let hasProcessedAuth = false;
 
+// Function to safely decode JWT token 
+const decodeToken = (token: string) => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    
+    return JSON.parse(atob(parts[1]));
+  } catch (e) {
+    console.error('Error decoding token:', e);
+    return null;
+  }
+};
+
+// Check if token is valid and not expired
+const isTokenValid = (token: string) => {
+  const decoded = decodeToken(token);
+  if (!decoded) return false;
+  
+  // Check if token has expiration
+  if (decoded.exp) {
+    // exp is in seconds, Date.now() is in milliseconds
+    return decoded.exp * 1000 > Date.now();
+  }
+  
+  // If no expiration, check if token was created recently (within 7 days)
+  if (decoded.createdAt) {
+    const createdTime = new Date(decoded.createdAt).getTime();
+    // 7 days in milliseconds
+    return Date.now() - createdTime < 7 * 24 * 60 * 60 * 1000;
+  }
+  
+  return false;
+};
+
 const AuthCallback = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,27 +94,14 @@ const AuthCallback = () => {
 
         // First check for token in localStorage (may have been set by a redirect)
         const storedToken = localStorage.getItem('token');
-        if (storedToken) {
-          log('Found token in localStorage, using it directly');
-          
-          // Verify token is valid by checking its format (simple validation)
-          const parts = storedToken.split('.');
-          if (parts.length === 3) {
-            try {
-              // Try to decode the middle part
-              const decoded = JSON.parse(atob(parts[1]));
-              if (decoded && decoded.email) {
-                log('Token appears valid, logging in');
-                login(storedToken);
-                navigate('/dashboard');
-                return;
-              }
-            } catch (e) {
-              log('Error decoding token:', e);
-            }
-          }
-          
-          log('Token found but could not be validated, continuing...');
+        if (storedToken && isTokenValid(storedToken)) {
+          log('Found valid token in localStorage, using it directly');
+          login(storedToken);
+          navigate('/dashboard');
+          return;
+        } else if (storedToken) {
+          log('Found token in localStorage but it appears invalid, clearing');
+          localStorage.removeItem('token');
         }
         
         // Get the code from URL query params
@@ -248,69 +269,34 @@ const AuthCallback = () => {
           log(`Authentication error: ${result.error}`);
           
           if (result.error === 'invalid_grant') {
-            log('Invalid grant error, checking if token exists in localStorage anyway');
-            const existingToken = localStorage.getItem('token');
-            if (existingToken) {
-              log('Found existing token despite invalid_grant error, using it');
-              login(existingToken);
-              navigate('/dashboard');
-              return;
-            }
-            
-            setError('Your authentication session has expired. Please try logging in again.');
-            return;
+            setError('This authentication code has expired or already been used. Please try logging in again.');
+          } else {
+            setError(result.message || 'Failed to authenticate with Google. Please try again.');
           }
-          
-          setError(result.message || 'Authentication failed');
           return;
         }
         
-        if (result && result.token) {
-          log('Successfully received auth token');
+        if (result.success && result.token) {
+          log('Successfully received token from API');
           localStorage.setItem('token', result.token);
           login(result.token);
           navigate('/dashboard');
-        } else {
-          log('No token received from authentication server');
-          
-          // Check one more time if a token appeared in localStorage
-          const finalTokenCheck = localStorage.getItem('token');
-          if (finalTokenCheck) {
-            log('Found token in localStorage as last resort');
-            login(finalTokenCheck);
-            navigate('/dashboard');
-            return;
-          }
-          
-          setError('No token received from authentication server. Please try again.');
-        }
-      } catch (err) {
-        console.error('Google callback error:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        log(`Error: ${errorMessage}`);
-        
-        // Check if token exists in localStorage anyway
-        const existingToken = localStorage.getItem('token');
-        if (existingToken) {
-          log('Found existing token despite error, using it');
-          login(existingToken);
-          navigate('/dashboard');
           return;
         }
         
-        setError('Authentication failed: ' + errorMessage);
+        // If we get here, something unexpected happened
+        setError('An unexpected error occurred during authentication. Please try again.');
+        
+      } catch (callbackError) {
+        log(`Auth callback error: ${callbackError instanceof Error ? callbackError.message : 'Unknown error'}`);
+        setError('Failed to process authentication. Please try again.');
       } finally {
         setIsProcessing(false);
       }
     };
-    
+
     processGoogleCallback();
-    
-    // Cleanup function
-    return () => {
-      log('AuthCallback component unmounting');
-    };
-  }, [login, navigate, location.search]); // Only include dependencies that should trigger a rerun
+  }, [location, navigate, login]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
