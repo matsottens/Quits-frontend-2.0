@@ -324,8 +324,60 @@ const apiService = {
       sessionStorage.setItem(processedCodesKey, JSON.stringify(processedCodes));
       
       try {
-        // First try the Google proxy API which is optimized for handling OAuth
-        console.log('Attempting to exchange code via Google proxy API');
+        // First try the direct callback endpoint which is most efficient
+        console.log('Attempting to use direct callback endpoint');
+        
+        try {
+          const directUrl = `${AUTH_API_URL}/auth/google/callback?code=${encodeURIComponent(code)}&_t=${Date.now()}`;
+          console.log(`Using direct URL: ${directUrl}`);
+          
+          // Use fetch for this call as it has better cross-origin support
+          const response = await fetch(directUrl, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'X-Client-Version': '2.0',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Cache-Control': 'no-cache, no-store'
+            }
+          });
+          
+          if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await response.json();
+              console.log('Direct callback successful:', data);
+              
+              if (data.token) {
+                // Store token in localStorage
+                localStorage.setItem('token', data.token);
+                return {
+                  success: true,
+                  token: data.token,
+                  user: data.user
+                };
+              }
+            } else {
+              console.log('Received non-JSON response from direct callback');
+              const text = await response.text();
+              console.log(`Response text (first 100 chars): ${text.substring(0, 100)}...`);
+            }
+          } else {
+            console.error(`Direct callback failed with status: ${response.status}`);
+            try {
+              const errorText = await response.text();
+              console.error('Error response:', errorText);
+            } catch (e) {
+              console.error('Could not read error response');
+            }
+          }
+        } catch (directError) {
+          console.error('Error with direct callback:', directError);
+        }
+        
+        // If we get here, the direct method failed, try the Google proxy API as a fallback
+        console.log('Direct callback failed, attempting to exchange code via Google proxy API');
         
         const proxyEndpoint = `${AUTH_API_URL}/google-proxy`;
         console.log(`Using proxy endpoint: ${proxyEndpoint}`);
@@ -345,137 +397,68 @@ const apiService = {
           
           console.log('Fetch options:', fetchOptions);
           
-          const fullUrl = `${proxyEndpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`;
-          console.log('Making request to:', fullUrl);
+          // Try both paths: with and without /api prefix
+          const urls = [
+            `${proxyEndpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`,
+            `https://api.quits.cc/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`,
+            `https://api.quits.cc/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`
+          ];
           
-          const response = await fetch(fullUrl, fetchOptions);
+          let successResponse = null;
           
-          console.log('Response status:', response.status);
-          console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
-          
-          const responseText = await response.text();
-          console.log('Raw response:', responseText);
-          
-          // Try to parse as JSON
-          let data;
-          try {
-            data = JSON.parse(responseText);
-            console.log('Google proxy API response (parsed):', data);
-          } catch (parseError) {
-            console.error('Failed to parse response as JSON:', parseError);
-            throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 100));
+          for (const url of urls) {
+            try {
+              console.log(`Trying URL: ${url}`);
+              
+              const response = await fetch(url, fetchOptions);
+              
+              console.log(`Response status for ${url}: ${response.status}`);
+              
+              if (response.ok) {
+                const responseText = await response.text();
+                console.log(`Raw response from ${url}: ${responseText.substring(0, 100)}...`);
+                
+                try {
+                  const data = JSON.parse(responseText);
+                  console.log(`Parsed response from ${url}:`, data);
+                  
+                  if (data.token) {
+                    successResponse = data;
+                    break;
+                  }
+                } catch (parseError) {
+                  console.error(`Failed to parse response from ${url} as JSON:`, parseError);
+                }
+              }
+            } catch (urlError) {
+              console.error(`Failed to fetch from ${url}:`, urlError);
+            }
           }
           
-          if (data.token) {
-            console.log('Received token from server:', data.token.substring(0, 10) + '...');
-            // Store token in localStorage
-            localStorage.setItem('token', data.token);
-            console.log('Token stored in localStorage successfully');
-            
+          if (successResponse) {
+            console.log('Successfully obtained token from Google proxy');
+            localStorage.setItem('token', successResponse.token);
             return {
               success: true,
-              token: data.token,
-              user: data.user
-            };
-          } else if (data.pending) {
-            // The server is processing the request in the background
-            console.log('Auth is being processed in background');
-            return {
-              success: false,
-              pending: true,
-              message: data.message || 'Authentication in progress'
-            };
-          } else if (data.error) {
-            console.error('Error in Google proxy response:', data.error);
-            
-            // If it's invalid_grant, mark this specific code as permanently invalid
-            if (data.error === 'invalid_grant') {
-              processedCodes[code] = 'invalid';
-              sessionStorage.setItem(processedCodesKey, JSON.stringify(processedCodes));
-              
-              return {
-                success: false,
-                error: data.error,
-                message: data.message || 'Authorization code has expired or been used'
-              };
-            }
-            
-            return {
-              success: false,
-              error: data.error,
-              message: data.message || 'Unknown error'
-            };
-          } else {
-            console.warn('Unexpected response structure:', data);
-            return {
-              success: false,
-              error: 'unexpected_response',
-              message: 'Received an unexpected response from the server'
+              token: successResponse.token,
+              user: successResponse.user
             };
           }
-        } catch (fetchError) {
-          console.error('Error with fetch request:', fetchError);
+        } catch (proxyError) {
+          console.error('All proxy attempts failed:', proxyError);
         }
         
-        // Try the primary API endpoint as a fallback
-        console.log('Trying primary API endpoint as fallback');
-        try {
-          const response = await authApi.get(`/auth/google/callback?code=${encodeURIComponent(code)}&_t=${Date.now()}`);
-          
-          console.log('Primary API response:', response.data);
-          
-          if (response.data && response.data.token) {
-            // Store token in localStorage
-            localStorage.setItem('token', response.data.token);
-            return {
-              success: true,
-              token: response.data.token,
-              user: response.data.user
-            };
-          }
-        } catch (axiosError) {
-          console.error('Axios error with primary endpoint:', axiosError);
-          
-          // Try direct fetch as last resort
-          try {
-            console.log('Trying direct fetch to callback endpoint as last resort');
-            const directResponse = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${encodeURIComponent(code)}&_t=${Date.now()}`, {
-              headers: {
-                'Accept': 'application/json'
-              }
-            });
-            
-            if (directResponse.ok) {
-              const directData = await directResponse.json();
-              console.log('Direct fetch response:', directData);
-              
-              if (directData.token) {
-                localStorage.setItem('token', directData.token);
-                return {
-                  success: true,
-                  token: directData.token,
-                  user: directData.user
-                };
-              }
-            } else {
-              console.error('Direct fetch failed:', await directResponse.text());
-            }
-          } catch (directFetchError) {
-            console.error('Direct fetch error:', directFetchError);
-          }
-        }
-        
-        // If we get here, something unexpected happened
+        // If we get here, all attempts failed
         return {
           success: false,
-          error: 'unknown_error',
+          error: 'auth_failed',
           message: 'Failed to authenticate with Google. Please try again.'
         };
-      } catch (error) {
+      } catch (error: any) {
         console.error('Google callback error:', error);
         
         // Check if we have an error response with details
-        if (axios.isAxiosError(error) && error.response?.data) {
+        if (error.response?.data) {
           const errorData = error.response.data;
           
           if (errorData.error === 'invalid_grant') {
@@ -494,7 +477,7 @@ const apiService = {
         return {
           success: false,
           error: 'request_failed',
-          message: error instanceof Error ? error.message : 'Unknown error during authentication'
+          message: error.message || 'Unknown error during authentication'
         };
       }
     },
