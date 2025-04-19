@@ -235,7 +235,7 @@ const apiService = {
   // Auth endpoints
   auth: {
     // Generate Google OAuth URL with state parameter for security
-    getGoogleAuthUrl: (redirect = '/dashboard') => {
+    getGoogleAuthUrl: (email = '') => {
       console.log('Generating Google OAuth URL');
       
       // Generate a random state value for CSRF protection
@@ -249,18 +249,26 @@ const apiService = {
         console.error('Failed to store OAuth state:', e);
       }
       
-      // Use prompt=select_account to force account picker
+      // Always force the account picker by using prompt=select_account
       const params = new URLSearchParams({
         client_id: GOOGLE_OAUTH_CONFIG.client_id,
         redirect_uri: GOOGLE_OAUTH_CONFIG.redirect_uri,
         response_type: 'code',
         scope: GOOGLE_OAUTH_CONFIG.scope,
         state,
-        prompt: 'select_account consent',
+        prompt: 'select_account consent', // Force Google to show account selection screen
         access_type: 'offline'
       });
       
-      return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      // If email was provided, add login_hint parameter
+      if (email && email.includes('@')) {
+        params.append('login_hint', email);
+        console.log(`Added login_hint with email: ${email}`);
+      }
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      console.log(`Generated Google auth URL: ${authUrl.substring(0, 50)}...`);
+      return authUrl;
     },
 
     // Handle Google OAuth callback with multiple fallback methods

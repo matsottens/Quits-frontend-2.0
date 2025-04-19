@@ -77,6 +77,13 @@ const Login = () => {
       setIsLoading(true);
       setError(null);
       
+      // Clear any previous authentication data
+      localStorage.removeItem('token');
+      localStorage.removeItem('quits_auth_token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth_state');
+      console.log('Cleared previous authentication data');
+      
       // Use the improved API service for Google auth
       const authUrl = await api.auth.getGoogleAuthUrl(email);
       
