@@ -78,13 +78,13 @@ const Login = () => {
       setError(null);
       
       // Use the improved API service for Google auth
-      const result = await api.auth.getGoogleAuthUrl(email);
+      const authUrl = await api.auth.getGoogleAuthUrl(email);
       
-      if (result && result.url) {
+      if (authUrl) {
         console.log('Redirecting to Google OAuth...');
         // Add timestamp to track OAuth flow
         localStorage.setItem('google_auth_started', Date.now().toString());
-        window.location.href = result.url;
+        window.location.href = authUrl;
       } else {
         throw new Error('Failed to generate Google auth URL');
       }
