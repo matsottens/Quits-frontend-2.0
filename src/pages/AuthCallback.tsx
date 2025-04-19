@@ -268,11 +268,17 @@ const AuthCallback = () => {
           // Handle specific error cases more gracefully
           log(`Authentication error: ${result.error}`);
           
-          if (result.error === 'invalid_grant') {
-            setError('This authentication code has expired or already been used. Please try logging in again.');
-          } else {
-            setError(result.message || 'Failed to authenticate with Google. Please try again.');
+          if (result.error === 'invalid_grant' || result.error === 'auth_code_already_used') {
+            // Simply redirect back to login with better error message
+            window.location.href = '/login?error=invalid_grant&message=Your authorization session has expired. Please login again.';
+            return;
+          } else if (result.error === 'auth_failed') {
+            window.location.href = '/login?error=auth_failed&message=Authentication failed. Please try again.';
+            return;
           }
+          
+          // For other errors, show in UI
+          setError(result.message || 'Failed to authenticate with Google. Please try again.');
           return;
         }
         
@@ -299,41 +305,55 @@ const AuthCallback = () => {
   }, [location, navigate, login]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center max-w-md w-full p-8 bg-white shadow-lg rounded-lg">
-        {error ? (
-          <>
-            <div className="text-red-500 mb-6 font-semibold">{error}</div>
-            <p className="mt-4 text-gray-600">
-              Redirecting to login in {redirectCountdown} seconds...
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mx-auto mb-4"></div>
-            <h1 className="text-xl font-bold text-gray-800 mb-2">Authentication Processing...</h1>
-            <p className="mt-4 text-gray-600">
-              Redirecting to your dashboard...
-            </p>
-          </>
-        )}
-        
-        {/* Log display */}
-        <details className="mt-6 text-left" open>
-          <summary className="text-sm text-gray-500 cursor-pointer">Auth Log</summary>
-          <div className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto max-h-60">
-            <pre>{logMessages.map((msg, i) => <div key={i}>{msg}</div>)}</pre>
-          </div>
-        </details>
-
-        <div className="mt-6">
-          <button 
-            onClick={() => error ? navigate('/login') : navigate('/dashboard')} 
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            {error ? 'Go to Login' : 'Continue to Dashboard'}
-          </button>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F7FA] p-4">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <img src="/quits-logo.svg" alt="Quits" className="mx-auto h-16 w-auto" />
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            {error ? "Authentication Error" : "Authenticating..."}
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            {error 
+              ? "There was a problem with authentication." 
+              : "Please wait while we complete your sign-in."}
+          </p>
         </div>
+
+        {error ? (
+          <div className="mt-4">
+            <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
+              <p className="font-medium">{error}</p>
+            </div>
+            <div className="mt-6">
+              <button
+                onClick={() => window.location.href = '/login'}
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              >
+                Return to Login
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-6">
+            <div className="flex justify-center">
+              <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+            </div>
+            <div className="mt-4 text-center text-sm text-gray-500">
+              <p>This should only take a moment...</p>
+            </div>
+          </div>
+        )}
+
+        {logMessages.length > 0 && (
+          <div className="mt-8 p-4 bg-gray-100 rounded-md">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Authentication log:</h3>
+            <div className="text-xs text-gray-600 overflow-auto max-h-40">
+              {logMessages.map((msg, i) => (
+                <div key={i} className="mb-1">{msg}</div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

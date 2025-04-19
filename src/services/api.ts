@@ -163,7 +163,8 @@ const GOOGLE_OAUTH_CONFIG = {
   scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
   response_type: 'code',
   access_type: 'offline',
-  prompt: 'consent',
+  prompt: 'select_account consent', // Always prompt for account selection + consent
+  include_granted_scopes: 'true', // Include previously granted scopes
 };
 
 // Log the redirect URI for debugging
@@ -234,9 +235,34 @@ const apiService = {
   // Auth endpoints
   auth: {
     // Get Google OAuth URL
-    getGoogleAuthUrl: async () => {
+    getGoogleAuthUrl: async (loginHint: string = '') => {
       const params = new URLSearchParams(GOOGLE_OAUTH_CONFIG);
-      return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` };
+      
+      // Add login_hint if an email was provided
+      if (loginHint && loginHint.includes('@')) {
+        params.append('login_hint', loginHint);
+      }
+      
+      // Add a unique state parameter to prevent CSRF
+      const stateValue = Math.random().toString(36).substring(2, 15);
+      params.append('state', stateValue);
+      
+      // Store the state in sessionStorage to verify later
+      try {
+        sessionStorage.setItem('oauth_state', stateValue);
+        
+        // Clear any previous OAuth codes
+        const processedCodesKey = 'processed_oauth_codes';
+        sessionStorage.setItem(processedCodesKey, '{}');
+      } catch (e) {
+        console.error('Failed to store OAuth state:', e);
+      }
+      
+      // Use a clean URL
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      console.log(`Generated OAuth URL: ${authUrl.substring(0, 100)}...`);
+      
+      return { url: authUrl };
     },
     
     // Handle Google OAuth callback with multiple fallback methods
@@ -458,6 +484,26 @@ const apiService = {
     updatePhoneNumber: async (phoneNumber: string) => {
       const response = await api.post('/auth/update-phone', { phoneNumber });
       return response.data;
+    },
+
+    // Clear all auth data and storage
+    clearAuthData: () => {
+      // Clear local storage
+      localStorage.removeItem('token');
+      
+      // Clear session storage
+      try {
+        sessionStorage.removeItem('processed_oauth_codes');
+        sessionStorage.removeItem('oauth_state');
+      } catch (e) {
+        console.error('Error clearing session storage:', e);
+      }
+      
+      // Clear any cookies (add any auth-related cookies here)
+      document.cookie = 'auth_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      
+      console.log('All authentication data cleared');
     },
   },
   

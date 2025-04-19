@@ -1,5 +1,5 @@
-import { useState, FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, FormEvent, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/Header';
 import GoogleLogo from '../components/GoogleLogo';
@@ -11,6 +11,48 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Get URL query parameters
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const errorParam = query.get('error');
+  const reason = query.get('reason');
+  const message = query.get('message');
+
+  // Handle URL errors on page load
+  useEffect(() => {
+    // Clear any previous auth data on login page
+    api.auth.clearAuthData();
+    
+    // Handle error parameters
+    if (errorParam) {
+      console.log(`Login error: ${errorParam}, reason: ${reason}, message: ${message}`);
+      
+      if (errorParam === 'invalid_grant') {
+        setError('Authentication session expired. Please try logging in again.');
+      } else if (errorParam === 'session_expired') {
+        setError('Your session has expired. Please sign in again.');
+      } else if (message) {
+        setError(message);
+      } else {
+        setError('Authentication error. Please try again.');
+      }
+    } else if (reason) {
+      if (reason === 'token_missing') {
+        setError('Authentication required. Please sign in.');
+      } else if (reason === 'token_expired') {
+        setError('Your session has expired. Please sign in again.');
+      } else if (reason === 'missing_gmail_access') {
+        setError('Gmail access is required. Please authorize access to your Gmail account.');
+      } else if (reason === 'invalid_token') {
+        setError('Invalid authentication token. Please sign in again.');
+      } else if (reason === 'auth_failed') {
+        setError('Authentication failed. Please try again.');
+      } else if (reason === 'permission_denied') {
+        setError('Access to Gmail was denied. Please try again and grant permission.');
+      }
+    }
+  }, [errorParam, reason, message]);
 
   const handleEmailLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,35 +75,22 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       
-      // Don't use the API service, construct the URL directly
-      const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      const isProd = window.location.hostname !== 'localhost';
-      const REDIRECT_URI = isProd 
-        ? 'https://www.quits.cc/auth/callback'
-        : `${window.location.origin}/auth/callback`;
+      // Use the improved API service for Google auth
+      const result = await api.auth.getGoogleAuthUrl(email);
       
-      const params = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
-        response_type: 'code',
-        access_type: 'offline',
-        prompt: 'consent',
-        include_granted_scopes: 'true' // Request all previously granted scopes
-      });
-      
-      const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-      console.log('Redirecting to Google OAuth URL:', url);
-      
-      // Add a timestamp to the localStorage to track when the OAuth flow was initiated
-      localStorage.setItem('google_auth_started', Date.now().toString());
-      
-      // Redirect to Google sign-in
-      window.location.href = url;
-    } catch (error) {
+      if (result && result.url) {
+        console.log('Redirecting to Google OAuth...');
+        // Add timestamp to track OAuth flow
+        localStorage.setItem('google_auth_started', Date.now().toString());
+        window.location.href = result.url;
+      } else {
+        throw new Error('Failed to generate Google auth URL');
+      }
+    } catch (error: any) {
       console.error('Google login error:', error);
-      setError('Failed to initiate Google login. Please try again.');
+      setError(error.message || 'Failed to initiate Google login. Please try again.');
       setIsLoading(false);
     }
   };
