@@ -234,39 +234,39 @@ function getGmailToken() {
 const apiService = {
   // Auth endpoints
   auth: {
-    // Get Google OAuth URL
-    getGoogleAuthUrl: async (loginHint: string = '') => {
-      const params = new URLSearchParams(GOOGLE_OAUTH_CONFIG);
+    // Generate Google OAuth URL with state parameter for security
+    getGoogleAuthUrl: (redirect = '/dashboard') => {
+      console.log('Generating Google OAuth URL');
       
-      // Add login_hint if an email was provided
-      if (loginHint && loginHint.includes('@')) {
-        params.append('login_hint', loginHint);
-      }
+      // Generate a random state value for CSRF protection
+      const state = Math.random().toString(36).substring(2, 15);
       
-      // Add a unique state parameter to prevent CSRF
-      const stateValue = Math.random().toString(36).substring(2, 15);
-      params.append('state', stateValue);
-      
-      // Store the state in sessionStorage to verify later
+      // Store state in sessionStorage to verify on callback
       try {
-        sessionStorage.setItem('oauth_state', stateValue);
-        
-        // Clear any previous OAuth codes
-        const processedCodesKey = 'processed_oauth_codes';
-        sessionStorage.setItem(processedCodesKey, '{}');
+        sessionStorage.setItem('oauth_state', state);
+        console.log('Stored OAuth state in sessionStorage:', state);
       } catch (e) {
         console.error('Failed to store OAuth state:', e);
       }
       
-      // Use a clean URL
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-      console.log(`Generated OAuth URL: ${authUrl.substring(0, 100)}...`);
+      // Use prompt=select_account to force account picker
+      const params = new URLSearchParams({
+        client_id: GOOGLE_OAUTH_CONFIG.client_id,
+        redirect_uri: GOOGLE_OAUTH_CONFIG.redirect_uri,
+        response_type: 'code',
+        scope: GOOGLE_OAUTH_CONFIG.scope,
+        state,
+        prompt: 'select_account consent',
+        access_type: 'offline'
+      });
       
-      return { url: authUrl };
+      return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     },
-    
+
     // Handle Google OAuth callback with multiple fallback methods
     handleGoogleCallback: async (code: string) => {
+      console.log(`Starting OAuth callback process for code: ${code.substring(0, 10)}...`);
+      
       // First check if we already have a token in localStorage
       const existingToken = localStorage.getItem('token');
       if (existingToken) {
@@ -278,6 +278,7 @@ const apiService = {
             // Try to decode the middle part
             const payload = JSON.parse(atob(parts[1]));
             if (payload && payload.email) {
+              console.log('Existing token validated successfully');
               return {
                 success: true,
                 token: existingToken,
@@ -286,6 +287,8 @@ const apiService = {
             }
           } catch (e) {
             console.error('Error decoding existing token:', e);
+            localStorage.removeItem('token');
+            console.log('Removed invalid token from localStorage');
           }
         }
       }
@@ -295,7 +298,7 @@ const apiService = {
       const processedCodes = JSON.parse(sessionStorage.getItem(processedCodesKey) || '{}');
       
       if (processedCodes[code]) {
-        console.log('This OAuth code has already been processed, checking for token');
+        console.log(`This code has already been processed at ${new Date(processedCodes[code]).toISOString()}`);
         
         // Check if we now have a token (might have been set by another tab/process)
         const newToken = localStorage.getItem('token');
@@ -328,55 +331,87 @@ const apiService = {
         console.log(`Using proxy endpoint: ${proxyEndpoint}`);
         
         try {
-          const response = await fetch(`${proxyEndpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`, {
+          // Include extensive debugging headers to help diagnose issues
+          const fetchOptions = {
             method: 'GET',
             headers: {
-              'Accept': 'application/json'
+              'Accept': 'application/json',
+              'X-Client-Version': '2.0',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Cache-Control': 'no-cache, no-store',
+              'Pragma': 'no-cache'
             }
-          });
+          };
           
-          if (response.ok) {
-            const data = await response.json();
-            console.log('Google proxy API response:', data);
+          console.log('Fetch options:', fetchOptions);
+          
+          const fullUrl = `${proxyEndpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`;
+          console.log('Making request to:', fullUrl);
+          
+          const response = await fetch(fullUrl, fetchOptions);
+          
+          console.log('Response status:', response.status);
+          console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
+          
+          const responseText = await response.text();
+          console.log('Raw response:', responseText);
+          
+          // Try to parse as JSON
+          let data;
+          try {
+            data = JSON.parse(responseText);
+            console.log('Google proxy API response (parsed):', data);
+          } catch (parseError) {
+            console.error('Failed to parse response as JSON:', parseError);
+            throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 100));
+          }
+          
+          if (data.token) {
+            console.log('Received token from server:', data.token.substring(0, 10) + '...');
+            // Store token in localStorage
+            localStorage.setItem('token', data.token);
+            console.log('Token stored in localStorage successfully');
             
-            if (data.token) {
-              // Store token in localStorage
-              localStorage.setItem('token', data.token);
-              return {
-                success: true,
-                token: data.token,
-                user: data.user
-              };
-            } else if (data.pending) {
-              // The server is processing the request in the background
-              console.log('Auth is being processed in background');
+            return {
+              success: true,
+              token: data.token,
+              user: data.user
+            };
+          } else if (data.pending) {
+            // The server is processing the request in the background
+            console.log('Auth is being processed in background');
+            return {
+              success: false,
+              pending: true,
+              message: data.message || 'Authentication in progress'
+            };
+          } else if (data.error) {
+            console.error('Error in Google proxy response:', data.error);
+            
+            // If it's invalid_grant, mark this specific code as permanently invalid
+            if (data.error === 'invalid_grant') {
+              processedCodes[code] = 'invalid';
+              sessionStorage.setItem(processedCodesKey, JSON.stringify(processedCodes));
+              
               return {
                 success: false,
-                pending: true,
-                message: data.message || 'Authentication in progress'
+                error: data.error,
+                message: data.message || 'Authorization code has expired or been used'
               };
             }
+            
+            return {
+              success: false,
+              error: data.error,
+              message: data.message || 'Unknown error'
+            };
           } else {
-            // Handle error response
-            try {
-              const errorData = await response.json();
-              console.error('Error response (' + response.status + '):', errorData);
-              console.log('Parsed error details: ', errorData);
-              
-              // If it's invalid_grant, mark this specific code as permanently invalid
-              if (errorData.error === 'invalid_grant') {
-                processedCodes[code] = 'invalid';
-                sessionStorage.setItem(processedCodesKey, JSON.stringify(processedCodes));
-                
-                return {
-                  success: false,
-                  error: errorData.error,
-                  message: errorData.message || 'Authorization code has expired or been used'
-                };
-              }
-            } catch (parseError) {
-              console.error('Error parsing error response:', parseError);
-            }
+            console.warn('Unexpected response structure:', data);
+            return {
+              success: false,
+              error: 'unexpected_response',
+              message: 'Received an unexpected response from the server'
+            };
           }
         } catch (fetchError) {
           console.error('Error with fetch request:', fetchError);
@@ -384,16 +419,50 @@ const apiService = {
         
         // Try the primary API endpoint as a fallback
         console.log('Trying primary API endpoint as fallback');
-        const response = await authApi.get(`/auth/google/callback?code=${encodeURIComponent(code)}&_t=${Date.now()}`);
-        
-        if (response.data && response.data.token) {
-          // Store token in localStorage
-          localStorage.setItem('token', response.data.token);
-          return {
-            success: true,
-            token: response.data.token,
-            user: response.data.user
-          };
+        try {
+          const response = await authApi.get(`/auth/google/callback?code=${encodeURIComponent(code)}&_t=${Date.now()}`);
+          
+          console.log('Primary API response:', response.data);
+          
+          if (response.data && response.data.token) {
+            // Store token in localStorage
+            localStorage.setItem('token', response.data.token);
+            return {
+              success: true,
+              token: response.data.token,
+              user: response.data.user
+            };
+          }
+        } catch (axiosError) {
+          console.error('Axios error with primary endpoint:', axiosError);
+          
+          // Try direct fetch as last resort
+          try {
+            console.log('Trying direct fetch to callback endpoint as last resort');
+            const directResponse = await fetch(`${AUTH_API_URL}/auth/google/callback?code=${encodeURIComponent(code)}&_t=${Date.now()}`, {
+              headers: {
+                'Accept': 'application/json'
+              }
+            });
+            
+            if (directResponse.ok) {
+              const directData = await directResponse.json();
+              console.log('Direct fetch response:', directData);
+              
+              if (directData.token) {
+                localStorage.setItem('token', directData.token);
+                return {
+                  success: true,
+                  token: directData.token,
+                  user: directData.user
+                };
+              }
+            } else {
+              console.error('Direct fetch failed:', await directResponse.text());
+            }
+          } catch (directFetchError) {
+            console.error('Direct fetch error:', directFetchError);
+          }
         }
         
         // If we get here, something unexpected happened
