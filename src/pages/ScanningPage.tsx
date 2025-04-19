@@ -65,10 +65,23 @@ const ScanningPage = () => {
       
       // Start polling for status updates
       pollScanStatus();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error starting scan:', err);
+      
+      // Handle authentication-specific errors
+      if (err.message?.includes('Authentication') || 
+          err.message?.includes('token') || 
+          err.message?.includes('Gmail access')) {
+        // Don't show an error here since we're redirecting to login
+        // The window.location redirect in the API service will handle this
+        setScanningStatus('error');
+        setError('Authentication error. Redirecting to login...');
+        return;
+      }
+      
+      // For other errors, allow retries
       setError('Failed to start email scanning. Please try again or check if Gmail API access is properly authorized.');
-          setScanningStatus('error');
+      setScanningStatus('error');
       
       // Only allow manual retries after multiple automatic attempts fail
       if (retryCount >= maxRetries) {

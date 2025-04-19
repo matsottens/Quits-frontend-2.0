@@ -197,9 +197,34 @@ function getGmailToken() {
     
     // Decode the payload (middle part)
     const payload = JSON.parse(atob(parts[1]));
-    return payload.gmail_token || null;
+    
+    // If token has expired, return null
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      console.warn('Token has expired, clearing from storage');
+      localStorage.removeItem('token');
+      return null;
+    }
+    
+    // Check when the token was created
+    if (payload.createdAt) {
+      const createdTime = new Date(payload.createdAt).getTime();
+      // If token is older than 7 days, it may be expired
+      if (Date.now() - createdTime > 7 * 24 * 60 * 60 * 1000) {
+        console.warn('Token is older than 7 days, might be stale');
+      }
+    }
+    
+    // If no Gmail token is present, return null
+    if (!payload.gmail_token) {
+      console.warn('No Gmail token found in JWT payload');
+      return null;
+    }
+    
+    return payload.gmail_token;
   } catch (error) {
     console.error('Error extracting Gmail token:', error);
+    // Clear the token if it can't be parsed - it's probably corrupted
+    localStorage.removeItem('token');
     return null;
   }
 }
@@ -447,7 +472,40 @@ const apiService = {
         const authToken = localStorage.getItem('token');
         if (!authToken) {
           console.error('No authentication token found');
+          // Redirect to login page instead of throwing error
+          window.location.href = '/login?reason=token_missing';
           throw new Error('Authentication required to scan emails');
+        }
+        
+        // Validate the token before proceeding
+        try {
+          const parts = authToken.split('.');
+          if (parts.length !== 3) {
+            throw new Error('Invalid token format');
+          }
+          
+          // Parse the payload
+          const payload = JSON.parse(atob(parts[1]));
+          
+          // Check token expiration
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            console.error('Token has expired');
+            localStorage.removeItem('token'); // Clear invalid token
+            window.location.href = '/login?reason=token_expired';
+            throw new Error('Authentication token has expired');
+          }
+          
+          // Check if we have a Gmail token inside the JWT
+          if (!payload.gmail_token) {
+            console.warn('No Gmail token in JWT - user needs to re-authenticate with Gmail');
+            window.location.href = '/login?reason=missing_gmail_access';
+            throw new Error('Gmail access token is missing. Please re-authenticate with Gmail.');
+          }
+        } catch (tokenError) {
+          console.error('Token validation error:', tokenError);
+          localStorage.removeItem('token'); // Clear invalid token
+          window.location.href = '/login?reason=invalid_token';
+          throw new Error('Invalid authentication token');
         }
         
         // Check if we have Gmail token
@@ -474,35 +532,51 @@ const apiService = {
       } catch (error) {
         console.error('Email scanning error:', error);
         
-        // Only try fetch fallback if there's a network error
-        if (axios.isAxiosError(error) && (error.code === 'ERR_NETWORK' || error.response?.status === 400)) {
-          try {
-            console.log('Trying fetch fallback method');
-            const authToken = localStorage.getItem('token');
-            const gmailToken = getGmailToken();
-            
-            const fetchResponse = await fetch(`${API_URL}/email/scan`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`,
-                'X-Gmail-Token': gmailToken || ''
-              },
-              body: JSON.stringify({ useRealData: !!gmailToken })
-            });
-            
-            if (!fetchResponse.ok) {
-              console.error('Fetch fallback failed:', await fetchResponse.text());
-              throw new Error('Failed to fetch');
+        // Check for specific error types that indicate authentication issues
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 401) {
+            console.error('Authentication failed (401) - clearing token');
+            localStorage.removeItem('token');
+            window.location.href = '/login?reason=auth_failed';
+            throw new Error('Authentication failed. Please log in again.');
+          }
+          
+          if (error.response?.status === 403) {
+            console.error('Access forbidden (403) - may need new Gmail permissions');
+            window.location.href = '/login?reason=permission_denied';
+            throw new Error('Access to Gmail was denied. Please re-authorize with Gmail.');
+          }
+          
+          // Only try fetch fallback if there's a network error
+          if (error.code === 'ERR_NETWORK' || error.response?.status === 400) {
+            try {
+              console.log('Trying fetch fallback method');
+              const authToken = localStorage.getItem('token');
+              const gmailToken = getGmailToken();
+              
+              const fetchResponse = await fetch(`${API_URL}/email/scan`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${authToken}`,
+                  'X-Gmail-Token': gmailToken || ''
+                },
+                body: JSON.stringify({ useRealData: !!gmailToken })
+              });
+              
+              if (!fetchResponse.ok) {
+                console.error('Fetch fallback failed:', await fetchResponse.text());
+                throw new Error('Failed to fetch');
+              }
+              
+              const data = await fetchResponse.json();
+              console.log('Fetch fallback succeeded:', data);
+              return data;
+            } catch (fetchError) {
+              console.error('Fetch fallback failed:', fetchError);
+              throw new Error('Failed to start email scanning');
             }
-            
-            const data = await fetchResponse.json();
-            console.log('Fetch fallback succeeded:', data);
-            return data;
-          } catch (fetchError) {
-            console.error('Fetch fallback failed:', fetchError);
-            throw new Error('Failed to start email scanning');
           }
         }
         
