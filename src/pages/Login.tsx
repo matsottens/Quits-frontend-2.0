@@ -84,6 +84,17 @@ const Login = () => {
       localStorage.removeItem('auth_state');
       console.log('Cleared previous authentication data');
       
+      // First try to visit the restart-oauth endpoint to ensure all server-side state is cleared
+      try {
+        console.log('Visiting restart-oauth endpoint');
+        await fetch('https://api.quits.cc/restart-oauth', {
+          method: 'GET',
+          mode: 'no-cors'
+        });
+      } catch (e) {
+        console.log('Failed to visit restart-oauth endpoint, continuing anyway');
+      }
+      
       // Use the improved API service for Google auth
       const authUrl = await api.auth.getGoogleAuthUrl(email);
       
