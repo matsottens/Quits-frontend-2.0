@@ -84,15 +84,19 @@ const Login = () => {
       localStorage.removeItem('auth_state');
       console.log('Cleared previous authentication data');
       
-      // First try to visit the restart-oauth endpoint to ensure all server-side state is cleared
+      // Store a timestamp to track how long the process takes
+      localStorage.setItem('auth_started', Date.now().toString());
+      
+      // First check if the API is reachable
       try {
-        console.log('Visiting restart-oauth endpoint');
-        await fetch('https://api.quits.cc/restart-oauth', {
+        const healthCheck = await fetch('https://api.quits.cc/api/health', {
           method: 'GET',
-          mode: 'no-cors'
+          mode: 'no-cors', // Avoid CORS issues
+          cache: 'no-store'
         });
+        console.log('API health check complete');
       } catch (e) {
-        console.log('Failed to visit restart-oauth endpoint, continuing anyway');
+        console.warn('API health check failed, continuing anyway:', e);
       }
       
       // Use the improved API service for Google auth
@@ -102,6 +106,11 @@ const Login = () => {
         console.log('Redirecting to Google OAuth...');
         // Add timestamp to track OAuth flow
         localStorage.setItem('google_auth_started', Date.now().toString());
+        
+        // Show a simple message to the user
+        alert('You will now be redirected to Google for authentication. After signing in with Google, you will be returned to this site automatically.');
+        
+        // Redirect to Google
         window.location.href = authUrl;
       } else {
         throw new Error('Failed to generate Google auth URL');

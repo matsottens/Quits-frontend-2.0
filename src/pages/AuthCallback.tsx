@@ -93,6 +93,47 @@ const AuthCallback = () => {
     }
   };
 
+  // Function to directly fetch the token from Google proxy without complex CORS handling
+  const fetchTokenDirectly = async (code: string) => {
+    try {
+      log('Attempting to fetch token directly using simple GET request');
+      
+      // Use a simple URL with all parameters
+      const proxyUrl = `https://api.quits.cc/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${Date.now()}`;
+      
+      log(`Using URL: ${proxyUrl.substring(0, 50)}...`);
+      
+      // Using a simple GET request with minimal headers
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        log(`Response not OK: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        log(`Error response: ${errorText.substring(0, 100)}...`);
+        return { success: false, error: 'api_error', message: `API Error: ${response.status}` };
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        log(`Unexpected content type: ${contentType}`);
+        return { success: false, error: 'invalid_response', message: 'Invalid response format' };
+      }
+      
+      const data = await response.json();
+      log('Successfully received response from Google proxy');
+      return data;
+    } catch (error) {
+      log(`Direct fetch error: ${error instanceof Error ? error.message : String(error)}`);
+      return { success: false, error: 'fetch_error', message: 'Network error during authentication' };
+    }
+  };
+
   useEffect(() => {
     // Check both local and global processed flags to prevent multiple calls
     if (processedRef.current || hasProcessedAuth) {
@@ -194,120 +235,115 @@ const AuthCallback = () => {
         log(`Found authorization code: ${code.substring(0, 8)}...`);
         log('Attempting to exchange code for token');
         
-        // Add direct Google redirect option for user
-        const directGoogleAuth = () => {
-          const redirectUrl = 'https://accounts.google.com/o/oauth2/auth' +
-            '?client_id=82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com' +
-            '&redirect_uri=' + encodeURIComponent('https://www.quits.cc/auth/callback') +
-            '&response_type=code' +
-            '&scope=' + encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid') +
-            '&state=auth' +
-            '&prompt=select_account+consent' +
-            '&access_type=offline';
-          
-          window.location.href = redirectUrl;
-        };
+        // First try our simple direct fetch
+        const directResult = await fetchTokenDirectly(code);
         
-        try {
-          // First try direct method
-          log('Trying direct Google proxy method');
-          const result = await apiService.auth.handleGoogleCallback(code);
+        log(`Direct result: ${JSON.stringify(directResult, null, 2)}`);
+        
+        if (directResult.success && directResult.token) {
+          log('Successfully obtained token, storing and logging in');
           
-          log(`Auth result: ${JSON.stringify(result, null, 2)}`);
-          
-          if (result.success && result.token) {
-            log('Successfully obtained token, storing and logging in');
-            
-            // Validate the token first
-            if (!validateToken(result.token)) {
-              log('Token validation failed');
-              setError('Invalid authentication token received. Please try logging in again.');
-              return;
-            }
-            
-            if (safelyStoreToken(result.token)) {
-              log('Token stored successfully');
-              await login(result.token);
-              navigate('/dashboard');
-              return;
-            } else {
-              log('Failed to store token');
-              setError('Failed to store authentication data. Please ensure cookies and localStorage are enabled.');
-              return;
-            }
-          }
-          
-          // Check for pending property (may not be in the type definition)
-          if ('pending' in result && result.pending) {
-            // The API is handling the redirect, show a loading message
-            log('Pending redirect to backend service');
-            setError('Authentication in progress, please wait...');
-            
-            // Set a timer to check localStorage for token
-            log('Setting timer to check for token in localStorage');
-            const checkInterval = setInterval(() => {
-              const tokenCheck = localStorage.getItem('token');
-              if (tokenCheck && validateToken(tokenCheck)) {
-                log('Valid token appeared in localStorage, using it');
-                clearInterval(checkInterval);
-                login(tokenCheck);
-                navigate('/dashboard');
-              }
-            }, 1000);
-            
-            // Clear interval after 15 seconds if no token appears
-            setTimeout(() => {
-              clearInterval(checkInterval);
-              log('Token check timed out after 15 seconds');
-              setError('Authentication timed out. Please try again.');
-            }, 15000);
-            
-            return;
-          }
-
-          if (result.success === false) {
-            // Handle specific error cases more gracefully
-            log(`Authentication error: ${result.error}`);
-            
-            if (result.error === 'invalid_grant' || result.error === 'auth_code_already_used') {
-              // Automatically check auth configuration to help debug
-              await checkAuthConfig();
-              
-              // Simply redirect back to login with better error message
-              window.location.href = '/login?error=invalid_grant&message=Your authorization session has expired. Please login again.';
-              return;
-            } else if (result.error === 'auth_failed') {
-              await checkAuthConfig();
-              window.location.href = '/login?error=auth_failed&message=Authentication failed. Please try again.';
-              return;
-            }
-            
-            // For other errors, show in UI
-            setError(result.message || 'Failed to authenticate with Google. Please try again.');
+          // Validate the token first
+          if (!validateToken(directResult.token)) {
+            log('Token validation failed');
+            setError('Invalid authentication token received. Please try logging in again.');
             return;
           }
           
-          // If we got here, something unexpected happened
-          log('Unexpected response format');
-          setError('Unexpected authentication response. Please try again.');
-          
-        } catch (error) {
-          // Handle CORS errors specifically
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          if (errorMsg.includes('CORS') || errorMsg.includes('cross-origin') || errorMsg.includes('network error')) {
-            log(`CORS or network error detected: ${errorMsg}`);
-            setError(`Authentication server connection issue. Please try again or contact support.`);
-            
-            // Add a button for manual authentication
-            setShowDirectAuthOption(true);
+          if (safelyStoreToken(directResult.token)) {
+            log('Token stored successfully');
+            await login(directResult.token);
+            navigate('/dashboard');
+            return;
           } else {
-            log(`Authentication error: ${errorMsg}`);
-            setError(`Authentication failed. ${errorMsg}`);
+            log('Failed to store token');
+            setError('Failed to store authentication data. Please ensure cookies and localStorage are enabled.');
+            return;
+          }
+        }
+        
+        // If direct fetch failed, try the service method as a fallback
+        log('Direct fetch failed, trying service method as fallback');
+        const result = await apiService.auth.handleGoogleCallback(code);
+        
+        log(`Auth result: ${JSON.stringify(result, null, 2)}`);
+        
+        if (result.success && result.token) {
+          log('Successfully obtained token, storing and logging in');
+          
+          // Validate the token first
+          if (!validateToken(result.token)) {
+            log('Token validation failed');
+            setError('Invalid authentication token received. Please try logging in again.');
+            return;
           }
           
-          // Check API configuration anyway
-          await checkAuthConfig();
+          if (safelyStoreToken(result.token)) {
+            log('Token stored successfully');
+            await login(result.token);
+            navigate('/dashboard');
+            return;
+          } else {
+            log('Failed to store token');
+            setError('Failed to store authentication data. Please ensure cookies and localStorage are enabled.');
+            return;
+          }
         }
+        
+        // Check for pending property (may not be in the type definition)
+        if ('pending' in result && result.pending) {
+          // The API is handling the redirect, show a loading message
+          log('Pending redirect to backend service');
+          setError('Authentication in progress, please wait...');
+          
+          // Set a timer to check localStorage for token
+          log('Setting timer to check for token in localStorage');
+          const checkInterval = setInterval(() => {
+            const tokenCheck = localStorage.getItem('token');
+            if (tokenCheck && validateToken(tokenCheck)) {
+              log('Valid token appeared in localStorage, using it');
+              clearInterval(checkInterval);
+              login(tokenCheck);
+              navigate('/dashboard');
+            }
+          }, 1000);
+          
+          // Clear interval after 15 seconds if no token appears
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            log('Token check timed out after 15 seconds');
+            setError('Authentication timed out. Please try again.');
+          }, 15000);
+          
+          return;
+        }
+
+        if (result.success === false) {
+          // Handle specific error cases more gracefully
+          log(`Authentication error: ${result.error}`);
+          
+          if (result.error === 'invalid_grant' || result.error === 'auth_code_already_used') {
+            // Automatically check auth configuration to help debug
+            await checkAuthConfig();
+            
+            // Simply redirect back to login with better error message
+            window.location.href = '/login?error=invalid_grant&message=Your authorization session has expired. Please login again.';
+            return;
+          } else if (result.error === 'auth_failed') {
+            await checkAuthConfig();
+            window.location.href = '/login?error=auth_failed&message=Authentication failed. Please try again.';
+            return;
+          }
+          
+          // For other errors, show in UI
+          setError(result.message || 'Failed to authenticate with Google. Please try again.');
+          return;
+        }
+        
+        // If we got here, something unexpected happened
+        log('Unexpected response format');
+        setError('Unexpected authentication response. Please try again.');
+        
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         log(`Unhandled error: ${errorMsg}`);

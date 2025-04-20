@@ -234,258 +234,105 @@ function getGmailToken() {
 const apiService = {
   // Auth endpoints
   auth: {
-    // Generate Google OAuth URL with state parameter for security
-    getGoogleAuthUrl: (email = '') => {
-      console.log('Generating Google OAuth URL');
+    // Get Google Auth URL directly (no backend call needed)
+    getGoogleAuthUrl: (emailHint = '') => {
+      console.log('Generating direct Google auth URL');
       
-      // Generate a random state value for CSRF protection
+      // Generate random state to prevent CSRF
       const state = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('oauth_state', state);
       
-      // Store state in sessionStorage to verify on callback
-      try {
-        sessionStorage.setItem('oauth_state', state);
-        console.log('Stored OAuth state in sessionStorage:', state);
-      } catch (e) {
-        console.error('Failed to store OAuth state:', e);
-      }
+      // Store the timestamp for debugging
+      localStorage.setItem('oauth_start_time', Date.now().toString());
       
-      // Always force the account picker by using prompt=select_account
-      const params = new URLSearchParams({
-        client_id: GOOGLE_OAUTH_CONFIG.client_id,
-        redirect_uri: GOOGLE_OAUTH_CONFIG.redirect_uri,
-        response_type: 'code',
-        scope: GOOGLE_OAUTH_CONFIG.scope,
-        state,
-        prompt: 'select_account consent', // Force Google to show account selection screen
-        access_type: 'offline'
-      });
+      // Direct URL construction (matching what the backend would provide)
+      const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
+      const redirectUri = 'https://www.quits.cc/auth/callback';
+      const scope = 'email profile https://www.googleapis.com/auth/gmail.readonly openid';
       
-      // If email was provided, add login_hint parameter
-      if (email && email.includes('@')) {
-        params.append('login_hint', email);
-        console.log(`Added login_hint with email: ${email}`);
-      }
+      const url = 'https://accounts.google.com/o/oauth2/auth' +
+        '?client_id=' + encodeURIComponent(clientId) +
+        '&redirect_uri=' + encodeURIComponent(redirectUri) +
+        '&response_type=code' +
+        '&scope=' + encodeURIComponent(scope) +
+        '&state=' + encodeURIComponent(state) +
+        '&prompt=select_account+consent' +
+        '&access_type=offline';
       
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-      console.log(`Generated Google auth URL: ${authUrl.substring(0, 50)}...`);
-      return authUrl;
+      // Add email hint if provided
+      const finalUrl = emailHint ? 
+        `${url}&login_hint=${encodeURIComponent(emailHint)}` : 
+        url;
+      
+      console.log('Using Google OAuth redirect_uri:', redirectUri);
+      return finalUrl;
     },
-
-    // Handle Google OAuth callback with multiple fallback methods
-    handleGoogleCallback: async (code: string) => {
-      console.log(`Starting OAuth callback process for code: ${code.substring(0, 10)}...`);
-      
-      // First check if we already have a token in localStorage
-      const existingToken = localStorage.getItem('token');
-      if (existingToken) {
-        console.log('Token already exists in localStorage, using it directly');
-        // Verify token is valid by checking its format (simple validation)
-        const parts = existingToken.split('.');
-        if (parts.length === 3) {
-          try {
-            // Try to decode the middle part
-            const payload = JSON.parse(atob(parts[1]));
-            if (payload && payload.email) {
-              console.log('Existing token validated successfully');
-              return {
-                success: true,
-                token: existingToken,
-                message: 'Using existing token from localStorage'
-              };
-            }
-          } catch (e) {
-            console.error('Error decoding existing token:', e);
-            localStorage.removeItem('token');
-            console.log('Removed invalid token from localStorage');
-          }
-        }
-      }
-
-      // Check if this code has already been processed using sessionStorage to track codes
-      const processedCodesKey = 'processed_oauth_codes';
-      const processedCodes = JSON.parse(sessionStorage.getItem(processedCodesKey) || '{}');
-      
-      if (processedCodes[code]) {
-        console.log(`This code has already been processed at ${new Date(processedCodes[code]).toISOString()}`);
-        
-        // Check if we now have a token (might have been set by another tab/process)
-        const newToken = localStorage.getItem('token');
-        if (newToken) {
-          console.log('Found token in localStorage from previous processing');
-          return {
-            success: true,
-            token: newToken,
-            message: 'Using token from previous code processing'
-          };
-        }
-        
-        // If code was processed but no token, return error
-        return {
-          success: false,
-          error: 'auth_code_already_used',
-          message: 'This authorization code has already been used. Please start a new login flow.'
-        };
-      }
-      
-      // Mark this code as being processed
-      processedCodes[code] = Date.now();
-      sessionStorage.setItem(processedCodesKey, JSON.stringify(processedCodes));
+    
+    // Handle Google callback
+    handleGoogleCallback: async (code) => {
+      console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
       
       try {
-        // First try the direct callback endpoint which is most efficient
-        console.log('Attempting to use direct callback endpoint');
+        // Use mode: 'no-cors' for the first attempt to avoid CORS errors
+        // Note: This will give an "opaque" response that can't be read directly
+        // but can help test if the server is reachable
+        const preflightCheck = await fetch(`${AUTH_API_URL}/api/google-proxy`, {
+          method: 'OPTIONS',
+          mode: 'no-cors'
+        });
+        
+        console.log('Preflight check completed');
+        
+        // Always use GET for Google proxy to avoid CORS issues
+        const timestamp = Date.now();
+        const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
+        
+        console.log('Trying proxy URL:', proxyUrl);
         
         try {
-          const directUrl = `${AUTH_API_URL}/auth/google/callback?code=${encodeURIComponent(code)}&_t=${Date.now()}`;
-          console.log(`Using direct URL: ${directUrl}`);
-          
-          // Use fetch for this call as it has better cross-origin support
-          const response = await fetch(directUrl, {
+          // First try with no credentials to avoid preflight
+          const response = await fetch(proxyUrl, {
             method: 'GET',
-            credentials: 'include',
             headers: {
               'Accept': 'application/json',
-              'X-Client-Version': '2.0',
-              'X-Requested-With': 'XMLHttpRequest',
-              'Cache-Control': 'no-cache, no-store'
+              'Cache-Control': 'no-cache'
             }
           });
           
           if (response.ok) {
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-              const data = await response.json();
-              console.log('Direct callback successful:', data);
-              
-              if (data.token) {
-                // Store token in localStorage
-                localStorage.setItem('token', data.token);
-                return {
-                  success: true,
-                  token: data.token,
-                  user: data.user
-                };
-              }
-            } else {
-              console.log('Received non-JSON response from direct callback');
-              const text = await response.text();
-              console.log(`Response text (first 100 chars): ${text.substring(0, 100)}...`);
-            }
+            const data = await response.json();
+            console.log('Proxy response:', data);
+            return data;
           } else {
-            console.error(`Direct callback failed with status: ${response.status}`);
+            console.log('Proxy response not OK:', response.status);
+            const errorText = await response.text();
+            console.log('Error response:', errorText);
+            
+            // Try to parse the error text as JSON
             try {
-              const errorText = await response.text();
-              console.error('Error response:', errorText);
-            } catch (e) {
-              console.error('Could not read error response');
+              return JSON.parse(errorText);
+            } catch {
+              return {
+                success: false,
+                error: 'proxy_error',
+                message: `Server returned ${response.status}: ${errorText}`
+              };
             }
           }
-        } catch (directError) {
-          console.error('Error with direct callback:', directError);
-        }
-        
-        // If we get here, the direct method failed, try the Google proxy API as a fallback
-        console.log('Direct callback failed, attempting to exchange code via Google proxy API');
-        
-        const proxyEndpoint = `${AUTH_API_URL}/google-proxy`;
-        console.log(`Using proxy endpoint: ${proxyEndpoint}`);
-        
-        try {
-          // Include extensive debugging headers to help diagnose issues
-          const fetchOptions = {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'X-Client-Version': '2.0',
-              'X-Requested-With': 'XMLHttpRequest',
-              'Cache-Control': 'no-cache, no-store',
-              'Pragma': 'no-cache'
-            }
+        } catch (error) {
+          console.error('Fetch error:', error);
+          return {
+            success: false,
+            error: 'fetch_error',
+            message: error.message || 'Network error during authentication'
           };
-          
-          console.log('Fetch options:', fetchOptions);
-          
-          // Try both paths: with and without /api prefix
-          const urls = [
-            `${proxyEndpoint}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`,
-            `https://api.quits.cc/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`,
-            `https://api.quits.cc/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${Date.now()}`
-          ];
-          
-          let successResponse = null;
-          
-          for (const url of urls) {
-            try {
-              console.log(`Trying URL: ${url}`);
-              
-              const response = await fetch(url, fetchOptions);
-              
-              console.log(`Response status for ${url}: ${response.status}`);
-              
-              if (response.ok) {
-                const responseText = await response.text();
-                console.log(`Raw response from ${url}: ${responseText.substring(0, 100)}...`);
-                
-                try {
-                  const data = JSON.parse(responseText);
-                  console.log(`Parsed response from ${url}:`, data);
-                  
-                  if (data.token) {
-                    successResponse = data;
-                    break;
-                  }
-                } catch (parseError) {
-                  console.error(`Failed to parse response from ${url} as JSON:`, parseError);
-                }
-              }
-            } catch (urlError) {
-              console.error(`Failed to fetch from ${url}:`, urlError);
-            }
-          }
-          
-          if (successResponse) {
-            console.log('Successfully obtained token from Google proxy');
-            localStorage.setItem('token', successResponse.token);
-            return {
-              success: true,
-              token: successResponse.token,
-              user: successResponse.user
-            };
-          }
-        } catch (proxyError) {
-          console.error('All proxy attempts failed:', proxyError);
         }
-        
-        // If we get here, all attempts failed
+      } catch (error) {
+        console.error('Error in handleGoogleCallback:', error);
         return {
           success: false,
           error: 'auth_failed',
           message: 'Failed to authenticate with Google. Please try again.'
-        };
-      } catch (error: any) {
-        console.error('Google callback error:', error);
-        
-        // Check if we have an error response with details
-        if (error.response?.data) {
-          const errorData = error.response.data;
-          
-          if (errorData.error === 'invalid_grant') {
-            // Mark this code as invalid in our tracking
-            processedCodes[code] = 'invalid';
-            sessionStorage.setItem(processedCodesKey, JSON.stringify(processedCodes));
-          }
-          
-          return {
-            success: false,
-            error: errorData.error,
-            message: errorData.message || 'Failed to authenticate with Google'
-          };
-        }
-        
-        return {
-          success: false,
-          error: 'request_failed',
-          message: error.message || 'Unknown error during authentication'
         };
       }
     },
@@ -548,22 +395,12 @@ const apiService = {
 
     // Clear all auth data and storage
     clearAuthData: () => {
-      // Clear local storage
-      localStorage.removeItem('token');
-      
-      // Clear session storage
-      try {
-        sessionStorage.removeItem('processed_oauth_codes');
-        sessionStorage.removeItem('oauth_state');
-      } catch (e) {
-        console.error('Error clearing session storage:', e);
-      }
-      
-      // Clear any cookies (add any auth-related cookies here)
-      document.cookie = 'auth_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-      
       console.log('All authentication data cleared');
+      localStorage.removeItem('token');
+      localStorage.removeItem('quits_auth_token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('oauth_state');
+      localStorage.removeItem('oauth_start_time');
     },
   },
   
