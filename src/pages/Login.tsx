@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import authService from '../services/authService';
-import { ReactComponent as GoogleIcon } from '../assets/google.svg';
-import { ReactComponent as Logo } from '../assets/logo.svg';
 
 const Login: React.FC = () => {
   const location = useLocation();
@@ -62,7 +60,7 @@ const Login: React.FC = () => {
       
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <Logo className="h-16 w-auto" />
+          <div className="text-4xl font-bold text-primary-600">Quits</div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Sign in to Quits
@@ -106,7 +104,12 @@ const Login: React.FC = () => {
               ) : (
                 <>
                   <span className="mr-2">
-                    <GoogleIcon className="h-5 w-5" />
+                    <svg className="h-5 w-5" viewBox="0 0 24 24">
+                      <path
+                        d="M12.2461 14.5C13.0971 14.5 13.8341 14.176 14.4281 13.61L17.5861 16.755C16.1051 18.162 14.2581 19 12.2461 19C8.66413 19 5.59713 16.632 4.63013 13.345L1.31213 16.656V11.001H6.96713L4.21613 13.751C4.84613 16.123 7.29013 18 10.2461 18C11.4001 18 12.4951 17.701 13.4361 17.145L10.6951 14.415C10.2211 14.461 9.74113 14.5 9.25013 14.5C7.76013 14.5 6.45713 14.051 5.44113 13.268L5.44213 13.267C4.41313 12.474 3.75013 11.32 3.75013 10C3.75013 8.68 4.41313 7.526 5.44213 6.733L5.44113 6.732C6.45713 5.949 7.76013 5.5 9.25013 5.5C11.6301 5.5 13.6051 7.007 14.1221 9.079H9.25013V11.825H17.1851C17.3671 11.278 17.5001 10.713 17.5001 10C17.5001 7.791 16.3761 5.805 14.6381 4.58L14.6401 4.579C13.1341 3.497 11.2751 3 9.25013 3C6.43513 3 3.92413 4.243 2.37313 6.251L2.37213 6.25C0.837131 8.234 0.000131279 10.724 0.000131279 13.5C0.000131279 16.276 0.837131 18.766 2.37213 20.75L2.37313 20.749C3.92413 22.757 6.43513 24 9.25013 24C11.2751 24 13.1341 23.503 14.6401 22.421L14.6381 22.42C16.8071 20.982 18.3471 18.585 18.8471 16H12.2461V14.5Z"
+                        fill="#4285F4"
+                      />
+                    </svg>
                   </span>
                   Continue with Google
                 </>
