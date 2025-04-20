@@ -269,7 +269,7 @@ const apiService = {
     },
     
     // Handle Google callback
-    handleGoogleCallback: async (code) => {
+    handleGoogleCallback: async (code: string) => {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
       
       try {
@@ -319,15 +319,15 @@ const apiService = {
               };
             }
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Fetch error:', error);
           return {
             success: false,
             error: 'fetch_error',
-            message: error.message || 'Network error during authentication'
+            message: error instanceof Error ? error.message : 'Network error during authentication'
           };
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error in handleGoogleCallback:', error);
         return {
           success: false,
