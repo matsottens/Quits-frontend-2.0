@@ -8,6 +8,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     // Check for error parameters in URL
@@ -27,10 +28,23 @@ const Login: React.FC = () => {
         setError('Authentication failed. Please try again.');
       } else if (errorParam === 'token_storage') {
         setError('Failed to store authentication token. Please ensure cookies and localStorage are enabled.');
+      } else if (errorParam === 'api_error') {
+        if (reasonParam === 'invalid_response_format') {
+          setError('Our authentication server is returning an invalid response. Please try again later or contact support.');
+        } else if (reasonParam === 'endpoint_unavailable') {
+          setError('Unable to connect to our authentication server. Please try again later.');
+        } else {
+          setError(`API error: ${reasonParam || 'Unknown issue'}`);
+        }
       } else if (reasonParam) {
         setError(`Authentication error: ${reasonParam}`);
       } else {
         setError(`Authentication error: ${errorParam}`);
+      }
+      
+      // Show debug panel for API errors
+      if (errorParam === 'api_error') {
+        setShowDebug(true);
       }
     }
   }, [location]);
@@ -47,6 +61,28 @@ const Login: React.FC = () => {
       window.location.href = authUrl;
     } catch (err: any) {
       console.error('Google login error:', err);
+      setError('Failed to start Google login process. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  const handleDirectLogin = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Create direct Google auth URL
+      const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
+      const redirectUri = encodeURIComponent(window.location.origin + '/auth/callback');
+      const scope = encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid');
+      const state = Date.now().toString();
+      
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account+consent&state=${state}`;
+      
+      // Redirect to Google authentication
+      window.location.href = authUrl;
+    } catch (err: any) {
+      console.error('Direct login error:', err);
       setError('Failed to start Google login process. Please try again.');
       setLoading(false);
     }
@@ -115,6 +151,22 @@ const Login: React.FC = () => {
                 </>
               )}
             </button>
+            
+            {showDebug && (
+              <div className="mt-4">
+                <div className="text-sm text-gray-700 mb-2 font-medium">Having trouble logging in?</div>
+                <button
+                  type="button"
+                  onClick={handleDirectLogin}
+                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 relative"
+                >
+                  Try Direct Google Login
+                </button>
+                <div className="mt-2 text-xs text-gray-500">
+                  <p>This bypasses our authentication server and connects directly to Google.</p>
+                </div>
+              </div>
+            )}
             
             <div className="text-sm text-center text-gray-600">
               <p>By signing in, you agree to our <a href="/terms" className="font-medium text-primary-600 hover:text-primary-500">Terms of Service</a> and <a href="/privacy" className="font-medium text-primary-600 hover:text-primary-500">Privacy Policy</a></p>

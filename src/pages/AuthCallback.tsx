@@ -38,12 +38,25 @@ const AuthCallback: React.FC = () => {
         
         try {
           console.log('Processing OAuth code:', code.substring(0, 10) + '...');
+          
           // Call the backend to process the OAuth code
           const response = await fetch(`https://api.quits.cc/api/auth/google/callback?code=${encodeURIComponent(code)}`);
           
-          // Log the response status for debugging
+          // Log the response status and content type for debugging
           console.log('Auth callback response status:', response.status);
+          console.log('Content-Type:', response.headers.get('content-type'));
           
+          // Check if response is JSON before trying to parse it
+          const contentType = response.headers.get('content-type');
+          
+          // Handle HTML responses (which indicate an error)
+          if (contentType && contentType.includes('text/html')) {
+            const htmlText = await response.text();
+            console.error('Received HTML response instead of JSON:', htmlText.substring(0, 200) + '...');
+            throw new Error('Received HTML instead of JSON response. The API server might be returning an error page.');
+          }
+          
+          // Parse JSON response
           const result = await response.json();
           console.log('Auth callback result:', result);
           
@@ -76,6 +89,14 @@ const AuthCallback: React.FC = () => {
         } catch (error: any) {
           console.error('Auth callback error:', error);
           
+          // Check if the error is from parsing JSON
+          if (error instanceof SyntaxError && error.message.includes('JSON')) {
+            console.error('Failed to parse JSON response, likely received HTML error page');
+            // Try direct authentication as a fallback
+            navigate('/login?error=api_error&reason=invalid_response_format');
+            return;
+          }
+          
           // Handle specific errors
           if (error.message && error.message.includes('invalid_grant')) {
             navigate('/login?error=invalid_grant');
@@ -89,6 +110,16 @@ const AuthCallback: React.FC = () => {
           
           if (error.message && error.message.includes('auth_failed')) {
             navigate('/login?error=auth_failed');
+            return;
+          }
+          
+          // Use direct URL as fallback for API errors
+          if (error.message && error.message.includes('API')) {
+            console.log('API error detected, trying alternative approach');
+            // Try using a direct Google auth URL as a last resort
+            const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
+            console.log('Redirecting to login with API error message');
+            navigate('/login?error=api_error&reason=endpoint_unavailable');
             return;
           }
           
