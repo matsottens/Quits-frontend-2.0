@@ -37,9 +37,15 @@ const AuthCallback: React.FC = () => {
         setProcessing(true);
         
         try {
+          console.log('Processing OAuth code:', code.substring(0, 10) + '...');
           // Call the backend to process the OAuth code
-          const response = await fetch(`https://api.quits.cc/api/auth/google/callback?code=${code}`);
+          const response = await fetch(`https://api.quits.cc/api/auth/google/callback?code=${encodeURIComponent(code)}`);
+          
+          // Log the response status for debugging
+          console.log('Auth callback response status:', response.status);
+          
           const result = await response.json();
+          console.log('Auth callback result:', result);
           
           if (!response.ok) {
             throw new Error(result.message || 'Authentication failed');
@@ -47,6 +53,7 @@ const AuthCallback: React.FC = () => {
           
           // If successful, store the token
           if (result.success && result.token) {
+            console.log('Token received, storing and redirecting');
             authService.setToken(result.token);
             
             // Redirect to dashboard
@@ -57,7 +64,8 @@ const AuthCallback: React.FC = () => {
           }
           
           // Handle special case for pending scan
-          if ('pending' in result && result.pending) {
+          if (result && 'pending' in result && result.pending) {
+            console.log('Pending scan detected, redirecting to scanning page');
             // Redirect to scanning page
             navigate('/scanning');
             return;
@@ -95,6 +103,7 @@ const AuthCallback: React.FC = () => {
       }
     };
 
+    // Execute the callback handler
     handleCallback();
   }, [location, navigate]);
 

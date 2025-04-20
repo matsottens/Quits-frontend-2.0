@@ -1,22 +1,66 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { HelmetProvider } from 'react-helmet-async'
 import './index.css'
 import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
+import authService from './services/authService'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <AuthProvider>
-      <HelmetProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </HelmetProvider>
-    </AuthProvider>
-  </React.StrictMode>,
-)
+// Root wrapper component to initialize services and handle global errors
+const Root: React.FC = () => {
+  useEffect(() => {
+    // Initialize auth service
+    try {
+      console.log('Initializing auth service...');
+      authService.setupAxiosInterceptors();
+      console.log('Auth service initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize auth service:', error);
+    }
+  }, []);
+
+  return (
+    <React.StrictMode>
+      <AuthProvider>
+        <HelmetProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </HelmetProvider>
+      </AuthProvider>
+    </React.StrictMode>
+  );
+};
+
+// Error boundary for the root DOM element
+const renderApp = () => {
+  try {
+    const rootElement = document.getElementById('root');
+    if (!rootElement) {
+      console.error('Root element not found!');
+      return;
+    }
+    
+    console.log('Rendering app to root element');
+    ReactDOM.createRoot(rootElement).render(<Root />);
+  } catch (error) {
+    console.error('Failed to render app:', error);
+    // Display a basic error message if rendering fails
+    document.body.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: Arial, sans-serif;">
+        <h1 style="color: #e53e3e;">Something went wrong</h1>
+        <p>We're sorry, but the application failed to load properly.</p>
+        <button onclick="window.location.reload()" style="margin-top: 20px; padding: 8px 16px; background-color: #3182ce; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          Reload the page
+        </button>
+      </div>
+    `;
+  }
+};
+
+// Initialize the app
+renderApp();
 
 // Service worker registration
 if ('serviceWorker' in navigator) {
