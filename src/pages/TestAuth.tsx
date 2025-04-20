@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../utils/api';
+import api from '../api';
 
 const TestAuth: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ const TestAuth: React.FC = () => {
     setError(null);
     
     try {
-      const response = await fetch(`${api.authApiUrl}/debug-auth`);
+      const response = await fetch(`${api.defaults.baseURL}/debug?type=auth`);
       const data = await response.json();
       console.log('Auth config:', data);
       setAuthConfig(data);
@@ -34,10 +34,17 @@ const TestAuth: React.FC = () => {
   const testGoogleAuthUrl = async () => {
     try {
       addTestResult('Google Auth URL', true, 'Generating auth URL...');
-      const response = await api.getGoogleAuthUrl();
-      console.log('Google Auth URL:', response);
-      addTestResult('Google Auth URL', true, `Generated URL: ${response.url.substring(0, 50)}...`);
-      return response.url;
+      const timestamp = Date.now();
+      const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
+      const redirectUri = encodeURIComponent('https://www.quits.cc/auth/callback');
+      const scope = encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid');
+      const state = Math.random().toString(36).substring(2, 15);
+      
+      const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${state}&prompt=select_account+consent&access_type=offline`;
+      
+      console.log('Google Auth URL:', url);
+      addTestResult('Google Auth URL', true, `Generated URL: ${url.substring(0, 50)}...`);
+      return url;
     } catch (err: any) {
       console.error('Error generating Google auth URL:', err);
       addTestResult('Google Auth URL', false, `Error: ${err.message}`);
@@ -54,8 +61,8 @@ const TestAuth: React.FC = () => {
 
   const testEnvironmentVars = async () => {
     try {
-      addTestResult('Test Environment Variables', true, 'Fetching test-env data...');
-      const response = await fetch(`${api.apiUrl}/test-env`);
+      addTestResult('Test Environment Variables', true, 'Fetching environment data...');
+      const response = await fetch(`${api.defaults.baseURL}/debug?type=env`);
       const data = await response.json();
       console.log('Environment variables:', data);
       addTestResult('Test Environment Variables', true, JSON.stringify(data.env, null, 2));
@@ -68,7 +75,7 @@ const TestAuth: React.FC = () => {
   const testAuthEndpoint = async () => {
     try {
       addTestResult('Direct Auth Endpoint', true, 'Testing direct auth endpoint...');
-      const response = await fetch(`${api.authApiUrl}/auth/google/callback?test=true`);
+      const response = await fetch(`${api.defaults.baseURL}/auth/google/callback?test=true`);
       const data = await response.text();
       console.log('Auth endpoint response:', data.substring(0, 200) + '...');
       addTestResult('Direct Auth Endpoint', true, 'Endpoint is accessible');
@@ -95,7 +102,7 @@ const TestAuth: React.FC = () => {
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
         <h1 className="text-2xl font-bold mb-6">Auth Configuration Test</h1>
         
-        <div className="mb-6 flex space-x-3">
+        <div className="mb-6 flex flex-wrap gap-3">
           <button 
             onClick={checkAuthConfig}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -131,6 +138,13 @@ const TestAuth: React.FC = () => {
           >
             Test Auth Endpoint
           </button>
+          
+          <a 
+            href="/login" 
+            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+          >
+            Go to Login
+          </a>
         </div>
         
         {error && (

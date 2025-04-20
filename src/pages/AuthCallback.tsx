@@ -70,21 +70,20 @@ const AuthCallback = () => {
   const checkAuthConfig = async () => {
     try {
       log('Checking auth configuration...');
-      const response = await fetch('https://api.quits.cc/debug-auth');
+      const response = await fetch('https://api.quits.cc/debug?type=auth');
       
       if (response.ok) {
         const data = await response.json();
         log('Auth configuration received:');
-        log(`- Environment: ${data.env} / ${data.vercel_env}`);
-        log(`- Google Client ID: ${data.oauth?.google_client_id || 'Not found'}`);
-        log(`- Google Redirect URI: ${data.oauth?.google_redirect_uri || 'Not set'}`);
-        log(`- JWT Secret: ${data.oauth?.jwt_secret ? 'Set' : 'Not set'}`);
+        log(`- Environment: ${data.env?.NODE_ENV || 'undefined'} / ${data.env?.VERCEL_ENV || 'undefined'}`);
+        log(`- Google Client ID: ${data.env?.has_google_id === 'yes' ? 'Found' : 'Not found'}`);
+        log(`- Google Redirect URI: ${data.env?.using_redirect_uri || 'Not set'}`);
+        log(`- JWT Secret: ${data.env?.has_jwt_secret === 'yes' ? 'Set' : 'Not set'}`);
         
-        if (data.oauth_clients) {
-          log(`- Tested ${data.oauth_clients.length} redirect URIs`);
-          data.oauth_clients.forEach((client: any, index: number) => {
-            log(`  ${index + 1}. ${client.redirect_uri}: ${client.client_created ? 'Success' : 'Failed'}`);
-          });
+        if (data.env?.oauth_client_created) {
+          log('- OAuth client created successfully');
+        } else {
+          log('- OAuth client creation failed');
         }
       } else {
         log(`Failed to check auth config: ${response.status} ${response.statusText}`);
