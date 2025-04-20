@@ -112,11 +112,13 @@ const AuthCallback = () => {
         
         // Log any network issues
         try {
+          // Use a simple GET request to avoid CORS issues
           const testFetch = await fetch('https://api.quits.cc/health', { 
             method: 'GET',
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json' },
+            mode: 'no-cors' // This prevents CORS errors, but will give an opaque response
           });
-          log(`API health check: ${testFetch.status}`);
+          log(`API health check: ${testFetch.type === 'opaque' ? 'Connection successful (opaque response)' : testFetch.status}`);
         } catch (e) {
           log(`API health check failed: ${e instanceof Error ? e.message : String(e)}`);
         }
@@ -192,6 +194,20 @@ const AuthCallback = () => {
         log(`Found authorization code: ${code.substring(0, 8)}...`);
         log('Attempting to exchange code for token');
         
+        // Add direct Google redirect option for user
+        const directGoogleAuth = () => {
+          const redirectUrl = 'https://accounts.google.com/o/oauth2/auth' +
+            '?client_id=82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com' +
+            '&redirect_uri=' + encodeURIComponent('https://www.quits.cc/auth/callback') +
+            '&response_type=code' +
+            '&scope=' + encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid') +
+            '&state=auth' +
+            '&prompt=select_account+consent' +
+            '&access_type=offline';
+          
+          window.location.href = redirectUrl;
+        };
+        
         try {
           // First try direct method
           log('Trying direct Google proxy method');
@@ -206,7 +222,7 @@ const AuthCallback = () => {
             if (!validateToken(result.token)) {
               log('Token validation failed');
               setError('Invalid authentication token received. Please try logging in again.');
-            return;
+              return;
             }
             
             if (safelyStoreToken(result.token)) {
@@ -223,36 +239,36 @@ const AuthCallback = () => {
           
           // Check for pending property (may not be in the type definition)
           if ('pending' in result && result.pending) {
-          // The API is handling the redirect, show a loading message
-          log('Pending redirect to backend service');
-          setError('Authentication in progress, please wait...');
-          
-          // Set a timer to check localStorage for token
-          log('Setting timer to check for token in localStorage');
-          const checkInterval = setInterval(() => {
-            const tokenCheck = localStorage.getItem('token');
+            // The API is handling the redirect, show a loading message
+            log('Pending redirect to backend service');
+            setError('Authentication in progress, please wait...');
+            
+            // Set a timer to check localStorage for token
+            log('Setting timer to check for token in localStorage');
+            const checkInterval = setInterval(() => {
+              const tokenCheck = localStorage.getItem('token');
               if (tokenCheck && validateToken(tokenCheck)) {
                 log('Valid token appeared in localStorage, using it');
+                clearInterval(checkInterval);
+                login(tokenCheck);
+                navigate('/dashboard');
+              }
+            }, 1000);
+            
+            // Clear interval after 15 seconds if no token appears
+            setTimeout(() => {
               clearInterval(checkInterval);
-              login(tokenCheck);
-              navigate('/dashboard');
-            }
-          }, 1000);
-          
-          // Clear interval after 15 seconds if no token appears
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            log('Token check timed out after 15 seconds');
-            setError('Authentication timed out. Please try again.');
-          }, 15000);
-          
-          return;
-        }
+              log('Token check timed out after 15 seconds');
+              setError('Authentication timed out. Please try again.');
+            }, 15000);
+            
+            return;
+          }
 
-        if (result.success === false) {
-          // Handle specific error cases more gracefully
-          log(`Authentication error: ${result.error}`);
-          
+          if (result.success === false) {
+            // Handle specific error cases more gracefully
+            log(`Authentication error: ${result.error}`);
+            
             if (result.error === 'invalid_grant' || result.error === 'auth_code_already_used') {
               // Automatically check auth configuration to help debug
               await checkAuthConfig();
@@ -275,100 +291,110 @@ const AuthCallback = () => {
           log('Unexpected response format');
           setError('Unexpected authentication response. Please try again.');
           
-        } catch (error: any) {
-          log(`Error during code exchange: ${error.message}`);
-          setError(`Authentication error: ${error.message}`);
+        } catch (error) {
+          // Handle CORS errors specifically
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          if (errorMsg.includes('CORS') || errorMsg.includes('cross-origin') || errorMsg.includes('network error')) {
+            log(`CORS or network error detected: ${errorMsg}`);
+            setError(`Authentication server connection issue. Please try again or contact support.`);
+            
+            // Add a button for manual authentication
+            setShowDirectAuthOption(true);
+          } else {
+            log(`Authentication error: ${errorMsg}`);
+            setError(`Authentication failed. ${errorMsg}`);
+          }
+          
+          // Check API configuration anyway
           await checkAuthConfig();
         }
-        
-      } catch (error: any) {
-        console.error('Error in Google callback processing:', error);
-        setError(`Authentication failed: ${error.message}`);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        log(`Unhandled error: ${errorMsg}`);
+        setError(`An unexpected error occurred: ${errorMsg}`);
       } finally {
         setIsProcessing(false);
       }
     };
     
     processGoogleCallback();
+  }, [location.search, navigate, login, validateToken]);
+
+  // Add state for showing direct auth option
+  const [showDirectAuthOption, setShowDirectAuthOption] = useState(false);
+
+  // Direct Google auth function
+  const handleDirectGoogleAuth = () => {
+    const redirectUrl = 'https://accounts.google.com/o/oauth2/auth' +
+      '?client_id=82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com' +
+      '&redirect_uri=' + encodeURIComponent('https://www.quits.cc/auth/callback') +
+      '&response_type=code' +
+      '&scope=' + encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid') +
+      '&state=auth' +
+      '&prompt=select_account+consent' +
+      '&access_type=offline';
     
-    // Cleanup function
-    return () => {
-      // Any cleanup needed
-    };
-    
-  }, [login, navigate, location]);
+    window.location.href = redirectUrl;
+  };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md overflow-hidden p-6">
-        <div className="flex justify-center mb-6">
-          <img src="/quits-logo.svg" alt="Quits Logo" className="h-16 w-auto" />
-        </div>
-        
-        <h2 className="text-center text-2xl font-bold text-gray-900 mb-4">
-          {error ? 'Authentication Error' : 'Authenticating...'}
-        </h2>
-        
-        {isProcessing && !error && (
-          <div className="flex flex-col items-center justify-center p-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700 mb-4"></div>
-            <p className="text-gray-600 text-center">
-              Please wait while we complete your authentication...
-            </p>
-          </div>
-        )}
-        
-        {error && (
-          <div className="mt-4">
-            <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-              <p className="text-red-700 text-sm">{error}</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">
+      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold">Processing Authentication</h1>
+          
+          {isProcessing ? (
+            <div className="mt-4">
+              <div className="w-12 h-12 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin mx-auto"></div>
+              <p className="mt-4 text-gray-600">Please wait while we authenticate your account...</p>
             </div>
-            <div className="flex flex-col gap-2">
+          ) : error ? (
+            <div className="mt-4">
+              <div className="text-red-500 mb-4">{error}</div>
+              
+              {/* Show direct auth option if there were CORS issues */}
+              {showDirectAuthOption && (
+                <button
+                  onClick={handleDirectGoogleAuth}
+                  className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded"
+                >
+                  Try Direct Google Authentication
+                </button>
+              )}
+              
               <button
-                onClick={() => window.location.href = '/login'}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                onClick={() => navigate('/login')}
+                className="mt-4 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded"
               >
                 Return to Login
               </button>
-              <button
-                onClick={checkAuthConfig}
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Check OAuth Configuration
-              </button>
-              <button
-                onClick={toggleDebug}
-                className="text-xs text-gray-500 hover:text-gray-700 mt-2"
-              >
-                {debugVisible ? 'Hide Debug Info' : 'Show Debug Info'}
-              </button>
-              <a
-                href="https://api.quits.cc/restart-oauth?redirect=/login"
-                className="text-xs text-blue-500 hover:text-blue-700 mt-2 block text-center"
-              >
-                Restart Authentication Flow
-              </a>
             </div>
-          </div>
-        )}
-        
-        {/* Debug info section (always included, but visibility controlled by state) */}
-        {debugVisible && debugMessages.length > 0 && (
-          <div className="mt-8 p-2 border border-gray-200 rounded-md bg-gray-50">
-            <div className="flex justify-between items-center mb-1">
-              <p className="text-xs font-bold">Debug Info:</p>
+          ) : (
+            <div className="mt-4">
+              <div className="w-12 h-12 border-t-2 border-b-2 border-green-500 rounded-full animate-spin mx-auto"></div>
+              <p className="mt-4 text-gray-600">Authentication successful! Redirecting...</p>
+            </div>
+          )}
+        </div>
+
+        {/* Debug toggle button */}
+        <div className="mt-8 text-center">
           <button 
-                onClick={() => navigator.clipboard.writeText(debugMessages.join('\n'))}
-                className="text-xs text-blue-500 hover:text-blue-700"
+            onClick={toggleDebug}
+            className="text-sm text-gray-500 hover:text-gray-700"
           >
-                Copy
+            {debugVisible ? 'Hide Debug Info' : 'Show Debug Info'}
           </button>
         </div>
-            <div className="max-h-60 overflow-y-auto">
-              {debugMessages.map((msg, i) => (
-                <p key={i} className="text-xs font-mono text-gray-700">{msg}</p>
-              ))}
-            </div>
+
+        {/* Debug information */}
+        {debugVisible && (
+          <div className="mt-4 p-4 bg-gray-100 rounded overflow-auto max-h-60 text-xs font-mono">
+            {debugMessages.map((msg, i) => (
+              <div key={i} className="mb-1">
+                {msg}
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -283,88 +283,152 @@ api.interceptors.response.use(
 // Export API client and utility functions
 export default api;
 
-export const handleGoogleCallback = async (code: string) => {
-  try {
-    console.log(`Starting OAuth callback process for code: ${code.substring(0, 10)}...`);
-    
-    // Add timestamp to prevent caching
-    const timestamp = Date.now();
-    const state = localStorage.getItem('oauth_state') || Math.random().toString(36).substring(2, 15);
-    
-    // First try direct callback endpoint
+/**
+ * Exchange a Google OAuth code for a token
+ * This uses a simplified approach to avoid CORS preflight requests
+ */
+export const handleGoogleCallback = async (code: string): Promise<AuthResponse> => {
+  console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
+  
+  // Create a URL with the code as a query parameter - simpler approach to avoid CORS issues
+  const useSimplifiedApproach = true;
+  
+  if (useSimplifiedApproach) {
     try {
-      console.log('Attempting to use direct callback endpoint');
-      const directUrl = `${authApiUrl}/auth/google/callback?code=${encodeURIComponent(code)}&_t=${timestamp}`;
-      console.log(`Using direct URL: ${directUrl}`);
+      console.log('Using simplified approach without preflight requests');
       
-      const response = await fetch(directUrl, {
+      // Direct redirect to Google - this will work cross-origin without preflight
+      const redirectUrl = `https://accounts.google.com/o/oauth2/auth?client_id=82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com&redirect_uri=${encodeURIComponent('https://www.quits.cc/auth/callback')}&response_type=code&scope=${encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid')}&state=auth&prompt=select_account+consent&access_type=offline`;
+      
+      // Open in a new window
+      window.open(redirectUrl, '_blank');
+      
+      return {
+        success: true,
+        token: '',
+        message: 'Redirecting to Google for authentication',
+        redirecting: true
+      };
+    } catch (error) {
+      console.error('Error with simplified OAuth approach:', error);
+      return {
+        success: false,
+        token: '',
+        error: 'auth_failed',
+        message: 'Failed to authenticate with Google. Please try again.'
+      };
+    }
+  }
+  
+  // If simplified approach is disabled, try the multiple approaches below
+  try {
+    console.log('Attempting to use direct callback endpoint');
+    const timestamp = Date.now();
+    const directUrl = `${authApiUrl}/auth/google/callback?code=${encodeURIComponent(code)}&_t=${timestamp}`;
+    console.log('Using direct URL:', directUrl);
+    
+    try {
+      // First try with credentials: 'same-origin' to avoid preflight request
+      const directResponse = await fetch(directUrl, {
         method: 'GET',
-        headers: { 
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/json'
         }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        return data;
+      if (directResponse.ok) {
+        const data = await directResponse.json();
+        return {
+          success: true,
+          token: data.token,
+          user: data.user
+        };
       }
-      
-      console.warn(`Direct callback failed with status: ${response.status}`);
     } catch (directError) {
-      console.warn('Direct callback failed:', directError);
+      console.log('Direct callback failed, attempting to exchange code via Google proxy API');
+      // Continue to next approach
     }
     
-    // If direct method fails, try the proxy
-    console.log('Direct callback failed, attempting to exchange code via Google proxy API');
-    
-    // Try the proxy endpoint
+    // If direct approach fails, try the proxy endpoint
     console.log('Using proxy endpoint:', `${authApiUrl}/google-proxy`);
-    
-    // Set up fetch options
     const fetchOptions = {
       method: 'GET',
-      headers: { 
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache, no-store'
+      headers: {
+        'Accept': 'application/json'
       }
     };
+    console.log('Fetch options:', fetchOptions);
     
-    // Try multiple variants of the URL (with and without /api prefix)
+    // Try multiple URL formats
     const urlsToTry = [
-      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${timestamp}`,
-      `${authApiUrl}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${timestamp}`,
-      `${API_DOMAINS[1]}/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(window.location.origin + '/dashboard')}&_t=${timestamp}`
+      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
+      `${authApiUrl}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
+      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`
     ];
+    
+    let lastError: any = null;
     
     for (const url of urlsToTry) {
       try {
         console.log('Trying URL:', url);
-        const response = await fetch(url, fetchOptions);
+        const response = await fetch(url, {
+          ...fetchOptions,
+          credentials: 'same-origin' // This helps avoid preflight requests
+        });
         
         if (response.ok) {
           const data = await response.json();
-          return data;
+          
+          if (data.token) {
+            return {
+              success: true,
+              token: data.token,
+              user: data.user
+            };
+          } else if (data.redirectUrl) {
+            // Handle redirection if needed
+            window.location.href = data.redirectUrl;
+            return {
+              success: true,
+              token: '',
+              redirecting: true
+            };
+          } else if (data.pending) {
+            // Handle pending background operation
+            return {
+              success: true,
+              token: '',
+              pending: true
+            };
+          }
         }
         
-        console.warn(`Proxy request failed with status: ${response.status}`);
-      } catch (fetchError) {
-        console.warn(`Fetch error for ${url}:`, fetchError);
+        // If we got a response but it wasn't ok, try to parse error
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          lastError = errorData;
+        }
+      } catch (error) {
+        console.error('Error with URL', url, error);
+        lastError = error;
+        // Continue to next URL
       }
     }
     
-    // If all attempts fail, return error
+    // If we've tried all approaches and nothing worked
     return {
       success: false,
-      error: 'auth_failed',
-      message: 'Failed to authenticate with Google. Please try again.'
+      token: '',
+      error: lastError?.error || 'auth_failed',
+      message: lastError?.message || 'Failed to authenticate with Google. Please try again.'
     };
   } catch (error) {
-    console.error('OAuth callback error:', error);
     return {
       success: false,
-      error: 'unknown_error',
-      message: error instanceof Error ? error.message : 'An unknown error occurred'
+      token: '',
+      error: 'auth_failed',
+      message: 'Failed to authenticate with Google. Please try again.'
     };
   }
 }; 
