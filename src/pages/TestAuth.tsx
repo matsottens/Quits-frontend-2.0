@@ -6,17 +6,27 @@ const TestAuth: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [authConfig, setAuthConfig] = useState<any>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
+  const [selectedApiUrl, setSelectedApiUrl] = useState<string>(api.defaults.baseURL);
+
+  // List of potential API URLs to try
+  const apiUrls = [
+    api.defaults.baseURL,
+    'https://api.quits.cc',
+    'https://api.quits.cc/api',
+    'https://quits-backend-2-0-mahy1vpr6-mats-ottens-hotmailcoms-projects.vercel.app',
+    'https://quits-backend-2-0-mahy1vpr6-mats-ottens-hotmailcoms-projects.vercel.app/api'
+  ];
 
   useEffect(() => {
     checkAuthConfig();
-  }, []);
+  }, [selectedApiUrl]);
 
   const checkAuthConfig = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch(`${api.defaults.baseURL}/debug?type=auth`);
+      const response = await fetch(`${selectedApiUrl}/debug?type=auth`);
       const data = await response.json();
       console.log('Auth config:', data);
       setAuthConfig(data);
@@ -28,6 +38,29 @@ const TestAuth: React.FC = () => {
       addTestResult('Auth config check', false, `Error: ${err.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testConnectionToAllApis = async () => {
+    addTestResult('Testing Multiple API URLs', true, 'Starting test of multiple API endpoints...');
+    
+    for (const url of apiUrls) {
+      try {
+        const response = await fetch(`${url}/health`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          mode: 'cors'
+        });
+        
+        if (response.ok) {
+          const responseText = await response.text();
+          addTestResult(`API URL: ${url}`, true, `Connected successfully! Response: ${responseText.substring(0, 50)}...`);
+        } else {
+          addTestResult(`API URL: ${url}`, false, `Failed with status: ${response.status} ${response.statusText}`);
+        }
+      } catch (err: any) {
+        addTestResult(`API URL: ${url}`, false, `Error: ${err.message}`);
+      }
     }
   };
 
@@ -62,7 +95,7 @@ const TestAuth: React.FC = () => {
   const testEnvironmentVars = async () => {
     try {
       addTestResult('Test Environment Variables', true, 'Fetching environment data...');
-      const response = await fetch(`${api.defaults.baseURL}/debug?type=env`);
+      const response = await fetch(`${selectedApiUrl}/debug?type=env`);
       const data = await response.json();
       console.log('Environment variables:', data);
       addTestResult('Test Environment Variables', true, JSON.stringify(data.env, null, 2));
@@ -75,7 +108,7 @@ const TestAuth: React.FC = () => {
   const testAuthEndpoint = async () => {
     try {
       addTestResult('Direct Auth Endpoint', true, 'Testing direct auth endpoint...');
-      const response = await fetch(`${api.defaults.baseURL}/auth/google/callback?test=true`);
+      const response = await fetch(`${selectedApiUrl}/auth/google/callback?test=true`);
       const data = await response.text();
       console.log('Auth endpoint response:', data.substring(0, 200) + '...');
       addTestResult('Direct Auth Endpoint', true, 'Endpoint is accessible');
@@ -101,6 +134,29 @@ const TestAuth: React.FC = () => {
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6">
         <h1 className="text-2xl font-bold mb-6">Auth Configuration Test</h1>
+        
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            API URL:
+          </label>
+          <div className="flex space-x-2">
+            <select 
+              className="flex-1 p-2 border border-gray-300 rounded-md"
+              value={selectedApiUrl}
+              onChange={(e) => setSelectedApiUrl(e.target.value)}
+            >
+              {apiUrls.map(url => (
+                <option key={url} value={url}>{url}</option>
+              ))}
+            </select>
+            <button
+              onClick={testConnectionToAllApis}
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              Test All API URLs
+            </button>
+          </div>
+        </div>
         
         <div className="mb-6 flex flex-wrap gap-3">
           <button 
