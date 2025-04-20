@@ -6,11 +6,11 @@ const TestAuth: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [authConfig, setAuthConfig] = useState<any>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
-  const [selectedApiUrl, setSelectedApiUrl] = useState<string>(api.defaults.baseURL);
+  const [selectedApiUrl, setSelectedApiUrl] = useState<string>(api.defaults.baseURL ?? 'https://api.quits.cc');
 
   // List of potential API URLs to try
   const apiUrls = [
-    api.defaults.baseURL,
+    api.defaults.baseURL ?? 'https://api.quits.cc',
     'https://api.quits.cc',
     'https://api.quits.cc/api',
     'https://quits-backend-2-0-mahy1vpr6-mats-ottens-hotmailcoms-projects.vercel.app',
