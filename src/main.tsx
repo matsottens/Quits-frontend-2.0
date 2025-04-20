@@ -62,12 +62,13 @@ const renderApp = () => {
 // Initialize the app
 renderApp();
 
-// Service worker registration
-if ('serviceWorker' in navigator) {
+// Conditionally register service worker only in development
+// In production, it should be handled by the hosting platform
+if (process.env.NODE_ENV === 'development' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(registration => {
-        console.log('API Service worker registered:', registration.scope);
+        console.log('Service worker registered:', registration.scope);
       })
       .catch(error => {
         console.error('Service worker registration failed:', error);

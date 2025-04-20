@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -14,7 +14,6 @@ import Settings from './pages/Settings';
 import Calendar from './pages/Calendar';
 import SubscriptionDetails from './pages/SubscriptionDetails';
 import Navigation from './components/Navigation';
-import SubscriptionList from './components/SubscriptionList';
 import AddPhoneNumber from './pages/AddPhoneNumber';
 import { useEffect, useState } from 'react';
 
@@ -66,7 +65,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
-const AppContent = () => {
+const App = () => {
   const { isAuthenticated } = useAuth();
 
   return (
@@ -141,16 +140,6 @@ const AppContent = () => {
       </div>
       <Navigation />
     </div>
-  );
-};
-
-const App = () => {
-  return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
   );
 };
 
