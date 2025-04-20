@@ -1,436 +1,136 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import apiService from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import authService from '../services/authService';
 
-// Extend Window interface to allow for dynamic property assignment
-declare global {
-  interface Window {
-    [key: string]: any;
-  }
-}
-
-// Global flag to prevent multiple auth attempts across renders
-let hasProcessedAuth = false;
-
-// Helper to check if localStorage is available and working
-const isLocalStorageAvailable = () => {
-  try {
-    const test = 'test';
-    localStorage.setItem(test, test);
-    const result = localStorage.getItem(test) === test;
-    localStorage.removeItem(test);
-    return result;
-  } catch (e) {
-    return false;
-  }
-};
-
-// Helper to safely store tokens in localStorage
-const safelyStoreToken = (token: string): boolean => {
-  try {
-    // First clear any existing tokens
-    localStorage.removeItem('token');
-    localStorage.removeItem('quits_auth_token');
-    
-    // Store the token in both places for consistency
-    localStorage.setItem('token', token);
-    localStorage.setItem('quits_auth_token', token);
-    
-    // Verify token was stored correctly
-    return localStorage.getItem('token') === token;
-  } catch (e) {
-    console.error('Error storing token:', e);
-    return false;
-  }
-};
-
-const AuthCallback = () => {
-  const [isProcessing, setIsProcessing] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [debugMessages, setDebugMessages] = useState<string[]>([]);
-  const [debugVisible, setDebugVisible] = useState(false);
-  const navigate = useNavigate();
+const AuthCallback: React.FC = () => {
   const location = useLocation();
-  const { login, validateToken } = useAuth();
-  const processedRef = useRef(false);
-  
-  // Helper for adding debug messages
-  const log = (message: string) => {
-    console.log(`[AuthCallback] ${message}`);
-    setDebugMessages(prev => [...prev, message]);
-  };
-
-  // Toggle debug info visibility
-  const toggleDebug = () => {
-    setDebugVisible(prev => !prev);
-  };
-
-  // Function to make a direct call to debug endpoint
-  const checkAuthConfig = async () => {
-    try {
-      log('Checking auth configuration...');
-      const response = await fetch('https://api.quits.cc/debug?type=auth');
-      
-      if (response.ok) {
-        const data = await response.json();
-        log('Auth configuration received:');
-        log(`- Environment: ${data.env?.NODE_ENV || 'undefined'} / ${data.env?.VERCEL_ENV || 'undefined'}`);
-        log(`- Google Client ID: ${data.env?.has_google_id === 'yes' ? 'Found' : 'Not found'}`);
-        log(`- Google Redirect URI: ${data.env?.using_redirect_uri || 'Not set'}`);
-        log(`- JWT Secret: ${data.env?.has_jwt_secret === 'yes' ? 'Set' : 'Not set'}`);
-        
-        if (data.env?.oauth_client_created) {
-          log('- OAuth client created successfully');
-        } else {
-          log('- OAuth client creation failed');
-        }
-      } else {
-        log(`Failed to check auth config: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      log(`Error checking auth config: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  };
-
-  // Function to directly fetch the token from Google proxy without complex CORS handling
-  const fetchTokenDirectly = async (code: string) => {
-    try {
-      log('Attempting to fetch token directly using simple GET request');
-      
-      // Use a simple URL with all parameters
-      const proxyUrl = `https://api.quits.cc/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${Date.now()}`;
-      
-      log(`Using URL: ${proxyUrl.substring(0, 50)}...`);
-      
-      // Using a simple GET request with minimal headers
-      const response = await fetch(proxyUrl, {
-        method: 'GET',
-        cache: 'no-store',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        log(`Response not OK: ${response.status} ${response.statusText}`);
-        const errorText = await response.text();
-        log(`Error response: ${errorText.substring(0, 100)}...`);
-        return { success: false, error: 'api_error', message: `API Error: ${response.status}` };
-      }
-      
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        log(`Unexpected content type: ${contentType}`);
-        return { success: false, error: 'invalid_response', message: 'Invalid response format' };
-      }
-      
-      const data = await response.json();
-      log('Successfully received response from Google proxy');
-      return data;
-    } catch (error) {
-      log(`Direct fetch error: ${error instanceof Error ? error.message : String(error)}`);
-      return { success: false, error: 'fetch_error', message: 'Network error during authentication' };
-    }
-  };
+  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(true);
 
   useEffect(() => {
-    // Check both local and global processed flags to prevent multiple calls
-    if (processedRef.current || hasProcessedAuth) {
-      log('Auth callback already processed, skipping');
-      return; // Skip if already processed
-    }
-    
-    const processGoogleCallback = async () => {
+    const handleCallback = async () => {
       try {
-        // Set both local and global processed flags immediately
-        processedRef.current = true;
-        hasProcessedAuth = true;
-        setIsProcessing(true);
-        
-        log('Starting Google callback processing');
-        log(`URL: ${window.location.href}`);
-        
-        // Log any network issues
-        try {
-          // Use a simple GET request to avoid CORS issues
-          const testFetch = await fetch('https://api.quits.cc/health', { 
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            mode: 'no-cors' // This prevents CORS errors, but will give an opaque response
-          });
-          log(`API health check: ${testFetch.type === 'opaque' ? 'Connection successful (opaque response)' : testFetch.status}`);
-        } catch (e) {
-          log(`API health check failed: ${e instanceof Error ? e.message : String(e)}`);
-        }
-        
-        // Check localStorage availability
-        if (!isLocalStorageAvailable()) {
-          log('localStorage is not available - authentication will not persist');
-          setError('Your browser storage is disabled. Please enable cookies and localStorage for this site.');
-          return;
-        }
+        // Get code and state from URL
+        const searchParams = new URLSearchParams(location.search);
+        const code = searchParams.get('code');
+        const state = searchParams.get('state');
+        const errorParam = searchParams.get('error');
 
-        // First check for token in localStorage (may have been set by a redirect)
-        const storedToken = localStorage.getItem('token');
-        if (storedToken && validateToken(storedToken)) {
-          log('Found valid token in localStorage, using it directly');
-          await login(storedToken);
-                navigate('/dashboard');
-                return;
-        } else if (storedToken) {
-          log('Found token in localStorage but it appears invalid, clearing');
-          localStorage.removeItem('token');
-          localStorage.removeItem('quits_auth_token');
-        }
-        
-        // Get the code from URL query params
-        const urlParams = new URLSearchParams(location.search);
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
-        log(`State parameter: ${state || 'Not present'}`);
-        
-        // Also check for token in query params (from backend redirect)
-        const token = urlParams.get('token');
-        
-        // Handle error parameters directly from URL
-        const errorParam = urlParams.get('error');
-        const errorMessage = urlParams.get('message');
+        // Check for error parameter from Google
         if (errorParam) {
-          log(`Error in URL parameters: ${errorParam} - ${errorMessage}`);
-          setError(errorMessage || `Authentication error: ${errorParam}`);
-          return;
-        }
-        
-        // If we have a token already, we can skip the code exchange
-        if (token) {
-          log('Token found in URL, validating it');
-          
-          if (validateToken(token)) {
-            log('Token is valid, storing and proceeding');
-            if (safelyStoreToken(token)) {
-              log('Token stored successfully');
-              await login(token);
-          navigate('/dashboard');
-          return;
-            } else {
-              log('Failed to store token in localStorage');
-              setError('Failed to store authentication token. Please ensure cookies and localStorage are enabled.');
-              return;
-            }
-          } else {
-            log('Token from URL is invalid');
-            setError('Invalid authentication token received. Please try logging in again.');
-            return;
-          }
-        }
-        
-        // If no token but we have a code, exchange it for a token
-        if (!code) {
-          log('No code found in URL parameters');
-          setError('No authentication code found. Please try logging in again.');
-          return;
-        }
-        
-        log(`Found authorization code: ${code.substring(0, 8)}...`);
-        log('Attempting to exchange code for token');
-        
-        // First try our simple direct fetch
-        const directResult = await fetchTokenDirectly(code);
-        
-        log(`Direct result: ${JSON.stringify(directResult, null, 2)}`);
-        
-        if (directResult.success && directResult.token) {
-          log('Successfully obtained token, storing and logging in');
-          
-          // Validate the token first
-          if (!validateToken(directResult.token)) {
-            log('Token validation failed');
-            setError('Invalid authentication token received. Please try logging in again.');
-            return;
-          }
-          
-          if (safelyStoreToken(directResult.token)) {
-            log('Token stored successfully');
-            await login(directResult.token);
-            navigate('/dashboard');
-            return;
-          } else {
-            log('Failed to store token');
-            setError('Failed to store authentication data. Please ensure cookies and localStorage are enabled.');
-            return;
-          }
-        }
-        
-        // If direct fetch failed, try the service method as a fallback
-        log('Direct fetch failed, trying service method as fallback');
-        const result = await apiService.auth.handleGoogleCallback(code);
-        
-        log(`Auth result: ${JSON.stringify(result, null, 2)}`);
-        
-        if (result.success && result.token) {
-          log('Successfully obtained token, storing and logging in');
-          
-          // Validate the token first
-          if (!validateToken(result.token)) {
-            log('Token validation failed');
-            setError('Invalid authentication token received. Please try logging in again.');
-            return;
-          }
-          
-          if (safelyStoreToken(result.token)) {
-            log('Token stored successfully');
-            await login(result.token);
-            navigate('/dashboard');
-            return;
-          } else {
-            log('Failed to store token');
-            setError('Failed to store authentication data. Please ensure cookies and localStorage are enabled.');
-            return;
-          }
-        }
-        
-        // Check for pending property (may not be in the type definition)
-        if ('pending' in result && result.pending) {
-          // The API is handling the redirect, show a loading message
-          log('Pending redirect to backend service');
-          setError('Authentication in progress, please wait...');
-          
-          // Set a timer to check localStorage for token
-          log('Setting timer to check for token in localStorage');
-          const checkInterval = setInterval(() => {
-            const tokenCheck = localStorage.getItem('token');
-            if (tokenCheck && validateToken(tokenCheck)) {
-              log('Valid token appeared in localStorage, using it');
-              clearInterval(checkInterval);
-              login(tokenCheck);
-              navigate('/dashboard');
-            }
-          }, 1000);
-          
-          // Clear interval after 15 seconds if no token appears
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            log('Token check timed out after 15 seconds');
-            setError('Authentication timed out. Please try again.');
-          }, 15000);
-          
+          console.error('Google returned an error:', errorParam);
+          navigate(`/login?error=${errorParam}`);
           return;
         }
 
-        if (result.success === false) {
-          // Handle specific error cases more gracefully
-          log(`Authentication error: ${result.error}`);
+        // Verify we have a code
+        if (!code) {
+          const errorMsg = 'No authorization code received from Google';
+          console.error(errorMsg);
+          navigate('/login?error=auth_failed&reason=missing_code');
+          return;
+        }
+
+        // Make API call to exchange the code for tokens
+        setProcessing(true);
+        
+        try {
+          // Call the backend to process the OAuth code
+          const response = await fetch(`https://api.quits.cc/api/auth/google/callback?code=${code}`);
+          const result = await response.json();
           
-          if (result.error === 'invalid_grant' || result.error === 'auth_code_already_used') {
-            // Automatically check auth configuration to help debug
-            await checkAuthConfig();
+          if (!response.ok) {
+            throw new Error(result.message || 'Authentication failed');
+          }
+          
+          // If successful, store the token
+          if (result.success && result.token) {
+            authService.setToken(result.token);
             
-            // Simply redirect back to login with better error message
-            window.location.href = '/login?error=invalid_grant&message=Your authorization session has expired. Please login again.';
-            return;
-          } else if (result.error === 'auth_failed') {
-            await checkAuthConfig();
-            window.location.href = '/login?error=auth_failed&message=Authentication failed. Please try again.';
+            // Redirect to dashboard
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 500);
             return;
           }
           
-          // For other errors, show in UI
-          setError(result.message || 'Failed to authenticate with Google. Please try again.');
-          return;
+          // Handle special case for pending scan
+          if ('pending' in result && result.pending) {
+            // Redirect to scanning page
+            navigate('/scanning');
+            return;
+          }
+          
+          // If we get here without a token, something went wrong
+          throw new Error('No valid authentication token received');
+        } catch (error: any) {
+          console.error('Auth callback error:', error);
+          
+          // Handle specific errors
+          if (error.message && error.message.includes('invalid_grant')) {
+            navigate('/login?error=invalid_grant');
+            return;
+          }
+          
+          if (error.message && error.message.includes('auth_code_already_used')) {
+            navigate('/login?error=invalid_grant&reason=code_reused');
+            return;
+          }
+          
+          if (error.message && error.message.includes('auth_failed')) {
+            navigate('/login?error=auth_failed');
+            return;
+          }
+          
+          // Generic error handler
+          setError(`Authentication error: ${error.message}`);
+          setProcessing(false);
         }
-        
-        // If we got here, something unexpected happened
-        log('Unexpected response format');
-        setError('Unexpected authentication response. Please try again.');
-        
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        log(`Unhandled error: ${errorMsg}`);
-        setError(`An unexpected error occurred: ${errorMsg}`);
-      } finally {
-        setIsProcessing(false);
+      } catch (error: any) {
+        console.error('Error processing callback:', error);
+        setError(`An unexpected error occurred: ${error.message}`);
+        setProcessing(false);
       }
     };
-    
-    processGoogleCallback();
-  }, [location.search, navigate, login, validateToken]);
 
-  // Add state for showing direct auth option
-  const [showDirectAuthOption, setShowDirectAuthOption] = useState(false);
-
-  // Direct Google auth function
-  const handleDirectGoogleAuth = () => {
-    const redirectUrl = 'https://accounts.google.com/o/oauth2/auth' +
-      '?client_id=82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com' +
-      '&redirect_uri=' + encodeURIComponent('https://www.quits.cc/auth/callback') +
-      '&response_type=code' +
-      '&scope=' + encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid') +
-      '&state=auth' +
-      '&prompt=select_account+consent' +
-      '&access_type=offline';
-    
-    window.location.href = redirectUrl;
-  };
+    handleCallback();
+  }, [location, navigate]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <h1 className="text-xl font-semibold">Processing Authentication</h1>
-          
-          {isProcessing ? (
-            <div className="mt-4">
-              <div className="w-12 h-12 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin mx-auto"></div>
-              <p className="mt-4 text-gray-600">Please wait while we authenticate your account...</p>
-            </div>
-          ) : error ? (
-            <div className="mt-4">
-              <div className="text-red-500 mb-4">{error}</div>
-              
-              {/* Show direct auth option if there were CORS issues */}
-              {showDirectAuthOption && (
-                <button
-                  onClick={handleDirectGoogleAuth}
-                  className="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded"
-                >
-                  Try Direct Google Authentication
-                </button>
-              )}
-              
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8">
+      <Helmet>
+        <title>Authenticating - Quits</title>
+      </Helmet>
+      
+      <div className="max-w-md w-full space-y-8 text-center">
+        {error ? (
+          <div className="bg-white rounded-lg shadow-md p-8">
+            <svg className="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h3 className="mt-4 text-lg font-medium text-gray-900">Authentication Failed</h3>
+            <p className="mt-2 text-sm text-gray-500">{error}</p>
+            <div className="mt-6">
               <button
                 onClick={() => navigate('/login')}
-                className="mt-4 bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 Return to Login
               </button>
             </div>
-          ) : (
-            <div className="mt-4">
-              <div className="w-12 h-12 border-t-2 border-b-2 border-green-500 rounded-full animate-spin mx-auto"></div>
-              <p className="mt-4 text-gray-600">Authentication successful! Redirecting...</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-md p-8">
+            <div className="mx-auto h-10 w-10">
+              <svg className="animate-spin h-10 w-10 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
             </div>
-          )}
-        </div>
-
-        {/* Debug toggle button */}
-        <div className="mt-8 text-center">
-          <button 
-            onClick={toggleDebug}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            {debugVisible ? 'Hide Debug Info' : 'Show Debug Info'}
-          </button>
-        </div>
-
-        {/* Debug information */}
-        {debugVisible && (
-          <div className="mt-4 p-4 bg-gray-100 rounded overflow-auto max-h-60 text-xs font-mono">
-            {debugMessages.map((msg, i) => (
-              <div key={i} className="mb-1">
-                {msg}
-              </div>
-            ))}
+            <h3 className="mt-4 text-lg font-medium text-gray-900">Authenticating...</h3>
+            <p className="mt-2 text-sm text-gray-500">Please wait while we complete your authentication process.</p>
           </div>
         )}
       </div>
