@@ -459,83 +459,100 @@ const apiService = {
           console.log('Gmail token found in JWT - will use real data');
         }
         
-        // Use the correct endpoint with explicit Authorization header
-        const response = await api.post('/email/scan', {
-          useRealData: !!gmailToken
-        }, {
-          timeout: 60000, // 60 second timeout
+        // Use direct fetch approach with simple headers to avoid CORS issues
+        console.log('Using direct fetch for email scanning');
+        const response = await fetch(`${API_URL}/email/scan`, {
+          method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
             'Authorization': `Bearer ${authToken}`,
             'X-Gmail-Token': gmailToken || ''
-          }
+          },
+          body: JSON.stringify({ useRealData: !!gmailToken })
         });
         
-        console.log('Email scan response:', response.data);
-        return response.data;
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Email scan failed:', response.status, errorText);
+          throw new Error(`Scan failed: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Email scan response:', data);
+        return data;
       } catch (error) {
         console.error('Email scanning error:', error);
         
-        // Check for specific error types that indicate authentication issues
-        if (axios.isAxiosError(error)) {
-          if (error.response?.status === 401) {
-            console.error('Authentication failed (401) - clearing token');
-            localStorage.removeItem('token');
-            window.location.href = '/login?reason=auth_failed';
-            throw new Error('Authentication failed. Please log in again.');
-          }
-          
-          if (error.response?.status === 403) {
-            console.error('Access forbidden (403) - may need new Gmail permissions');
-            window.location.href = '/login?reason=permission_denied';
-            throw new Error('Access to Gmail was denied. Please re-authorize with Gmail.');
-          }
-          
-          // Only try fetch fallback if there's a network error
-          if (error.code === 'ERR_NETWORK' || error.response?.status === 400) {
-            try {
-              console.log('Trying fetch fallback method');
-              const authToken = localStorage.getItem('token');
-              const gmailToken = getGmailToken();
-              
-              const fetchResponse = await fetch(`${API_URL}/email/scan`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${authToken}`,
-                  'X-Gmail-Token': gmailToken || ''
-                },
-                body: JSON.stringify({ useRealData: !!gmailToken })
-              });
-              
-              if (!fetchResponse.ok) {
-                console.error('Fetch fallback failed:', await fetchResponse.text());
-                throw new Error('Failed to fetch');
-              }
-              
-              const data = await fetchResponse.json();
-              console.log('Fetch fallback succeeded:', data);
-              return data;
-            } catch (fetchError) {
-              console.error('Fetch fallback failed:', fetchError);
-              throw new Error('Failed to start email scanning');
-            }
-          }
+        // Check if the error message suggests authentication issues
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        
+        if (errorMsg.includes('401') || errorMsg.includes('auth')) {
+          console.error('Authentication issue detected - redirecting to login');
+          localStorage.removeItem('token');
+          window.location.href = '/login?reason=auth_failed';
+          throw new Error('Authentication failed. Please log in again.');
         }
         
-        throw new Error('Failed to start email scanning');
+        // Fall back to fetch mode
+        try {
+          console.log('Trying fallback mode with minimal headers');
+          const authToken = localStorage.getItem('token');
+          const gmailToken = getGmailToken();
+          
+          // Even simpler approach with minimal headers
+          const fallbackResponse = await fetch(`${API_URL}/email/scan`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ useRealData: !!gmailToken })
+          });
+          
+          if (!fallbackResponse.ok) {
+            console.error('Fallback mode failed:', await fallbackResponse.text());
+            throw new Error('All email scanning approaches failed');
+          }
+          
+          const fallbackData = await fallbackResponse.json();
+          console.log('Fallback approach succeeded:', fallbackData);
+          return fallbackData;
+        } catch (fallbackError) {
+          console.error('All scanning approaches failed:', fallbackError);
+          
+          // Return mock response to avoid breaking the UI
+          return {
+            status: 'error',
+            message: 'Could not connect to scanning service. Please try again later.',
+            jobId: 'error-' + Date.now(),
+            mock: true
+          };
+        }
       }
     },
 
-    // Get scanning status with retry mechanism
+    // Get scanning status with retry mechanism and using fetch
     getScanStatus: async () => {
       const maxRetries = 3;
       let retries = 0;
       
       const tryGetStatus = async () => {
         try {
-          const response = await api.get('/email/status');
-          return response.data;
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_URL}/email/status`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Status check failed with ${response.status}`);
+          }
+          
+          return await response.json();
         } catch (error) {
           console.error('Error getting scan status:', error);
            
@@ -564,15 +581,28 @@ const apiService = {
       return await apiService.email.getScanStatus();
     },
 
-    // Get subscription suggestions from scanned emails
+    // Get subscription suggestions using fetch
     getSubscriptionSuggestions: async () => {
       try {
-        const response = await api.get('/email/suggestions');
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/email/suggestions`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to get suggestions: ${response.status}`);
+        }
+        
+        const data = await response.json();
         
         // Map the response data to make it more consistent
-        if (response.data?.suggestions && Array.isArray(response.data.suggestions)) {
+        if (data?.suggestions && Array.isArray(data.suggestions)) {
           // Ensure all fields are present with consistent naming
-          response.data.suggestions = response.data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
+          data.suggestions = data.suggestions.map((suggestion: SubscriptionSuggestion) => ({
             ...suggestion,
             // Ensure consistent property names (frontend uses camelCase)
             price: suggestion.price || 0,
@@ -587,20 +617,32 @@ const apiService = {
           }));
         }
         
-        return response.data;
+        return data;
       } catch (error) {
         console.error('Error getting subscription suggestions:', error);
         return { error: 'Failed to retrieve suggestions', suggestions: [] };
       }
     },
 
-    // Confirm or reject a subscription suggestion
+    // Confirm or reject a subscription suggestion using fetch
     confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
       try {
-        const response = await api.post(`/email/suggestions/${suggestionId}/confirm`, {
-          confirmed
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/email/suggestions/${suggestionId}/confirm`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ confirmed })
         });
-        return response.data;
+        
+        if (!response.ok) {
+          throw new Error(`Failed to confirm suggestion: ${response.status}`);
+        }
+        
+        return await response.json();
       } catch (error) {
         console.error('Error confirming suggestion:', error);
         throw error;
@@ -612,32 +654,124 @@ const apiService = {
   subscriptions: {
     // Get all subscriptions
     getAll: async () => {
-      const response = await api.get('/subscription');
-      return response.data;
+      try {
+        // Use fetch instead of axios to avoid CORS issues
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/subscription`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          console.error(`Subscription fetch failed with status: ${response.status}`);
+          return { error: `Failed to fetch subscriptions: ${response.status}`, subscriptions: [] };
+        }
+        
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Error fetching subscriptions:', error);
+        return { error: 'Failed to fetch subscriptions', subscriptions: [] };
+      }
     },
     
     // Get a single subscription
     getById: async (id: string) => {
-      const response = await api.get(`/subscription/${id}`);
-      return response.data;
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/subscription/${id}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch subscription: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error(`Error fetching subscription ${id}:`, error);
+        throw error;
+      }
     },
     
     // Create a new subscription
     create: async (data: any) => {
-      const response = await api.post('/subscription', data);
-      return response.data;
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/subscription`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to create subscription: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Error creating subscription:', error);
+        throw error;
+      }
     },
     
     // Update a subscription
     update: async (id: string, data: any) => {
-      const response = await api.put(`/subscription/${id}`, data);
-      return response.data;
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/subscription/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to update subscription: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error(`Error updating subscription ${id}:`, error);
+        throw error;
+      }
     },
     
     // Delete a subscription
     delete: async (id: string) => {
-      const response = await api.delete(`/subscription/${id}`);
-      return response.data;
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/subscription/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to delete subscription: ${response.status}`);
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error(`Error deleting subscription ${id}:`, error);
+        throw error;
+      }
     }
   }
 };

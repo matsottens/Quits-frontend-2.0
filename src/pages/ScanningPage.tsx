@@ -59,6 +59,15 @@ const ScanningPage = () => {
       
       const response = await api.email.scanEmails();
       
+      // Check for mock response (indicating connection issues)
+      if (response.mock) {
+        console.log('Received mock response, indicating connectivity issues');
+        setError('Could not connect to the scanning service. Please check your internet connection and try again.');
+        setScanningStatus('error');
+        scanInitiatedRef.current = false;
+        return;
+      }
+      
       if (response.error) {
         throw new Error(response.message || 'Failed to start scanning');
       }
@@ -123,6 +132,9 @@ const ScanningPage = () => {
     try {
       const statusResponse = await api.email.getScanStatus();
       
+      // Reset status check failure counter on success
+      setStatusCheckFailures(0);
+      
       if (statusResponse.error) {
         throw new Error(statusResponse.error);
       }
@@ -140,9 +152,21 @@ const ScanningPage = () => {
           pollingIntervalRef.current = null;
         }
         
-        // Get subscription suggestions
-        const suggestionsResponse = await api.email.getSubscriptionSuggestions();
-        setSuggestions(suggestionsResponse.suggestions || []);
+        try {
+          // Get subscription suggestions
+          const suggestionsResponse = await api.email.getSubscriptionSuggestions();
+          
+          if (suggestionsResponse.error) {
+            console.warn('Error in suggestions response:', suggestionsResponse.error);
+            setSuggestions([]); // Set empty array as fallback
+          } else {
+            setSuggestions(suggestionsResponse.suggestions || []);
+          }
+        } catch (suggestionError) {
+          console.error('Error fetching suggestions:', suggestionError);
+          setError('Scanning completed, but there was a problem retrieving your subscription suggestions.');
+          setSuggestions([]); // Set empty array as fallback
+        }
       }
       
       // If error, stop polling
@@ -155,7 +179,22 @@ const ScanningPage = () => {
       }
     } catch (err) {
       console.error('Error checking scan status:', err);
-      // Don't update status here - just log the error and continue polling
+      
+      // Increment failure counter
+      const newFailures = statusCheckFailures + 1;
+      setStatusCheckFailures(newFailures);
+      
+      // After 5 consecutive failures, stop polling and show error
+      if (newFailures >= 5) {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        setScanningStatus('error');
+        setError('Lost connection to the scanning service. Please try again.');
+        scanInitiatedRef.current = false;
+      }
+      // Otherwise, continue polling
     }
   };
 
