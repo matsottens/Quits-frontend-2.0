@@ -8,6 +8,21 @@ import { useDispatch } from 'react-redux';
 import { setLogin } from '../reducers/authSlice';
 import axios from 'axios';
 
+// Global debug info array for use in utility functions
+let debugInfoArray: string[] = [];
+// Function to add debug info that can be used by both component and utility functions
+const addDebugInfo = (message: string) => {
+  const timestamp = new Date().toISOString();
+  debugInfoArray.push(`${timestamp}: ${message}`);
+  // If the component's state setter is available, update it
+  if (typeof updateDebugState === 'function') {
+    updateDebugState(`${timestamp}: ${message}`);
+  }
+};
+
+// Reference to the component's setState function for debug info
+let updateDebugState: ((message: string) => void) | null = null;
+
 const LoadingContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -96,8 +111,9 @@ function extractTokenFromHtml(htmlContent: string): string | null {
         return jsonData.token;
       }
     }
-  } catch (e) {
-    addDebugInfo(`JSON extraction failed: ${e.message}`);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addDebugInfo(`JSON extraction failed: ${errorMessage}`);
   }
 
   // Second attempt: Direct token format
@@ -108,8 +124,9 @@ function extractTokenFromHtml(htmlContent: string): string | null {
       addDebugInfo('Token found via regex');
       return tokenMatch[1];
     }
-  } catch (e) {
-    addDebugInfo(`Regex extraction failed: ${e.message}`);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addDebugInfo(`Regex extraction failed: ${errorMessage}`);
   }
 
   // Third attempt: Look for JWT-like strings
@@ -120,8 +137,9 @@ function extractTokenFromHtml(htmlContent: string): string | null {
       addDebugInfo('JWT-like token found');
       return jwtMatch[0];
     }
-  } catch (e) {
-    addDebugInfo(`JWT extraction failed: ${e.message}`);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addDebugInfo(`JWT extraction failed: ${errorMessage}`);
   }
 
   // Fourth attempt: Look for localstorage code
@@ -132,8 +150,9 @@ function extractTokenFromHtml(htmlContent: string): string | null {
       addDebugInfo('Token found in localStorage code');
       return localStorageMatch[1];
     }
-  } catch (e) {
-    addDebugInfo(`localStorage extraction failed: ${e.message}`);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addDebugInfo(`localStorage extraction failed: ${errorMessage}`);
   }
   
   // Fifth attempt: Look for any string that resembles a base64-encoded JWT
@@ -149,8 +168,9 @@ function extractTokenFromHtml(htmlContent: string): string | null {
         return possibleToken;
       }
     }
-  } catch (e) {
-    addDebugInfo(`Base64 extraction failed: ${e.message}`);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    addDebugInfo(`Base64 extraction failed: ${errorMessage}`);
   }
 
   addDebugInfo('Failed to extract token from HTML');
@@ -158,7 +178,7 @@ function extractTokenFromHtml(htmlContent: string): string | null {
 }
 
 // Function to verify and process the token with retry logic
-async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: any, login: any): Promise<boolean> {
+async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: any, login: ((token: string) => Promise<boolean>) | undefined): Promise<boolean> {
   addDebugInfo(`Verifying token with ${maxRetries} retries available`);
   
   let retries = 0;
@@ -179,14 +199,19 @@ async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: an
       
       // Update AuthContext
       if (login) {
-        await login(token);
-        addDebugInfo('Auth context updated');
+        const loginSuccess = await login(token);
+        if (loginSuccess) {
+          addDebugInfo('Auth context updated successfully');
+        } else {
+          addDebugInfo('Auth context login returned false');
+        }
       } else {
         addDebugInfo('Warning: login function not available');
       }
       
       // Verify token with API
       try {
+        // Use the root-level verifyToken method for compatibility
         const response = await api.verifyToken(token);
         if (response && response.success) {
           addDebugInfo('Token verified with API');
@@ -194,15 +219,17 @@ async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: an
         } else {
           throw new Error('Token verification failed with API');
         }
-      } catch (apiError) {
-        addDebugInfo(`API verification error: ${apiError.message}`);
+      } catch (apiError: unknown) {
+        const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+        addDebugInfo(`API verification error: ${errorMessage}`);
         // Continue with navigation if API verification fails but we have a token
         // This allows offline mode to work in case API is down
         return true;
       }
-    } catch (error) {
+    } catch (error: unknown) {
       retries++;
-      addDebugInfo(`Token verification attempt ${retries} failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      addDebugInfo(`Token verification attempt ${retries} failed: ${errorMessage}`);
       
       if (retries > maxRetries) {
         addDebugInfo('Max retries reached, verification failed');
@@ -227,8 +254,27 @@ const AuthCallback = () => {
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
 
-  const addDebugInfo = (message: string) => {
+  // Set up the debug info updater
+  useEffect(() => {
+    // Set the global debug state updater reference
+    updateDebugState = (message: string) => {
+      setDebugInfo(prev => [...prev, message]);
+    };
+    
+    // Initialize the global debug array
+    debugInfoArray = [];
+    
+    // Clean up
+    return () => {
+      updateDebugState = null;
+    };
+  }, []);
+
+  // Local debug info adder for the component
+  const componentAddDebugInfo = (message: string) => {
     setDebugInfo(prev => [...prev, `${new Date().toISOString()}: ${message}`]);
+    // Also update the global array
+    debugInfoArray.push(`${new Date().toISOString()}: ${message}`);
   };
 
   const navigatePost = async () => {
@@ -239,20 +285,24 @@ const AuthCallback = () => {
         throw new Error('Token not found after authentication');
       }
       
-      addDebugInfo('Token stored, verifying with API');
+      componentAddDebugInfo('Token stored, verifying with API');
       
       // Update Redux state
       dispatch(setLogin(token));
       
       // Update auth context
       if (login) {
-        await login(token);
+        const loginSuccess = await login(token);
+        if (!loginSuccess) {
+          throw new Error('Auth context login failed');
+        }
       }
       
       // Navigate to home or dashboard
       navigate('/dashboard');
-    } catch (error) {
-      console.error('Error during post-authentication:', error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('Error during post-authentication:', errorMessage);
       setError('Authentication succeeded but encountered an error during login. Please try again.');
       setIsLoading(false);
     }
@@ -273,57 +323,57 @@ const AuthCallback = () => {
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
       }
       
-      addDebugInfo(`Starting auth callback process with code: ${code ? 'present' : 'missing'}`);
+      componentAddDebugInfo(`Starting auth callback process with code: ${code ? 'present' : 'missing'}`);
       
       if (errorParam) {
         // Handle errors from the OAuth provider
         const reason = params.get("error_reason") || "unknown_reason";
         setError(`Authentication failed: ${errorParam} (${reason})`);
-        addDebugInfo(`Auth error: ${errorParam}, reason: ${reason}`);
+        componentAddDebugInfo(`Auth error: ${errorParam}, reason: ${reason}`);
         setIsLoading(false);
         return;
       }
       
       if (!code) {
         setError("No authentication code found in URL");
-        addDebugInfo("Missing auth code in callback URL");
+        componentAddDebugInfo("Missing auth code in callback URL");
         setIsLoading(false);
         return;
       }
       
       try {
-        addDebugInfo("Fetching token from API");
+        componentAddDebugInfo("Fetching token from API");
         // First try using the API service
         try {
-          addDebugInfo("Attempting to use API service for authentication");
+          componentAddDebugInfo("Attempting to use API service for authentication");
           const result = await api.auth.handleGoogleCallback(code);
           
           if (result && result.token) {
-            addDebugInfo(`Received token directly from API service`);
+            componentAddDebugInfo(`Received token directly from API service`);
             const token = result.token;
             
             // Verify and process the token
             const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
             
             if (verificationSuccess) {
-              addDebugInfo("Token verification successful, redirecting to dashboard");
+              componentAddDebugInfo("Token verification successful, redirecting to dashboard");
               window.location.href = "/dashboard";
               return;
             } else {
               throw new Error("Token verification failed");
             }
           } else if (result && result.html_response && result.html_content) {
-            addDebugInfo("Received HTML response, attempting to extract token");
+            componentAddDebugInfo("Received HTML response, attempting to extract token");
             const token = extractTokenFromHtml(result.html_content);
             
             if (token) {
-              addDebugInfo(`Extracted token from HTML: ${token.substring(0, 10)}...`);
+              componentAddDebugInfo(`Extracted token from HTML: ${token.substring(0, 10)}...`);
               
               // Verify and process the token with retry logic
               const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
               
               if (verificationSuccess) {
-                addDebugInfo("Token verification successful, redirecting to dashboard");
+                componentAddDebugInfo("Token verification successful, redirecting to dashboard");
                 window.location.href = "/dashboard";
                 return;
               } else {
@@ -335,14 +385,15 @@ const AuthCallback = () => {
           } else if (result && result.error) {
             throw new Error(`API error: ${result.error}: ${result.message || 'Unknown error'}`);
           }
-        } catch (apiError) {
+        } catch (apiError: unknown) {
           // API service approach failed, fallback to manual fetch
-          addDebugInfo(`API service approach failed: ${apiError.message}`);
-          addDebugInfo("Falling back to direct fetch approach");
+          const errorMessage = apiError instanceof Error ? apiError.message : String(apiError);
+          componentAddDebugInfo(`API service approach failed: ${errorMessage}`);
+          componentAddDebugInfo("Falling back to direct fetch approach");
           
           // Call the API to exchange the code for a token
           const url = `${api.getGoogleCallbackUrl(code)}`;
-          addDebugInfo(`Making direct fetch request to: ${url}`);
+          componentAddDebugInfo(`Making direct fetch request to: ${url}`);
           
           const response = await fetch(url, {
             method: 'GET',
@@ -353,7 +404,7 @@ const AuthCallback = () => {
             }
           });
           
-          addDebugInfo(`API response status: ${response.status}`);
+          componentAddDebugInfo(`API response status: ${response.status}`);
           
           if (!response.ok) {
             const errorText = await response.text();
@@ -361,37 +412,38 @@ const AuthCallback = () => {
           }
           
           const htmlContent = await response.text();
-          addDebugInfo(`Received HTML response of length: ${htmlContent.length}`);
+          componentAddDebugInfo(`Received HTML response of length: ${htmlContent.length}`);
           
           // Try to extract the token from the HTML
           const token = extractTokenFromHtml(htmlContent);
           
           if (!token) {
             setError("Could not extract authentication token from response");
-            addDebugInfo("Token extraction failed");
+            componentAddDebugInfo("Token extraction failed");
             setIsLoading(false);
             return;
           }
           
-          addDebugInfo(`Extracted token: ${token.substring(0, 10)}...`);
+          componentAddDebugInfo(`Extracted token: ${token.substring(0, 10)}...`);
           
           // Verify and process the token with retry logic
           const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
           
           if (verificationSuccess) {
-            addDebugInfo("Token verification successful, redirecting to dashboard");
+            componentAddDebugInfo("Token verification successful, redirecting to dashboard");
             // Redirect to dashboard after successful authentication
             window.location.href = "/dashboard";
           } else {
             setError("Token verification failed after multiple attempts");
-            addDebugInfo("Token verification failed");
+            componentAddDebugInfo("Token verification failed");
             setIsLoading(false);
           }
         }
-      } catch (err) {
-        console.error("Auth callback error:", err);
-        setError(`Authentication error: ${err.message}`);
-        addDebugInfo(`Error in auth process: ${err.message}`);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error("Auth callback error:", errorMessage);
+        setError(`Authentication error: ${errorMessage}`);
+        componentAddDebugInfo(`Error in auth process: ${errorMessage}`);
         setIsLoading(false);
       }
     };
