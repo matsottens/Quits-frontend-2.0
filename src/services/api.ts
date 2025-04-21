@@ -186,46 +186,24 @@ interface SubscriptionSuggestion {
   [key: string]: any; // Allow for additional fields
 }
 
-// Function to safely extract the Gmail token from JWT
-function getGmailToken() {
+/**
+ * Function to extract Gmail token from JWT
+ */
+function extractGmailToken(token: string | null): string | null {
+  if (!token) return null;
+  
   try {
-    const token = localStorage.getItem('token');
-    if (!token) return null;
-    
-    // JWT tokens have 3 parts separated by periods
+    // Split the token to get the payload
     const parts = token.split('.');
     if (parts.length !== 3) return null;
     
-    // Decode the payload (middle part)
-    const payload = JSON.parse(atob(parts[1]));
+    // Decode the payload (second part)
+    const payload = atob(parts[1]);
+    const parsed = JSON.parse(payload);
     
-    // If token has expired, return null
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      console.warn('Token has expired, clearing from storage');
-      localStorage.removeItem('token');
-      return null;
-    }
-    
-    // Check when the token was created
-    if (payload.createdAt) {
-      const createdTime = new Date(payload.createdAt).getTime();
-      // If token is older than 7 days, it may be expired
-      if (Date.now() - createdTime > 7 * 24 * 60 * 60 * 1000) {
-        console.warn('Token is older than 7 days, might be stale');
-      }
-    }
-    
-    // If no Gmail token is present, return null
-    if (!payload.gmail_token) {
-      console.warn('No Gmail token found in JWT payload');
-      return null;
-    }
-    
-    return payload.gmail_token;
-  } catch (error) {
-    console.error('Error extracting Gmail token:', error);
-    // Clear the token if it can't be parsed - it's probably corrupted
-    localStorage.removeItem('token');
+    return parsed.gmail_token || null;
+  } catch (e) {
+    console.error('Error extracting Gmail token:', e);
     return null;
   }
 }
@@ -427,7 +405,7 @@ const apiService = {
         localStorage.setItem('token', token);
         
         // Make a request to verify the token
-        const response = await fetch(`${AUTH_API_URL}/auth/verify`, {
+        const response = await fetch(`${AUTH_API_URL}/api/auth/verify`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -476,6 +454,11 @@ const apiService = {
     scanEmails: async (options = {}) => {
       try {
         const token = localStorage.getItem('token');
+        const gmailToken = extractGmailToken(token);
+        
+        console.log('Starting email scanning with token');
+        
+        // First attempt with standard fetch
         const response = await fetch(`${API_URL}/api/email-scan`, {
           method: 'POST',
           headers: {
@@ -483,7 +466,10 @@ const apiService = {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(options)
+          body: JSON.stringify({
+            ...options,
+            useRealData: true
+          })
         });
         
         if (!response.ok) {
@@ -512,7 +498,6 @@ const apiService = {
         try {
           console.log('Trying fallback mode with minimal headers');
           const authToken = localStorage.getItem('token');
-          const gmailToken = getGmailToken();
           
           // Even simpler approach with minimal headers
           const fallbackResponse = await fetch(`${API_URL}/api/email-scan`, {
@@ -521,7 +506,7 @@ const apiService = {
               'Authorization': `Bearer ${authToken}`,
               'Accept': 'application/json'
             },
-            body: JSON.stringify({ useRealData: !!gmailToken })
+            body: JSON.stringify({ useRealData: true })
           });
           
           if (!fallbackResponse.ok) {

@@ -284,6 +284,42 @@ const ScanningPage = () => {
     }
   };
 
+  // Add a debug function
+  const checkGmailToken = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('No authentication token found. Please log in again.');
+        return;
+      }
+
+      const response = await fetch('https://api.quits.cc/api/debug-google-token', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        setError(`Token check failed: ${response.status}`);
+        return;
+      }
+
+      const data = await response.json();
+      if (data.tokenInfo.gmail_token_present) {
+        setError(null);
+        console.log('Gmail token is present:', data.tokenInfo);
+        alert(`Gmail token is present! Length: ${data.tokenInfo.gmail_token_length}, Prefix: ${data.tokenInfo.gmail_token_prefix}`);
+      } else {
+        setError('Gmail token is missing from your JWT. Please re-authenticate with Gmail permissions.');
+      }
+    } catch (err) {
+      console.error('Error checking Gmail token:', err);
+      setError(`Error checking token: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -301,12 +337,21 @@ const ScanningPage = () => {
                   <p className="text-sm font-medium text-red-800">{error}</p>
                 </div>
                 {scanningStatus === 'error' && (
-                  <button 
-                    onClick={handleRetry}
-                    className="ml-3 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    Retry
-                  </button>
+                  <div className="mt-4 flex gap-2 justify-center">
+                    <button 
+                      onClick={handleRetry}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      disabled={isRetrying}
+                    >
+                      {isRetrying ? 'Retrying...' : 'Try Again'}
+                    </button>
+                    <button 
+                      onClick={checkGmailToken}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Check Gmail Token
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
