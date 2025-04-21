@@ -570,8 +570,8 @@ const apiService = {
     },
 
     // Alias for getScanStatus to maintain backward compatibility
-    getScanningStatus: async () => {
-      return await apiService.email.getScanStatus();
+    getScanningStatus: async (scanId: string = 'latest') => {
+      return await apiService.email.getScanStatus(scanId);
     },
 
     // Get subscription suggestions using fetch

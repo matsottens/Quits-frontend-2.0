@@ -29,6 +29,7 @@ const ScanningPage = () => {
   const [isRetrying, setIsRetrying] = useState(false);
   const [statusCheckFailures, setStatusCheckFailures] = useState(0);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
+  const [scanId, setScanId] = useState<string | null>(null);
   const scanInitiatedRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const maxRetries = 3;
@@ -70,6 +71,14 @@ const ScanningPage = () => {
       
       if (response.error) {
         throw new Error(response.message || 'Failed to start scanning');
+      }
+      
+      // Store the scan ID for status checks
+      if (response.scanId) {
+        setScanId(response.scanId);
+        console.log('Scan started with ID:', response.scanId);
+      } else {
+        console.warn('No scan ID returned from API');
       }
       
       // Start polling for status updates
@@ -130,7 +139,12 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async () => {
     try {
-      const statusResponse = await api.email.getScanStatus();
+      if (!scanId) {
+        console.warn('No scan ID available for status check');
+        return;
+      }
+      
+      const statusResponse = await api.email.getScanStatus(scanId);
       
       // Reset status check failure counter on success
       setStatusCheckFailures(0);
