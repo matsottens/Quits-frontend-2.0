@@ -52,33 +52,60 @@ const Login: React.FC = () => {
   }, [location]);
 
   const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsLoading(true);
-      setError(null);
+      console.log('Initiating Google login process');
       
-      // Get the Google auth URL directly using the auth service
-      const googleAuthUrl = api.auth.getGoogleAuthUrl();
-      console.log('Opening Google Auth URL:', googleAuthUrl);
+      // Generate random state parameter to prevent CSRF attacks
+      const stateParam = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      sessionStorage.setItem('google_auth_state', stateParam);
       
-      // Open the Google auth URL in a popup
-      const width = 500;
-      const height = 600;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
+      // Try to get URL from API first (preferred method)
+      const baseRedirectUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3000/auth/callback'
+        : 'https://www.quits.cc/auth/callback';
       
-      const popup = window.open(
-        googleAuthUrl,
-        'googleAuth',
-        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-      );
+      // Clear any previous auth tokens
+      localStorage.removeItem('token');
       
-      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-        setError('Popup blocked! Please allow popups for this site and try again.');
-        setIsLoading(false);
+      // Try to use the API service method first
+      try {
+        const response = await api.auth.getGoogleAuthUrl({
+          redirectUrl: baseRedirectUrl,
+          state: stateParam
+        });
+        
+        if (response && response.url) {
+          console.log('Redirecting to Google auth URL from API');
+          window.location.href = response.url;
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to get Google auth URL from API:', e);
+        // Fall back to constructing URL manually
       }
-    } catch (err) {
-      console.error('Google login error:', err);
-      setError('Failed to start Google login. Please try again.');
+      
+      // Fallback: construct Google OAuth URL manually
+      const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
+      const scope = encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid');
+      
+      const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth' +
+        `?client_id=${clientId}` +
+        `&redirect_uri=${encodeURIComponent(baseRedirectUrl)}` +
+        '&response_type=code' +
+        `&scope=${scope}` +
+        '&prompt=select_account consent' +
+        '&access_type=offline' +
+        `&state=${stateParam}`;
+      
+      console.log('Redirecting to fallback Google auth URL');
+      window.location.href = googleAuthUrl;
+      
+    } catch (error) {
+      console.error('Error initiating Google login:', error);
+      setError('Failed to initiate Google login. Please try again later.');
       setIsLoading(false);
     }
   };

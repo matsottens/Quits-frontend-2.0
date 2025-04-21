@@ -78,56 +78,121 @@ const DebugContainer = styled.div`
   overflow-y: auto;
 `;
 
-// Function to extract token from HTML response
-function extractTokenFromHtml(html: string): string | null {
-  console.log('Attempting to extract token from HTML response');
+function extractTokenFromHtml(htmlContent: string): string | null {
+  addDebugInfo('Attempting to extract token from HTML');
   
+  // First attempt: Try to find JSON format in script tags
   try {
-    // Look for a token pattern in the HTML
-    // This pattern matches a token being assigned to a variable or as a string
-    const tokenPatterns = [
-      /const token = ['"]([^'"]+)['"]/,
-      /token = ['"]([^'"]+)['"]/,
-      /['"]token['"]:\s*['"]([^'"]+)['"]/,
-      /['"]([A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]+)['"]/
-    ];
-    
-    // Try each pattern
-    for (const pattern of tokenPatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        const token = match[1];
-        console.log(`Found token in HTML (${pattern}), length: ${token.length}`);
-        // Verify it looks like a JWT (xxx.yyy.zzz format)
-        if (/^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]+$/.test(token)) {
-          console.log('Token appears to be a valid JWT format');
-          return token;
-        }
-        console.log('Token does not match JWT format, continuing search');
+    const jsonMatch = htmlContent.match(/<script[^>]*>\s*({[^<]+})\s*<\/script>/);
+    if (jsonMatch && jsonMatch[1]) {
+      const jsonData = JSON.parse(jsonMatch[1]);
+      if (jsonData.token) {
+        addDebugInfo('Token found in JSON format');
+        return jsonData.token;
       }
     }
-    
-    // If no direct token find, search for a JSON object containing a token
-    const jsonMatch = html.match(/(\{[\s\S]*?"token"[\s\S]*?\})/);
-    if (jsonMatch) {
-      try {
-        const jsonStr = jsonMatch[1].replace(/'/g, '"');
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.token) {
-          console.log(`Found token in JSON object, length: ${parsed.token.length}`);
-          return parsed.token;
-        }
-      } catch (e) {
-        console.log('Failed to parse JSON object:', e);
-      }
-    }
-    
-    console.log('No token found in HTML response');
-    return null;
   } catch (e) {
-    console.error('Error extracting token from HTML:', e);
-    return null;
+    addDebugInfo(`JSON extraction failed: ${e.message}`);
   }
+
+  // Second attempt: Direct token format
+  try {
+    const tokenRegex = /"token"\s*:\s*"([^"]+)"/;
+    const tokenMatch = htmlContent.match(tokenRegex);
+    if (tokenMatch && tokenMatch[1]) {
+      addDebugInfo('Token found via regex');
+      return tokenMatch[1];
+    }
+  } catch (e) {
+    addDebugInfo(`Regex extraction failed: ${e.message}`);
+  }
+
+  // Third attempt: Look for JWT-like strings
+  try {
+    const jwtRegex = /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/;
+    const jwtMatch = htmlContent.match(jwtRegex);
+    if (jwtMatch && jwtMatch[0]) {
+      addDebugInfo('JWT-like token found');
+      return jwtMatch[0];
+    }
+  } catch (e) {
+    addDebugInfo(`JWT extraction failed: ${e.message}`);
+  }
+
+  // Fourth attempt: Look for localstorage code
+  try {
+    const localStorageRegex = /localStorage\.setItem\(['"]token['"],\s*['"]([^'"]+)['"]\)/;
+    const localStorageMatch = htmlContent.match(localStorageRegex);
+    if (localStorageMatch && localStorageMatch[1]) {
+      addDebugInfo('Token found in localStorage code');
+      return localStorageMatch[1];
+    }
+  } catch (e) {
+    addDebugInfo(`localStorage extraction failed: ${e.message}`);
+  }
+
+  addDebugInfo('Failed to extract token from HTML');
+  return null;
+}
+
+// Function to verify and process the token with retry logic
+async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: any, login: any): Promise<boolean> {
+  addDebugInfo(`Verifying token with ${maxRetries} retries available`);
+  
+  let retries = 0;
+  while (retries <= maxRetries) {
+    try {
+      // Store the token in localStorage
+      localStorage.setItem('token', token);
+      addDebugInfo(`Token stored in localStorage (attempt ${retries + 1})`);
+      
+      // Verify the token is stored correctly
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        throw new Error('Token storage verification failed');
+      }
+      
+      // Update Redux store
+      dispatch(setLogin(token));
+      
+      // Update AuthContext
+      if (login) {
+        await login(token);
+        addDebugInfo('Auth context updated');
+      } else {
+        addDebugInfo('Warning: login function not available');
+      }
+      
+      // Verify token with API
+      try {
+        const response = await api.verifyToken(token);
+        if (response && response.success) {
+          addDebugInfo('Token verified with API');
+          return true;
+        } else {
+          throw new Error('Token verification failed with API');
+        }
+      } catch (apiError) {
+        addDebugInfo(`API verification error: ${apiError.message}`);
+        // Continue with navigation if API verification fails but we have a token
+        // This allows offline mode to work in case API is down
+        return true;
+      }
+    } catch (error) {
+      retries++;
+      addDebugInfo(`Token verification attempt ${retries} failed: ${error.message}`);
+      
+      if (retries > maxRetries) {
+        addDebugInfo('Max retries reached, verification failed');
+        return false;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries - 1)));
+    }
+  }
+  
+  return false;
 }
 
 const AuthCallback = () => {
@@ -138,171 +203,132 @@ const AuthCallback = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
 
-  const addDebugInfo = (info: string) => {
-    console.log(`[Auth Debug] ${info}`);
-    setDebugInfo((prev) => [...prev, info]);
+  const addDebugInfo = (message: string) => {
+    setDebugInfo(prev => [...prev, `${new Date().toISOString()}: ${message}`]);
   };
 
-  const handleCallback = async () => {
+  const navigatePost = async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Extract the authorization code from the URL
-      const code = getParam(location.search, 'code');
-      
-      if (!code) {
-        throw new Error('No authorization code found in the URL');
+      // Verify the token is valid by checking it
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token not found after authentication');
       }
       
-      addDebugInfo(`Authorization code received: ${code.substring(0, 5)}...`);
+      addDebugInfo('Token stored, verifying with API');
       
-      // Check if we have a token in localStorage (could be from a previous direct HTML response)
-      const existingToken = localStorage.getItem('token') || localStorage.getItem('quits_auth_token');
-      if (existingToken) {
-        addDebugInfo('Found existing token in localStorage, attempting to use it');
-        try {
-          const loginResult = await login(existingToken);
-          addDebugInfo(`Login with existing token ${loginResult ? 'succeeded' : 'failed'}`);
-          if (loginResult) {
-            addDebugInfo('Authentication successful with existing token, redirecting to dashboard');
-            navigate('/dashboard');
-            return;
-          } else {
-            // Token didn't work, remove it
-            localStorage.removeItem('token');
-            localStorage.removeItem('quits_auth_token');
-            addDebugInfo('Existing token was invalid, removed from localStorage');
-          }
-        } catch (e) {
-          addDebugInfo(`Error using existing token: ${e instanceof Error ? e.message : String(e)}`);
-          // Continue with regular code flow
-        }
-      }
-
-      // Try to get a token from the API
-      addDebugInfo('Requesting token from API with authorization code');
+      // Update Redux state
+      dispatch(setLogin(token));
       
-      try {
-        // Use the auth.handleGoogleCallback method from our API service
-        const result = await api.auth.handleGoogleCallback(code);
-        
-        addDebugInfo(`API response: ${JSON.stringify(result)}`);
-        
-        if (result.success && result.token) {
-          addDebugInfo(`Token received from API, length: ${result.token.length}`);
-          
-          // Store the token
-          localStorage.setItem('token', result.token);
-          
-          // Try to login with the token
-          const loginSuccess = await login(result.token);
-          
-          if (loginSuccess) {
-            // Update Redux state if available
-            if (result.user) {
-              dispatch(setLogin({
-                isLoggedIn: true,
-                userData: result.user
-              }));
-            }
-            
-            addDebugInfo('Login successful!');
-            navigate('/dashboard');
-            return;
-          } else {
-            throw new Error('Failed to login with the received token');
-          }
-        } else if (result.error === 'invalid_grant') {
-          throw new Error('Authorization code has expired or already been used');
-        } else if ('pending' in result && result.pending) {
-          addDebugInfo('Authentication pending, redirecting to pending page');
-          navigate('/auth/pending', { state: { email: result.email } });
-          return;
-        } else {
-          throw new Error(result.message || 'Invalid response format: no token found');
-        }
-      } catch (apiError) {
-        addDebugInfo(`API error: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
-        
-        // Try direct approach with the callback endpoint using fetch
-        const apiUrl = window.location.hostname === 'localhost' 
-          ? 'http://localhost:3000'
-          : 'https://api.quits.cc';
-          
-        addDebugInfo('Trying direct callback endpoint');
-        const response = await fetch(`${apiUrl}/api/google-proxy?code=${encodeURIComponent(code)}`);
-        
-        const contentType = response.headers.get('content-type');
-        addDebugInfo(`Direct API response: ${response.status}, content-type: ${contentType}`);
-        
-        if (contentType && contentType.includes('text/html')) {
-          addDebugInfo('Response contains HTML, attempting to extract token');
-          const html = await response.text();
-          
-          // Try to extract token from HTML
-          const extractedToken = extractTokenFromHtml(html);
-          
-          if (extractedToken) {
-            addDebugInfo(`Successfully extracted token from HTML, length: ${extractedToken.length}`);
-            
-            // Try to login with the extracted token
-            const loginSuccess = await login(extractedToken);
-            
-            if (loginSuccess) {
-              addDebugInfo('Login successful with extracted token!');
-              navigate('/dashboard');
-              return;
-            } else {
-              throw new Error('Failed to login with extracted token');
-            }
-          } else {
-            throw new Error('Received HTML but could not extract token');
-          }
-        } else if (contentType && contentType.includes('application/json')) {
-          const data = await response.json();
-          
-          if (data.token) {
-            addDebugInfo(`Token received in JSON response, length: ${data.token.length}`);
-            
-            // Try to login with the token
-            const loginSuccess = await login(data.token);
-            
-            if (loginSuccess) {
-              addDebugInfo('Login successful with JSON token!');
-              navigate('/dashboard');
-              return;
-            } else {
-              throw new Error('Failed to login with token from JSON response');
-            }
-          } else {
-            throw new Error('No token in JSON response');
-          }
-        } else {
-          const responseText = await response.text();
-          addDebugInfo(`Unusual response content: ${responseText.substring(0, 100)}...`);
-          throw new Error(`Unexpected content type from direct API: ${contentType}`);
-        }
+      // Update auth context
+      if (login) {
+        await login(token);
       }
+      
+      // Navigate to home or dashboard
+      navigate('/dashboard');
     } catch (error) {
-      console.error('Authentication error:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      setError(errorMessage);
-      addDebugInfo(`Authentication error: ${errorMessage}`);
-    } finally {
+      console.error('Error during post-authentication:', error);
+      setError('Authentication succeeded but encountered an error during login. Please try again.');
       setIsLoading(false);
     }
   };
 
+  useEffect(() => {
+    const processAuthCallback = async () => {
+      setIsLoading(true);
+      setDebugInfo([]);
+      
+      // Get the code from the URL
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const errorParam = params.get("error");
+      
+      // Clear any fragments from URL to prevent issues with token extraction
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      
+      addDebugInfo(`Starting auth callback process with code: ${code ? 'present' : 'missing'}`);
+      
+      if (errorParam) {
+        // Handle errors from the OAuth provider
+        const reason = params.get("error_reason") || "unknown_reason";
+        setError(`Authentication failed: ${errorParam} (${reason})`);
+        addDebugInfo(`Auth error: ${errorParam}, reason: ${reason}`);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!code) {
+        setError("No authentication code found in URL");
+        addDebugInfo("Missing auth code in callback URL");
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        addDebugInfo("Fetching token from API");
+        // Call the API to exchange the code for a token
+        const url = api.getGoogleCallbackUrl(code);
+        const response = await fetch(url, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        addDebugInfo(`API response status: ${response.status}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to exchange code for token: ${errorText}`);
+        }
+        
+        const htmlContent = await response.text();
+        addDebugInfo(`Received HTML response of length: ${htmlContent.length}`);
+        
+        // Try to extract the token from the HTML
+        const token = extractTokenFromHtml(htmlContent);
+        
+        if (!token) {
+          setError("Could not extract authentication token from response");
+          addDebugInfo("Token extraction failed");
+          setIsLoading(false);
+          return;
+        }
+        
+        addDebugInfo(`Extracted token: ${token.substring(0, 10)}...`);
+        
+        // Verify and process the token with retry logic
+        const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
+        
+        if (verificationSuccess) {
+          addDebugInfo("Token verification successful, redirecting to dashboard");
+          // Redirect to dashboard after successful authentication
+          window.location.href = "/dashboard";
+        } else {
+          setError("Token verification failed after multiple attempts");
+          addDebugInfo("Token verification failed");
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error("Auth callback error:", err);
+        setError(`Authentication error: ${err.message}`);
+        addDebugInfo(`Error in auth process: ${err.message}`);
+        setIsLoading(false);
+      }
+    };
+    
+    processAuthCallback();
+  }, [dispatch, login]);
+
   const handleRetry = () => {
     navigate('/login');
   };
-
-  useEffect(() => {
-    handleCallback();
-  }, []);
 
   if (isLoading) {
     return (

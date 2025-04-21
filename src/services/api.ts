@@ -278,15 +278,13 @@ const apiService = {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
       
       try {
-        // Use mode: 'no-cors' for the first attempt to avoid CORS errors
-        // Note: This will give an "opaque" response that can't be read directly
-        // but can help test if the server is reachable
-        const preflightCheck = await fetch(`${AUTH_API_URL}/api/google-proxy`, {
-          method: 'OPTIONS',
-          mode: 'no-cors'
-        });
+        // Remove the problematic preflight check
+        // const preflightCheck = await fetch(`${AUTH_API_URL}/api/google-proxy`, {
+        //  method: 'OPTIONS',
+        //  mode: 'no-cors'
+        // });
         
-        console.log('Preflight check completed');
+        // console.log('Preflight check completed');
         
         // Always use GET for Google proxy to avoid CORS issues
         const timestamp = Date.now();
@@ -295,19 +293,36 @@ const apiService = {
         console.log('Trying proxy URL:', proxyUrl);
         
         try {
-          // First try with no credentials to avoid preflight
+          // First try with default cors mode and credentials
           const response = await fetch(proxyUrl, {
             method: 'GET',
             headers: {
-              'Accept': 'application/json',
+              'Accept': 'application/json, text/html, */*',
               'Cache-Control': 'no-cache'
-            }
+            },
+            credentials: 'include' // Include credentials for cross-domain requests
           });
           
           if (response.ok) {
-            const data = await response.json();
-            console.log('Proxy response:', data);
-            return data;
+            // Try to determine content type
+            const contentType = response.headers.get('content-type');
+            console.log('Response content type:', contentType);
+            
+            if (contentType && contentType.includes('application/json')) {
+              const data = await response.json();
+              console.log('Proxy response (JSON):', data);
+              return data;
+            } else {
+              // Handle HTML response
+              const text = await response.text();
+              console.log('Received HTML/text response, length:', text.length);
+              return {
+                success: false,
+                html_response: true,
+                text: text.substring(0, 500) + '...',
+                message: 'Received HTML response instead of JSON'
+              };
+            }
           } else {
             console.log('Proxy response not OK:', response.status);
             const errorText = await response.text();
