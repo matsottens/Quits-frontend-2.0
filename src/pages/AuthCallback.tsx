@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
-import authService from '../services/authService';
 import { useAuth } from '../context/AuthContext';
 import { getParam } from '../utils/url';
-import { api } from '../services/api';
+import api from '../services/api';
 import styled from 'styled-components';
-import { setLogin } from '../reducers/authSlice';
 import { useDispatch } from 'react-redux';
+import { setLogin } from '../reducers/authSlice';
 
 const LoadingContainer = styled.div`
   display: flex;
@@ -131,15 +129,14 @@ function extractTokenFromHtml(html: string): string | null {
   }
 }
 
-const AuthCallback: React.FC = () => {
-  const location = useLocation();
+const AuthCallback = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const dispatch = useDispatch();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
-  const dispatch = useDispatch();
-  const [isProcessing, setIsProcessing] = useState(true);
 
   const addDebugInfo = (info: string) => {
     console.log(`[Auth Debug] ${info}`);
@@ -147,158 +144,160 @@ const AuthCallback: React.FC = () => {
   };
 
   const handleCallback = async () => {
-    addDebugInfo('Starting auth callback processing');
-    setIsProcessing(true);
-    
     try {
-      // Extract code from URL
-      const params = new URLSearchParams(location.search);
-      const code = params.get('code');
-      const error = params.get('error');
+      setIsLoading(true);
+      setError(null);
       
-      if (error) {
-        addDebugInfo(`Auth error from Google: ${error}`);
-        const reason = params.get('error_reason') || '';
-        
-        // Handle specific error types
-        if (error === 'access_denied') {
-          throw new Error('You denied the authentication request. Please try again and allow access.');
-        } else {
-          throw new Error(`Authentication failed: ${error}${reason ? ` (${reason})` : ''}`);
-        }
-      }
+      // Extract the authorization code from the URL
+      const code = getParam(location.search, 'code');
       
       if (!code) {
-        addDebugInfo('No authorization code found in URL');
-        throw new Error('No authorization code received. Please try logging in again.');
+        throw new Error('No authorization code found in the URL');
       }
       
-      addDebugInfo(`Got authorization code: ${code.substring(0, 5)}...`);
+      addDebugInfo(`Authorization code received: ${code.substring(0, 5)}...`);
       
-      // Exchange code for token
-      try {
-        addDebugInfo('Attempting to exchange code for token');
-        const response = await api.post('/auth/google/callback', { code });
-        
-        if (response.data && response.data.token) {
-          addDebugInfo('Successfully received token as JSON');
-          
-          // Store the token, user data, and redirect
-          localStorage.setItem('token', response.data.token);
-          localStorage.setItem('userData', JSON.stringify(response.data.user || {}));
-          
-          // Update Redux store
-          dispatch(setLogin({
-            isLoggedIn: true,
-            userData: response.data.user || {}
-          }));
-          
-          // If this is a popup, communicate back to opener and close
-          if (window.opener && !window.opener.closed) {
-            addDebugInfo('Sending success message to opener window');
-            window.opener.postMessage({ type: 'AUTH_SUCCESS', token: response.data.token, user: response.data.user }, '*');
-            setTimeout(() => window.close(), 1000);
-          } else {
-            // Otherwise redirect to dashboard
-            addDebugInfo('Redirecting to dashboard');
+      // Check if we have a token in localStorage (could be from a previous direct HTML response)
+      const existingToken = localStorage.getItem('token') || localStorage.getItem('quits_auth_token');
+      if (existingToken) {
+        addDebugInfo('Found existing token in localStorage, attempting to use it');
+        try {
+          const loginResult = await login(existingToken);
+          addDebugInfo(`Login with existing token ${loginResult ? 'succeeded' : 'failed'}`);
+          if (loginResult) {
+            addDebugInfo('Authentication successful with existing token, redirecting to dashboard');
             navigate('/dashboard');
+            return;
+          } else {
+            // Token didn't work, remove it
+            localStorage.removeItem('token');
+            localStorage.removeItem('quits_auth_token');
+            addDebugInfo('Existing token was invalid, removed from localStorage');
           }
-          return;
+        } catch (e) {
+          addDebugInfo(`Error using existing token: ${e instanceof Error ? e.message : String(e)}`);
+          // Continue with regular code flow
         }
-      } catch (err: any) {
-        // Handle JSON parsing error - the response might be HTML
-        addDebugInfo(`Error with JSON response: ${err.message}`);
-        
-        if (err.response && typeof err.response.data === 'string') {
-          addDebugInfo('Response is HTML, attempting to extract token');
-          const token = extractTokenFromHtml(err.response.data);
-          
-          if (token) {
-            addDebugInfo('Successfully extracted token from HTML');
-            
-            // Try to get user info with the token
-            try {
-              api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-              const userResponse = await api.get('/auth/me');
-              
-              if (userResponse.data) {
-                // Store the token, user data, and redirect
-                localStorage.setItem('token', token);
-                localStorage.setItem('userData', JSON.stringify(userResponse.data));
-                
-                // Update Redux store
-                dispatch(setLogin({
-                  isLoggedIn: true,
-                  userData: userResponse.data
-                }));
-                
-                // If this is a popup, communicate back to opener and close
-                if (window.opener && !window.opener.closed) {
-                  addDebugInfo('Sending success message to opener window');
-                  window.opener.postMessage({ type: 'AUTH_SUCCESS', token, user: userResponse.data }, '*');
-                  setTimeout(() => window.close(), 1000);
-                } else {
-                  // Otherwise redirect to dashboard
-                  addDebugInfo('Redirecting to dashboard');
-                  navigate('/dashboard');
-                }
-                return;
-              }
-            } catch (userErr) {
-              addDebugInfo(`Failed to get user info with token: ${userErr}`);
-            }
-          }
-        }
-        
-        // If we couldn't extract a token from HTML or there's some other issue
-        throw new Error(err.response?.data?.message || err.message || 'Failed to exchange code for token');
       }
-    } catch (error: any) {
-      console.error('Auth callback error:', error);
-      setError(error.message || 'Authentication failed. Please try again.');
+
+      // Try to get a token from the API
+      addDebugInfo('Requesting token from API with authorization code');
+      
+      try {
+        // Use the auth.handleGoogleCallback method from the API service
+        const result = await api.auth.handleGoogleCallback(code);
+        
+        addDebugInfo(`API response: ${JSON.stringify(result)}`);
+        
+        if (result.success && result.token) {
+          addDebugInfo(`Token received from API, length: ${result.token.length}`);
+          
+          // Store the token
+          localStorage.setItem('token', result.token);
+          
+          // Try to login with the token
+          const loginSuccess = await login(result.token);
+          
+          if (loginSuccess) {
+            // Update Redux state if available
+            if (result.user) {
+              dispatch(setLogin({
+                isLoggedIn: true,
+                userData: result.user
+              }));
+            }
+            
+            addDebugInfo('Login successful!');
+            navigate('/dashboard');
+            return;
+          } else {
+            throw new Error('Failed to login with the received token');
+          }
+        } else if (result.error === 'invalid_grant') {
+          throw new Error('Authorization code has expired or already been used');
+        } else if ('pending' in result && result.pending) {
+          addDebugInfo('Authentication pending, redirecting to pending page');
+          navigate('/auth/pending', { state: { email: result.email } });
+          return;
+        } else {
+          throw new Error(result.message || 'Invalid response format: no token found');
+        }
+      } catch (apiError) {
+        addDebugInfo(`API error: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
+        
+        // Try direct approach with the callback endpoint
+        addDebugInfo('Trying direct callback endpoint');
+        const response = await fetch(`https://api.quits.cc/auth/google/callback?code=${encodeURIComponent(code)}`);
+        
+        const contentType = response.headers.get('content-type');
+        addDebugInfo(`Direct API response: ${response.status}, content-type: ${contentType}`);
+        
+        if (contentType && contentType.includes('text/html')) {
+          addDebugInfo('Response contains HTML, attempting to extract token');
+          const html = await response.text();
+          
+          // Try to extract token from HTML
+          const extractedToken = extractTokenFromHtml(html);
+          
+          if (extractedToken) {
+            addDebugInfo(`Successfully extracted token from HTML, length: ${extractedToken.length}`);
+            
+            // Try to login with the extracted token
+            const loginSuccess = await login(extractedToken);
+            
+            if (loginSuccess) {
+              addDebugInfo('Login successful with extracted token!');
+              navigate('/dashboard');
+              return;
+            } else {
+              throw new Error('Failed to login with extracted token');
+            }
+          } else {
+            throw new Error('Received HTML but could not extract token');
+          }
+        } else if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          
+          if (data.token) {
+            addDebugInfo(`Token received in JSON response, length: ${data.token.length}`);
+            
+            // Try to login with the token
+            const loginSuccess = await login(data.token);
+            
+            if (loginSuccess) {
+              addDebugInfo('Login successful with JSON token!');
+              navigate('/dashboard');
+              return;
+            } else {
+              throw new Error('Failed to login with token from JSON response');
+            }
+          } else {
+            throw new Error('No token in JSON response');
+          }
+        } else {
+          throw new Error(`Unexpected content type from direct API: ${contentType}`);
+        }
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      setError(errorMessage);
+      addDebugInfo(`Authentication error: ${errorMessage}`);
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    // Clear any stale auth data
-    localStorage.removeItem('token');
-    localStorage.removeItem('userData');
-    
-    handleCallback();
-    
-    // Listen for messages from other windows (if this is the opener)
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'AUTH_SUCCESS') {
-        console.log('Received auth success message from popup');
-        
-        // Store the token and user data
-        localStorage.setItem('token', event.data.token);
-        if (event.data.user) {
-          localStorage.setItem('userData', JSON.stringify(event.data.user));
-        }
-        
-        // Update Redux store
-        dispatch(setLogin({
-          isLoggedIn: true,
-          userData: event.data.user || {}
-        }));
-        
-        // Redirect to dashboard
-        navigate('/dashboard');
-      }
-    };
-    
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [dispatch, location, navigate]);
 
   const handleRetry = () => {
     navigate('/login');
   };
 
-  if (isProcessing) {
+  useEffect(() => {
+    handleCallback();
+  }, []);
+
+  if (isLoading) {
     return (
       <LoadingContainer>
         <h1>Authenticating...</h1>
@@ -316,11 +315,9 @@ const AuthCallback: React.FC = () => {
           <p>{error}</p>
         </ErrorContainer>
         <p>We encountered an error while trying to log you in.</p>
-        <div>
-          <RetryButton onClick={handleRetry}>
-            Return to Login
-          </RetryButton>
-        </div>
+        <RetryButton onClick={handleRetry}>
+          Return to Login
+        </RetryButton>
         <DebugContainer>
           <h4>Debug Information</h4>
           {debugInfo.map((info, index) => (

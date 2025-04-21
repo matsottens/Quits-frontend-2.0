@@ -56,29 +56,25 @@ const Login: React.FC = () => {
       setIsLoading(true);
       setError(null);
       
-      const response = await api.get('/auth/google/login');
-      if (response.data && response.data.url) {
-        const googleAuthUrl = response.data.url;
-        console.log('Opening Google Auth URL:', googleAuthUrl);
-        
-        // Open the Google auth URL in a popup
-        const width = 500;
-        const height = 600;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
-        
-        const popup = window.open(
-          googleAuthUrl,
-          'googleAuth',
-          `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-        );
-        
-        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-          setError('Popup blocked! Please allow popups for this site and try again.');
-          setIsLoading(false);
-        }
-      } else {
-        throw new Error('Failed to get Google authentication URL');
+      // Get the Google auth URL from our auth service
+      const googleAuthUrl = api.auth.getGoogleAuthUrl();
+      console.log('Opening Google Auth URL:', googleAuthUrl);
+      
+      // Open the Google auth URL in a popup
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        googleAuthUrl,
+        'googleAuth',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      );
+      
+      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        setError('Popup blocked! Please allow popups for this site and try again.');
+        setIsLoading(false);
       }
     } catch (err) {
       console.error('Google login error:', err);
