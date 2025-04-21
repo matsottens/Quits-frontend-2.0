@@ -565,10 +565,27 @@ const apiService = {
         });
         
         if (!response.ok) {
+          if (response.status === 404) {
+            console.error('Scan ID not found, it may have expired');
+            localStorage.removeItem('current_scan_id'); // Clear invalid scan ID
+            return { 
+              error: 'scan_not_found', 
+              status: 'error', 
+              message: 'Scan not found. It may have expired or been deleted.',
+              progress: 0 
+            };
+          }
           throw new Error(`Status check failed with ${response.status}`);
         }
         
-        return await response.json();
+        const data = await response.json();
+        
+        // If we get an error that the scan doesn't exist, clean up localStorage
+        if (data.error === 'scan_not_found' || (data.error && data.message?.includes('not found'))) {
+          localStorage.removeItem('current_scan_id');
+        }
+        
+        return data;
       } catch (error) {
         console.error('Error getting scan status:', error);
         return { error: 'Failed to retrieve scanning status', status: 'error', progress: 0 };

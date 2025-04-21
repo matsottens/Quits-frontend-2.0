@@ -29,7 +29,10 @@ const ScanningPage = () => {
   const [isRetrying, setIsRetrying] = useState(false);
   const [statusCheckFailures, setStatusCheckFailures] = useState(0);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  const [scanId, setScanId] = useState<string | null>(null);
+  const [scanId, setScanId] = useState<string | null>(() => {
+    // Try to get scanId from localStorage on initial load
+    return localStorage.getItem('current_scan_id');
+  });
   const scanInitiatedRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const maxRetries = 3;
@@ -76,6 +79,8 @@ const ScanningPage = () => {
       // Store the scan ID for status checks
       if (response.scanId) {
         setScanId(response.scanId);
+        // Save scanId to localStorage
+        localStorage.setItem('current_scan_id', response.scanId);
         console.log('Scan started with ID:', response.scanId);
       } else {
         console.warn('No scan ID returned from API');
@@ -145,6 +150,22 @@ const ScanningPage = () => {
       }
       
       const statusResponse = await api.email.getScanStatus(scanId);
+      
+      // Handle the case where the scan ID isn't recognized
+      if (statusResponse.error === 'scan_not_found') {
+        console.warn('Scan ID not found or expired:', scanId);
+        // Clear the scanId state
+        setScanId(null);
+        setError('Previous scan data not found. Starting a new scan...');
+        setScanningStatus('error');
+        scanInitiatedRef.current = false;
+        
+        // Wait a moment and initiate a new scan
+        setTimeout(() => {
+          handleRetry();
+        }, 2000);
+        return;
+      }
       
       // Reset status check failure counter on success
       setStatusCheckFailures(0);
@@ -220,6 +241,8 @@ const ScanningPage = () => {
     setProgress(0);
     setReconnectAttempt(0);
     setStatusCheckFailures(0);
+    // Clear the current scanId from localStorage
+    localStorage.removeItem('current_scan_id');
     scanInitiatedRef.current = false;
     
     // Stop any existing polling
@@ -237,8 +260,18 @@ const ScanningPage = () => {
   // Start scanning when component mounts, only once
   useEffect(() => {
     const initiateScanning = () => {
-      if (scanningStatus === 'idle' && !scanInitiatedRef.current) {
-        startScanning();
+      if (scanningStatus === 'idle') {
+        // If we have a scanId from localStorage but no active scanning
+        if (scanId && !scanInitiatedRef.current) {
+          console.log(`Found existing scan ID ${scanId} in localStorage, resuming polling`);
+          setScanningStatus('scanning');
+          scanInitiatedRef.current = true;
+          pollScanStatus();
+        } 
+        // Otherwise start a new scan
+        else if (!scanInitiatedRef.current) {
+          startScanning();
+        }
       }
     };
     
@@ -250,7 +283,7 @@ const ScanningPage = () => {
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, []);  // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   const handleSuggestionAction = async (suggestionId: string, confirmed: boolean) => {
     try {
