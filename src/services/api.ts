@@ -208,6 +208,9 @@ function extractGmailToken(token: string | null): string | null {
   }
 }
 
+// Add a global OAuth code processing lock
+let oauthCodeProcessing = false;
+
 // API service with methods for different API calls
 const apiService = {
   // Expose utility methods at the root level for direct access
@@ -268,6 +271,18 @@ const apiService = {
     handleGoogleCallback: async (code: string) => {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
       
+      // Prevent multiple simultaneous exchanges of the same code
+      if (oauthCodeProcessing) {
+        console.log('OAuth code already being processed, waiting for completion');
+        return {
+          success: false,
+          error: 'processing_in_progress',
+          message: 'Authentication is already in progress. Please wait.'
+        };
+      }
+      
+      oauthCodeProcessing = true;
+      
       try {
         // Always use GET for Google proxy to avoid CORS issues
         const timestamp = Date.now();
@@ -294,11 +309,13 @@ const apiService = {
             if (contentType && contentType.includes('application/json')) {
               const data = await response.json();
               console.log('Proxy response (JSON):', data);
+              oauthCodeProcessing = false; // Reset processing flag
               return data;
             } else {
               // Handle HTML response
               const text = await response.text();
               console.log('Received HTML/text response, length:', text.length);
+              oauthCodeProcessing = false; // Reset processing flag
               return {
                 success: false,
                 html_response: true,
@@ -313,8 +330,10 @@ const apiService = {
             
             // Try to parse the error text as JSON
             try {
+              oauthCodeProcessing = false; // Reset processing flag
               return JSON.parse(errorText);
             } catch {
+              oauthCodeProcessing = false; // Reset processing flag
               return {
                 success: false,
                 error: 'proxy_error',
@@ -324,6 +343,7 @@ const apiService = {
           }
         } catch (error: unknown) {
           console.error('Fetch error:', error);
+          oauthCodeProcessing = false; // Reset processing flag on error
           return {
             success: false,
             error: 'fetch_error',
@@ -332,6 +352,7 @@ const apiService = {
         }
       } catch (error: unknown) {
         console.error('Error in handleGoogleCallback:', error);
+        oauthCodeProcessing = false; // Reset processing flag on error
         return {
           success: false,
           error: 'auth_failed',
