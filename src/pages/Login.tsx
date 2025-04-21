@@ -56,7 +56,7 @@ const Login: React.FC = () => {
       setIsLoading(true);
       setError(null);
       
-      // Get the Google auth URL from our auth service
+      // Get the Google auth URL directly using the auth service
       const googleAuthUrl = api.auth.getGoogleAuthUrl();
       console.log('Opening Google Auth URL:', googleAuthUrl);
       

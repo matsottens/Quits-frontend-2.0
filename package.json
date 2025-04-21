@@ -13,17 +13,17 @@
   "dependencies": {
     "@headlessui/react": "^1.7.18",
     "@heroicons/react": "^2.1.1",
+    "@reduxjs/toolkit": "2.7.0",
     "@supabase/supabase-js": "2.49.4",
     "@types/react-helmet-async": "1.0.1",
     "axios": "^1.6.7",
+    "jwt-decode": "4.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet-async": "2.0.5",
+    "react-redux": "9.2.0",
     "react-router-dom": "^6.22.1",
-    "styled-components": "^6.1.8",
-    "jwt-decode": "^4.0.0",
-    "@reduxjs/toolkit": "^2.2.1",
-    "react-redux": "^9.1.0"
+    "styled-components": "6.1.17"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

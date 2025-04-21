@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../services/api';
+import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+
+// Define API service type
+interface ApiService {
+  auth: {
+    getGoogleAuthUrl: (emailHint?: string) => string;
+    handleGoogleCallback: (code: string) => Promise<any>;
+    getMe: () => Promise<any>;
+    logout: () => Promise<any>;
+    clearAuthData: () => void;
+  };
+}
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -91,8 +102,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Validate token with backend
       try {
         // Set token in Axios default headers
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        await api.get('/auth/me');
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        // Make a request to verify the token
+        const apiUrl = window.location.hostname === 'localhost' 
+          ? 'http://localhost:3000/api'
+          : 'https://api.quits.cc';
+          
+        await axios.get(`${apiUrl}/auth/me`);
       } catch (error) {
         console.error('Token validation error:', error);
         // Continue anyway since we validated the token structure
@@ -111,7 +128,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('token');
     setUser(null);
     setIsAuthenticated(false);
-    delete api.defaults.headers.common['Authorization'];
+    delete axios.defaults.headers.common['Authorization'];
     
     // Navigate to login page
     window.location.href = '/login';

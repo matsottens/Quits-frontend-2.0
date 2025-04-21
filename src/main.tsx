@@ -17,6 +17,9 @@ const store = configureStore({
   }
 })
 
+// Export type for the RootState
+export type RootState = ReturnType<typeof store.getState>
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Provider store={store}>

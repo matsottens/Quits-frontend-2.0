@@ -6,6 +6,7 @@ import api from '../services/api';
 import styled from 'styled-components';
 import { useDispatch } from 'react-redux';
 import { setLogin } from '../reducers/authSlice';
+import axios from 'axios';
 
 const LoadingContainer = styled.div`
   display: flex;
@@ -184,7 +185,7 @@ const AuthCallback = () => {
       addDebugInfo('Requesting token from API with authorization code');
       
       try {
-        // Use the auth.handleGoogleCallback method from the API service
+        // Use the auth.handleGoogleCallback method from our API service
         const result = await api.auth.handleGoogleCallback(code);
         
         addDebugInfo(`API response: ${JSON.stringify(result)}`);
@@ -225,9 +226,13 @@ const AuthCallback = () => {
       } catch (apiError) {
         addDebugInfo(`API error: ${apiError instanceof Error ? apiError.message : String(apiError)}`);
         
-        // Try direct approach with the callback endpoint
+        // Try direct approach with the callback endpoint using fetch
+        const apiUrl = window.location.hostname === 'localhost' 
+          ? 'http://localhost:3000/api'
+          : 'https://api.quits.cc';
+          
         addDebugInfo('Trying direct callback endpoint');
-        const response = await fetch(`https://api.quits.cc/auth/google/callback?code=${encodeURIComponent(code)}`);
+        const response = await fetch(`${apiUrl}/auth/google/callback?code=${encodeURIComponent(code)}`);
         
         const contentType = response.headers.get('content-type');
         addDebugInfo(`Direct API response: ${response.status}, content-type: ${contentType}`);
