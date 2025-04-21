@@ -416,6 +416,40 @@ const ScanningPage = () => {
     }
   };
 
+  // Add a debug function
+  const testGmailConnection = async () => {
+    try {
+      setError('Testing Gmail API connection...');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('No authentication token found. Please log in again.');
+        return;
+      }
+
+      const response = await fetch('https://api.quits.cc/api/debug-gmail', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        setError(`Gmail API test failed: ${response.status} - ${text}`);
+        return;
+      }
+
+      const data = await response.json();
+      setError(null);
+      console.log('Gmail API test:', data);
+      alert(`Gmail API test results:\n- Connected: ${data.connected}\n- Messages: ${data.messageCount}\n- Error: ${data.error || 'None'}`);
+    } catch (err) {
+      console.error('Error testing Gmail API:', err);
+      setError(`Error testing Gmail API: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -446,6 +480,12 @@ const ScanningPage = () => {
                       className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       Check Gmail Token
+                    </button>
+                    <button 
+                      onClick={testGmailConnection}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      Test Gmail API
                     </button>
                   </div>
                 )}
