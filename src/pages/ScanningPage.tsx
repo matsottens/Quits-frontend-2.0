@@ -41,6 +41,10 @@ const ScanningPage = () => {
 
   // Clear any active polling when component unmounts
   useEffect(() => {
+    // Debug logging for scanId
+    console.log('Initial scanId state:', scanId);
+    console.log('Initial localStorage scanId:', localStorage.getItem('current_scan_id'));
+    
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -78,16 +82,17 @@ const ScanningPage = () => {
       
       // Store the scan ID for status checks
       if (response.scanId) {
-        setScanId(response.scanId);
+        const newScanId = response.scanId;
+        setScanId(newScanId);
         // Save scanId to localStorage
-        localStorage.setItem('current_scan_id', response.scanId);
-        console.log('Scan started with ID:', response.scanId);
+        localStorage.setItem('current_scan_id', newScanId);
+        console.log('Scan started with ID:', newScanId);
+        
+        // Start polling for status updates with the new ID
+        pollScanStatus(newScanId);
       } else {
         console.warn('No scan ID returned from API');
       }
-      
-      // Start polling for status updates
-      pollScanStatus();
     } catch (err: any) {
       console.error('Error starting scan:', err);
       
@@ -128,32 +133,39 @@ const ScanningPage = () => {
   };
 
   // Poll for scan status
-  const pollScanStatus = () => {
+  const pollScanStatus = (currentScanId = scanId) => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
     
-    // Set initial poll immediately
-    checkScanStatus();
-    
-    // Then poll every 3 seconds
-    pollingIntervalRef.current = setInterval(checkScanStatus, 3000);
+    // Set initial poll immediately with the current scan ID
+    if (currentScanId) {
+      checkScanStatus(currentScanId);
+      
+      // Then poll every 3 seconds
+      pollingIntervalRef.current = setInterval(() => checkScanStatus(currentScanId), 3000);
+    } else {
+      console.warn('Cannot start polling: No scan ID available');
+    }
   };
 
   // Check the scanning status
-  const checkScanStatus = async () => {
+  const checkScanStatus = async (currentScanId = scanId) => {
     try {
-      if (!scanId) {
+      if (!currentScanId) {
         console.warn('No scan ID available for status check');
+        // Debug info
+        console.log('  → scanId state:', scanId);
+        console.log('  → localStorage scanId:', localStorage.getItem('current_scan_id'));
         return;
       }
       
-      const statusResponse = await api.email.getScanStatus(scanId);
+      const statusResponse = await api.email.getScanStatus(currentScanId);
       
       // Handle the case where the scan ID isn't recognized
       if (statusResponse.error === 'scan_not_found') {
-        console.warn('Scan ID not found or expired:', scanId);
+        console.warn('Scan ID not found or expired:', currentScanId);
         // Clear the scanId state
         setScanId(null);
         setError('Previous scan data not found. Starting a new scan...');
@@ -266,7 +278,7 @@ const ScanningPage = () => {
           console.log(`Found existing scan ID ${scanId} in localStorage, resuming polling`);
           setScanningStatus('scanning');
           scanInitiatedRef.current = true;
-          pollScanStatus();
+          pollScanStatus(scanId);
         } 
         // Otherwise start a new scan
         else if (!scanInitiatedRef.current) {
