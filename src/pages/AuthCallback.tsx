@@ -194,8 +194,11 @@ async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: an
         throw new Error('Token storage verification failed');
       }
       
-      // Update Redux store
-      dispatch(setLogin(token));
+      // Update Redux store with proper object format
+      dispatch(setLogin({ 
+        isLoggedIn: true,
+        userData: { token }
+      }));
       
       // Update AuthContext
       if (login) {
@@ -287,8 +290,11 @@ const AuthCallback = () => {
       
       componentAddDebugInfo('Token stored, verifying with API');
       
-      // Update Redux state
-      dispatch(setLogin(token));
+      // Update Redux state with proper object format
+      dispatch(setLogin({ 
+        isLoggedIn: true,
+        userData: { token }
+      }));
       
       // Update auth context
       if (login) {
