@@ -52,6 +52,10 @@ const ScanningPage = () => {
     subscriptions_found: 0
   });
 
+  // Add a timer ref to track scan duration
+  const scanStartTimeRef = useRef<number | null>(null);
+  const MIN_SCAN_DURATION_MS = 5000; // Minimum expected scan duration (5 seconds)
+
   // Clear any active polling when component unmounts
   useEffect(() => {
     // Debug logging for scanId
@@ -76,6 +80,7 @@ const ScanningPage = () => {
       setError(null);
       setScanningStatus('scanning');
       scanInitiatedRef.current = true;
+      scanStartTimeRef.current = Date.now(); // Record scan start time
       console.log('Starting email scanning process');
       
       const response = await api.email.scanEmails();
@@ -201,8 +206,23 @@ const ScanningPage = () => {
       
       const { status, progress: scanProgress, stats } = statusResponse;
       
+      // Check for too quick completion (potential issues)
+      const scanDuration = scanStartTimeRef.current ? Date.now() - scanStartTimeRef.current : null;
+      if ((status === 'complete' || status === 'completed') && 
+          scanDuration !== null && 
+          scanDuration < MIN_SCAN_DURATION_MS && 
+          (!stats || (stats.emails_processed < 5))) {
+        console.warn(`Scan completed too quickly (${scanDuration}ms) with minimal processing (${stats?.emails_processed || 0} emails). This may indicate an issue.`);
+        // Auto-retry after showing an error message
+        setError('The scan completed too quickly, which may indicate a problem. Retrying automatically...');
+        setTimeout(() => {
+          handleRetry();
+        }, 3000);
+        return;
+      }
+      
       // Update state based on status
-      setScanningStatus(status);
+      setScanningStatus(status === 'completed' ? 'complete' : status);
       setProgress(scanProgress || 0);
       
       // Update scan stats if available
@@ -210,8 +230,9 @@ const ScanningPage = () => {
         setScanStats(stats);
       }
       
-      // If complete, stop polling and get suggestions
-      if (status === 'complete') {
+      // If complete/completed, stop polling and get suggestions
+      if (status === 'complete' || status === 'completed') {
+        console.log('Scan complete! Clearing polling interval and getting subscription suggestions');
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
@@ -289,23 +310,30 @@ const ScanningPage = () => {
 
   // Start scanning when component mounts, only once
   useEffect(() => {
-    const initiateScanning = () => {
-      if (scanningStatus === 'idle') {
-        // If we have a scanId from localStorage but no active scanning
-        if (scanId && !scanInitiatedRef.current) {
-          console.log(`Found existing scan ID ${scanId} in localStorage, resuming polling`);
-          setScanningStatus('scanning');
-          scanInitiatedRef.current = true;
-          pollScanStatus(scanId);
-        } 
-        // Otherwise start a new scan
-        else if (!scanInitiatedRef.current) {
-          startScanning();
+    try {
+      const initiateScanning = () => {
+        console.log('initiateScanning called, current status:', scanningStatus, 'scanId:', scanId, 'scanInitiated:', scanInitiatedRef.current);
+        if (scanningStatus === 'idle') {
+          // If we have a scanId from localStorage but no active scanning
+          if (scanId && !scanInitiatedRef.current) {
+            console.log(`Found existing scan ID ${scanId} in localStorage, resuming polling`);
+            setScanningStatus('scanning');
+            scanInitiatedRef.current = true;
+            pollScanStatus(scanId);
+          } 
+          // Otherwise start a new scan
+          else if (!scanInitiatedRef.current) {
+            console.log('No existing scan found, starting new scan');
+            startScanning();
+          }
         }
-      }
-    };
-    
-    initiateScanning();
+      };
+      
+      initiateScanning();
+    } catch (err) {
+      console.error('Error in initiate scanning effect:', err);
+      setError('Error starting scan: ' + (err instanceof Error ? err.message : String(err)));
+    }
     
     // Cleanup on unmount
     return () => {
@@ -314,6 +342,11 @@ const ScanningPage = () => {
       }
     };
   }, []);
+
+  // Add a debugging effect to log state changes
+  useEffect(() => {
+    console.log('ScanningStatus changed to:', scanningStatus);
+  }, [scanningStatus]);
 
   const handleSuggestionAction = async (suggestionId: string, confirmed: boolean) => {
     try {
@@ -558,12 +591,43 @@ const ScanningPage = () => {
                 <p className="mt-4 text-lg text-gray-600">
                   We couldn't find any subscription confirmation emails. You can add subscriptions manually from your dashboard.
                 </p>
-                <div className="mt-8">
+
+                {/* Add scan statistics */}
+                <div className="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
+                  <div className="px-4 py-5 sm:px-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Scan Statistics</h3>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-500">Results from your email scan</p>
+                  </div>
+                  <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
+                    <dl className="sm:divide-y sm:divide-gray-200">
+                      <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500">Total emails found</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats.emails_found || 0}</dd>
+                      </div>
+                      <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500">Emails processed</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats.emails_processed || 0}</dd>
+                      </div>
+                      <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500">Subscriptions detected</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats.subscriptions_found || 0}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-center gap-4">
                   <button
                     onClick={() => navigate('/dashboard')}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                   >
                     Go to Dashboard
+                  </button>
+                  <button
+                    onClick={handleRetry}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    Try Again
                   </button>
                 </div>
               </div>
