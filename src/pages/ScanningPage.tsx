@@ -39,6 +39,19 @@ const ScanningPage = () => {
 
   const MAX_STATUS_CHECK_FAILURES = 5;
 
+  // Add these new state variables near the top
+  const [scanStats, setScanStats] = useState<{
+    emails_found: number;
+    emails_to_process: number;
+    emails_processed: number;
+    subscriptions_found: number;
+  }>({
+    emails_found: 0,
+    emails_to_process: 0,
+    emails_processed: 0,
+    subscriptions_found: 0
+  });
+
   // Clear any active polling when component unmounts
   useEffect(() => {
     // Debug logging for scanId
@@ -186,11 +199,16 @@ const ScanningPage = () => {
         throw new Error(statusResponse.error);
       }
       
-      const { status, progress: scanProgress } = statusResponse;
+      const { status, progress: scanProgress, stats } = statusResponse;
       
       // Update state based on status
       setScanningStatus(status);
       setProgress(scanProgress || 0);
+      
+      // Update scan stats if available
+      if (stats) {
+        setScanStats(stats);
+      }
       
       // If complete, stop polling and get suggestions
       if (status === 'complete') {
@@ -427,6 +445,20 @@ const ScanningPage = () => {
                       <span className="text-sm font-semibold text-gray-600">{progress}%</span>
                     </div>
                   </div>
+                  
+                  {/* Show scan stats when emails are being processed */}
+                  {scanningStatus === 'scanning' && scanStats.emails_found > 0 && (
+                    <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
+                      <p>Found <strong>{scanStats.emails_found}</strong> emails</p>
+                      <p>Processing <strong>{scanStats.emails_to_process}</strong> recent emails</p>
+                      <p>Processed <strong>{scanStats.emails_processed}</strong> so far</p>
+                      {scanStats.subscriptions_found > 0 && (
+                        <p className="text-green-600 font-medium">
+                          Found <strong>{scanStats.subscriptions_found}</strong> subscription{scanStats.subscriptions_found !== 1 ? 's' : ''}!
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
