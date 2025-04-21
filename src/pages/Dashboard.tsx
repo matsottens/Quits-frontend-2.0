@@ -463,7 +463,7 @@ const Dashboard = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                               <p>
-                                Renews on <time dateTime={subscription.next_billing_date || subscription.nextBillingDate}>
+                                Renews on <time dateTime={(subscription.next_billing_date || subscription.nextBillingDate) || ''}>
                                   {new Date(subscription.next_billing_date || subscription.nextBillingDate || '').toLocaleDateString()}
                                 </time>
                               </p>
