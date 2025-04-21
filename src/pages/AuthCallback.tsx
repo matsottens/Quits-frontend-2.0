@@ -375,7 +375,16 @@ const AuthCallback = () => {
         
         if (verifyResult.success) {
           // Authentication successful, set the user's authentication state
-          await dispatch(login({ token, user: response.user }));
+          // First update Redux store
+          dispatch(setLogin({ 
+            isLoggedIn: true,
+            userData: { token, ...response.user }
+          }));
+          
+          // Then use the AuthContext login function
+          if (login) {
+            await login(token);
+          }
           
           // Redirect the user to the dashboard
           navigate('/dashboard');
