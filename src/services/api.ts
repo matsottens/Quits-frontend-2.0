@@ -365,7 +365,7 @@ const apiService = {
     // Get current user info
     getMe: async () => {
       console.log(`Getting user info`);
-      const response = await authApi.get('/auth/me');
+      const response = await authApi.get('/api/auth/me');
       return response.data;
     },
     
@@ -472,70 +472,18 @@ const apiService = {
   
   // Email scanning endpoints
   email: {
-    // Start email scanning process
-    scanEmails: async () => {
+    // Scan emails for subscription information
+    scanEmails: async (options = {}) => {
       try {
-        console.log('Initiating email scanning process');
-        
-        // Get auth token
-        const authToken = localStorage.getItem('token');
-        if (!authToken) {
-          console.error('No authentication token found');
-          // Redirect to login page instead of throwing error
-          window.location.href = '/login?reason=token_missing';
-          throw new Error('Authentication required to scan emails');
-        }
-        
-        // Validate the token before proceeding
-        try {
-          const parts = authToken.split('.');
-          if (parts.length !== 3) {
-            throw new Error('Invalid token format');
-          }
-          
-          // Parse the payload
-          const payload = JSON.parse(atob(parts[1]));
-          
-          // Check token expiration
-          if (payload.exp && payload.exp * 1000 < Date.now()) {
-            console.error('Token has expired');
-            localStorage.removeItem('token'); // Clear invalid token
-            window.location.href = '/login?reason=token_expired';
-            throw new Error('Authentication token has expired');
-          }
-          
-          // Check if we have a Gmail token inside the JWT
-          if (!payload.gmail_token) {
-            console.warn('No Gmail token in JWT - user needs to re-authenticate with Gmail');
-            window.location.href = '/login?reason=missing_gmail_access';
-            throw new Error('Gmail access token is missing. Please re-authenticate with Gmail.');
-          }
-        } catch (tokenError) {
-          console.error('Token validation error:', tokenError);
-          localStorage.removeItem('token'); // Clear invalid token
-          window.location.href = '/login?reason=invalid_token';
-          throw new Error('Invalid authentication token');
-        }
-        
-        // Check if we have Gmail token
-        const gmailToken = getGmailToken();
-        if (!gmailToken) {
-          console.warn('No Gmail token found in JWT - will use mock data');
-        } else {
-          console.log('Gmail token found in JWT - will use real data');
-        }
-        
-        // Use direct fetch approach with simple headers to avoid CORS issues
-        console.log('Using direct fetch for email scanning');
-        const response = await fetch(`${API_URL}/email/scan`, {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/email-scan`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'X-Gmail-Token': gmailToken || ''
+            'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ useRealData: !!gmailToken })
+          body: JSON.stringify(options)
         });
         
         if (!response.ok) {
@@ -567,7 +515,7 @@ const apiService = {
           const gmailToken = getGmailToken();
           
           // Even simpler approach with minimal headers
-          const fallbackResponse = await fetch(`${API_URL}/email/scan`, {
+          const fallbackResponse = await fetch(`${API_URL}/api/email-scan`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${authToken}`,
@@ -598,48 +546,27 @@ const apiService = {
       }
     },
 
-    // Get scanning status with retry mechanism and using fetch
-    getScanStatus: async () => {
-      const maxRetries = 3;
-      let retries = 0;
-      
-      const tryGetStatus = async () => {
-        try {
-          const token = localStorage.getItem('token');
-          const response = await fetch(`${API_URL}/email/status`, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Status check failed with ${response.status}`);
+    // Get scan status
+    getScanStatus: async (scanId: string) => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/scan-status?scanId=${encodeURIComponent(scanId)}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`
           }
-          
-          return await response.json();
-        } catch (error) {
-          console.error('Error getting scan status:', error);
-           
-          if (retries < maxRetries - 1) {
-            retries++;
-            // Exponential backoff: 1s, 2s, 4s...
-            const delay = Math.pow(2, retries) * 1000;
-            console.log(`Retrying after ${delay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return tryGetStatus();
-          }
-           
-          return { 
-            error: 'Failed to retrieve scanning status', 
-            status: 'error', 
-            progress: 0 
-          };
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Status check failed with ${response.status}`);
         }
-      };
-       
-      return tryGetStatus();
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Error getting scan status:', error);
+        return { error: 'Failed to retrieve scanning status', status: 'error', progress: 0 };
+      }
     },
 
     // Alias for getScanStatus to maintain backward compatibility
@@ -651,7 +578,7 @@ const apiService = {
     getSubscriptionSuggestions: async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/email/suggestions`, {
+        const response = await fetch(`${API_URL}/api/email/suggestions`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -694,7 +621,7 @@ const apiService = {
     confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/email/suggestions/${suggestionId}/confirm`, {
+        const response = await fetch(`${API_URL}/api/email/suggestions/${suggestionId}/confirm`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -723,7 +650,7 @@ const apiService = {
       try {
         // Use fetch instead of axios to avoid CORS issues
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/subscription`, {
+        const response = await fetch(`${API_URL}/api/subscription`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -748,7 +675,7 @@ const apiService = {
     getById: async (id: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/subscription/${id}`, {
+        const response = await fetch(`${API_URL}/api/subscription/${id}`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -771,7 +698,7 @@ const apiService = {
     create: async (data: any) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/subscription`, {
+        const response = await fetch(`${API_URL}/api/subscription`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -796,7 +723,7 @@ const apiService = {
     update: async (id: string, data: any) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/subscription/${id}`, {
+        const response = await fetch(`${API_URL}/api/subscription/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -821,7 +748,7 @@ const apiService = {
     delete: async (id: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/subscription/${id}`, {
+        const response = await fetch(`${API_URL}/api/subscription/${id}`, {
           method: 'DELETE',
           headers: {
             'Accept': 'application/json',
