@@ -245,9 +245,14 @@ const apiService = {
       // Store the timestamp for debugging
       localStorage.setItem('oauth_start_time', Date.now().toString());
       
+      // Get the redirect URI based on current environment
+      const isProd = window.location.hostname !== 'localhost';
+      const redirectUri = isProd 
+        ? 'https://www.quits.cc/auth/callback'
+        : `${window.location.origin}/auth/callback`;
+      
       // Direct URL construction (matching what the backend would provide)
       const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
-      const redirectUri = 'https://www.quits.cc/auth/callback';
       const scope = 'email profile https://www.googleapis.com/auth/gmail.readonly openid';
       
       const url = 'https://accounts.google.com/o/oauth2/auth' +

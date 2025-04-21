@@ -228,11 +228,11 @@ const AuthCallback = () => {
         
         // Try direct approach with the callback endpoint using fetch
         const apiUrl = window.location.hostname === 'localhost' 
-          ? 'http://localhost:3000/api'
+          ? 'http://localhost:3000'
           : 'https://api.quits.cc';
           
         addDebugInfo('Trying direct callback endpoint');
-        const response = await fetch(`${apiUrl}/auth/google/callback?code=${encodeURIComponent(code)}`);
+        const response = await fetch(`${apiUrl}/api/google-proxy?code=${encodeURIComponent(code)}`);
         
         const contentType = response.headers.get('content-type');
         addDebugInfo(`Direct API response: ${response.status}, content-type: ${contentType}`);
@@ -280,6 +280,8 @@ const AuthCallback = () => {
             throw new Error('No token in JSON response');
           }
         } else {
+          const responseText = await response.text();
+          addDebugInfo(`Unusual response content: ${responseText.substring(0, 100)}...`);
           throw new Error(`Unexpected content type from direct API: ${contentType}`);
         }
       }
@@ -320,9 +322,14 @@ const AuthCallback = () => {
           <p>{error}</p>
         </ErrorContainer>
         <p>We encountered an error while trying to log you in.</p>
-        <RetryButton onClick={handleRetry}>
-          Return to Login
-        </RetryButton>
+        <div className="flex space-x-4 mt-4">
+          <RetryButton onClick={handleRetry}>
+            Return to Login
+          </RetryButton>
+          <RetryButton onClick={() => window.location.reload()}>
+            Try Again
+          </RetryButton>
+        </div>
         <DebugContainer>
           <h4>Debug Information</h4>
           {debugInfo.map((info, index) => (

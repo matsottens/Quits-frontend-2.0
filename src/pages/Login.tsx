@@ -154,6 +154,45 @@ const Login: React.FC = () => {
     };
   }, [location, handleAuthMessage]);
 
+  // Add this new function
+  const testAuthProxy = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setShowDebug(true);
+
+      // Try a direct request to the proxy endpoint
+      const proxyEndpoint = 'https://api.quits.cc/api/google-proxy';
+      console.log('Testing proxy endpoint:', proxyEndpoint);
+      
+      const response = await fetch(proxyEndpoint, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      const status = response.status;
+      const contentType = response.headers.get('content-type');
+      
+      let content;
+      try {
+        // Try to parse as JSON
+        content = await response.json();
+      } catch (e) {
+        // Fallback to text
+        content = await response.text();
+      }
+      
+      setError(`Proxy test result: Status ${status}, Type: ${contentType}, Content: ${JSON.stringify(content).substring(0, 100)}...`);
+    } catch (err: any) {
+      console.error('Proxy test error:', err);
+      setError(`Proxy test failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <Helmet>
@@ -211,16 +250,25 @@ const Login: React.FC = () => {
             
             {showDebug && (
               <div className="mt-4">
-                <div className="text-sm text-gray-700 mb-2 font-medium">Having trouble logging in?</div>
-                <button
-                  type="button"
-                  onClick={handleDirectLogin}
-                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 relative"
-                >
-                  Try Direct Google Login
-                </button>
+                <div className="text-sm text-gray-700 mb-2 font-medium">Troubleshooting Options</div>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleDirectLogin}
+                    className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    Try Direct Google Login
+                  </button>
+                  <button
+                    type="button"
+                    onClick={testAuthProxy}
+                    className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    Test Auth Proxy
+                  </button>
+                </div>
                 <div className="mt-2 text-xs text-gray-500">
-                  <p>This bypasses our authentication server and connects directly to Google.</p>
+                  <p>These options help diagnose authentication issues.</p>
                 </div>
               </div>
             )}
