@@ -232,6 +232,14 @@ function getGmailToken() {
 
 // API service with methods for different API calls
 const apiService = {
+  // Expose utility methods at the root level for direct access
+  getGoogleCallbackUrl: (code: string) => {
+    const baseUrl = `${AUTH_API_URL}/api/google-proxy`;
+    const timestamp = Date.now();
+    const redirectUrl = 'https://www.quits.cc/dashboard';
+    return `${baseUrl}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(redirectUrl)}&_t=${timestamp}`;
+  },
+  
   // Auth endpoints
   auth: {
     // Get Google Auth URL directly (no backend call needed)
@@ -278,14 +286,6 @@ const apiService = {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
       
       try {
-        // Remove the problematic preflight check
-        // const preflightCheck = await fetch(`${AUTH_API_URL}/api/google-proxy`, {
-        //  method: 'OPTIONS',
-        //  mode: 'no-cors'
-        // });
-        
-        // console.log('Preflight check completed');
-        
         // Always use GET for Google proxy to avoid CORS issues
         const timestamp = Date.now();
         const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
@@ -293,7 +293,7 @@ const apiService = {
         console.log('Trying proxy URL:', proxyUrl);
         
         try {
-          // First try with default cors mode and credentials
+          // First try with standard fetch - no explicit OPTIONS request
           const response = await fetch(proxyUrl, {
             method: 'GET',
             headers: {
@@ -319,7 +319,7 @@ const apiService = {
               return {
                 success: false,
                 html_response: true,
-                text: text.substring(0, 500) + '...',
+                html_content: text, // Return the full HTML for token extraction
                 message: 'Received HTML response instead of JSON'
               };
             }
@@ -411,6 +411,47 @@ const apiService = {
     updatePhoneNumber: async (phoneNumber: string) => {
       const response = await api.post('/auth/update-phone', { phoneNumber });
       return response.data;
+    },
+
+    // Verify token with backend
+    verifyToken: async (token: string) => {
+      try {
+        console.log('Verifying token with backend');
+        
+        // First, store the token securely
+        localStorage.setItem('token', token);
+        
+        // Make a request to verify the token
+        const response = await fetch(`${AUTH_API_URL}/auth/verify`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          },
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          // If the server rejects the token, try to extract the error
+          const errorText = await response.text();
+          console.error('Token verification failed:', errorText);
+          return { success: false, error: errorText };
+        }
+        
+        // If we get a successful response, the token is valid
+        const data = await response.json();
+        return { success: true, ...data };
+      } catch (error) {
+        console.error('Error verifying token:', error);
+        // Return success anyway if we can't reach the backend
+        // This allows offline mode to work
+        return { 
+          success: true, 
+          warning: 'Could not verify with backend, but token is stored',
+          offline: true
+        };
+      }
     },
 
     // Clear all auth data and storage

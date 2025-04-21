@@ -62,45 +62,28 @@ const Login: React.FC = () => {
       const stateParam = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       sessionStorage.setItem('google_auth_state', stateParam);
       
-      // Try to get URL from API first (preferred method)
-      const baseRedirectUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3000/auth/callback'
+      // Clear any previous auth data on login
+      api.auth.clearAuthData();
+      
+      // Try the direct URL construction approach (more reliable)
+      // Specifically configure to force account selection and consent to avoid invalid_grant errors
+      const redirectUri = window.location.hostname === 'localhost' 
+        ? 'http://localhost:5173/auth/callback'
         : 'https://www.quits.cc/auth/callback';
       
-      // Clear any previous auth tokens
-      localStorage.removeItem('token');
-      
-      // Try to use the API service method first
-      try {
-        const response = await api.auth.getGoogleAuthUrl({
-          redirectUrl: baseRedirectUrl,
-          state: stateParam
-        });
-        
-        if (response && response.url) {
-          console.log('Redirecting to Google auth URL from API');
-          window.location.href = response.url;
-          return;
-        }
-      } catch (e) {
-        console.warn('Failed to get Google auth URL from API:', e);
-        // Fall back to constructing URL manually
-      }
-      
-      // Fallback: construct Google OAuth URL manually
       const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
       const scope = encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid');
       
       const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth' +
         `?client_id=${clientId}` +
-        `&redirect_uri=${encodeURIComponent(baseRedirectUrl)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         '&response_type=code' +
         `&scope=${scope}` +
-        '&prompt=select_account consent' +
+        '&prompt=select_account+consent' + // Always force selection to avoid invalid_grant
         '&access_type=offline' +
         `&state=${stateParam}`;
       
-      console.log('Redirecting to fallback Google auth URL');
+      console.log('Redirecting to Google auth URL:', googleAuthUrl);
       window.location.href = googleAuthUrl;
       
     } catch (error) {

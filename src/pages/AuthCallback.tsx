@@ -81,6 +81,11 @@ const DebugContainer = styled.div`
 function extractTokenFromHtml(htmlContent: string): string | null {
   addDebugInfo('Attempting to extract token from HTML');
   
+  if (!htmlContent) {
+    addDebugInfo('Empty HTML content received');
+    return null;
+  }
+  
   // First attempt: Try to find JSON format in script tags
   try {
     const jsonMatch = htmlContent.match(/<script[^>]*>\s*({[^<]+})\s*<\/script>/);
@@ -129,6 +134,23 @@ function extractTokenFromHtml(htmlContent: string): string | null {
     }
   } catch (e) {
     addDebugInfo(`localStorage extraction failed: ${e.message}`);
+  }
+  
+  // Fifth attempt: Look for any string that resembles a base64-encoded JWT
+  try {
+    const base64Regex = /["']([A-Za-z0-9-_=]{40,})["']/g;
+    const matches = [...htmlContent.matchAll(base64Regex)];
+    
+    for (const match of matches) {
+      const possibleToken = match[1];
+      // Check if it looks like a JWT (3 parts separated by dots)
+      if (possibleToken.split('.').length === 3) {
+        addDebugInfo('Potential JWT found in base64 pattern');
+        return possibleToken;
+      }
+    }
+  } catch (e) {
+    addDebugInfo(`Base64 extraction failed: ${e.message}`);
   }
 
   addDebugInfo('Failed to extract token from HTML');
@@ -271,49 +293,100 @@ const AuthCallback = () => {
       
       try {
         addDebugInfo("Fetching token from API");
-        // Call the API to exchange the code for a token
-        const url = api.getGoogleCallbackUrl(code);
-        const response = await fetch(url, {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
+        // First try using the API service
+        try {
+          addDebugInfo("Attempting to use API service for authentication");
+          const result = await api.auth.handleGoogleCallback(code);
+          
+          if (result && result.token) {
+            addDebugInfo(`Received token directly from API service`);
+            const token = result.token;
+            
+            // Verify and process the token
+            const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
+            
+            if (verificationSuccess) {
+              addDebugInfo("Token verification successful, redirecting to dashboard");
+              window.location.href = "/dashboard";
+              return;
+            } else {
+              throw new Error("Token verification failed");
+            }
+          } else if (result && result.html_response && result.html_content) {
+            addDebugInfo("Received HTML response, attempting to extract token");
+            const token = extractTokenFromHtml(result.html_content);
+            
+            if (token) {
+              addDebugInfo(`Extracted token from HTML: ${token.substring(0, 10)}...`);
+              
+              // Verify and process the token with retry logic
+              const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
+              
+              if (verificationSuccess) {
+                addDebugInfo("Token verification successful, redirecting to dashboard");
+                window.location.href = "/dashboard";
+                return;
+              } else {
+                throw new Error("Token verification failed after HTML extraction");
+              }
+            } else {
+              throw new Error("Received HTML but could not extract token");
+            }
+          } else if (result && result.error) {
+            throw new Error(`API error: ${result.error}: ${result.message || 'Unknown error'}`);
           }
-        });
-        
-        addDebugInfo(`API response status: ${response.status}`);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to exchange code for token: ${errorText}`);
-        }
-        
-        const htmlContent = await response.text();
-        addDebugInfo(`Received HTML response of length: ${htmlContent.length}`);
-        
-        // Try to extract the token from the HTML
-        const token = extractTokenFromHtml(htmlContent);
-        
-        if (!token) {
-          setError("Could not extract authentication token from response");
-          addDebugInfo("Token extraction failed");
-          setIsLoading(false);
-          return;
-        }
-        
-        addDebugInfo(`Extracted token: ${token.substring(0, 10)}...`);
-        
-        // Verify and process the token with retry logic
-        const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
-        
-        if (verificationSuccess) {
-          addDebugInfo("Token verification successful, redirecting to dashboard");
-          // Redirect to dashboard after successful authentication
-          window.location.href = "/dashboard";
-        } else {
-          setError("Token verification failed after multiple attempts");
-          addDebugInfo("Token verification failed");
-          setIsLoading(false);
+        } catch (apiError) {
+          // API service approach failed, fallback to manual fetch
+          addDebugInfo(`API service approach failed: ${apiError.message}`);
+          addDebugInfo("Falling back to direct fetch approach");
+          
+          // Call the API to exchange the code for a token
+          const url = `${api.getGoogleCallbackUrl(code)}`;
+          addDebugInfo(`Making direct fetch request to: ${url}`);
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/html,application/json,*/*'
+            }
+          });
+          
+          addDebugInfo(`API response status: ${response.status}`);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to exchange code for token: ${errorText}`);
+          }
+          
+          const htmlContent = await response.text();
+          addDebugInfo(`Received HTML response of length: ${htmlContent.length}`);
+          
+          // Try to extract the token from the HTML
+          const token = extractTokenFromHtml(htmlContent);
+          
+          if (!token) {
+            setError("Could not extract authentication token from response");
+            addDebugInfo("Token extraction failed");
+            setIsLoading(false);
+            return;
+          }
+          
+          addDebugInfo(`Extracted token: ${token.substring(0, 10)}...`);
+          
+          // Verify and process the token with retry logic
+          const verificationSuccess = await verifyAndProcessToken(token, 3, dispatch, login);
+          
+          if (verificationSuccess) {
+            addDebugInfo("Token verification successful, redirecting to dashboard");
+            // Redirect to dashboard after successful authentication
+            window.location.href = "/dashboard";
+          } else {
+            setError("Token verification failed after multiple attempts");
+            addDebugInfo("Token verification failed");
+            setIsLoading(false);
+          }
         }
       } catch (err) {
         console.error("Auth callback error:", err);
