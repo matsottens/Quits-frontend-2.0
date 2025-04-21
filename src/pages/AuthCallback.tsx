@@ -2,179 +2,341 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import authService from '../services/authService';
+import { useAuth } from '../context/AuthContext';
+import { getParam } from '../utils/url';
+import { api } from '../services/api';
+import styled from 'styled-components';
+import { setLogin } from '../reducers/authSlice';
+import { useDispatch } from 'react-redux';
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  text-align: center;
+  padding: 0 20px;
+`;
+
+const Spinner = styled.div`
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: #09f;
+  animation: spin 1s linear infinite;
+  margin: 20px 0;
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
+const ErrorContainer = styled.div`
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  background-color: #f8d7da;
+  color: #721c24;
+  max-width: 600px;
+`;
+
+const RetryButton = styled.button`
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  margin-top: 15px;
+  cursor: pointer;
+  font-weight: bold;
+
+  &:hover {
+    background-color: #0069d9;
+  }
+`;
+
+const DebugContainer = styled.div`
+  margin-top: 20px;
+  padding: 15px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  color: #212529;
+  max-width: 800px;
+  text-align: left;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+`;
+
+// Function to extract token from HTML response
+function extractTokenFromHtml(html: string): string | null {
+  console.log('Attempting to extract token from HTML response');
+  
+  try {
+    // Look for a token pattern in the HTML
+    // This pattern matches a token being assigned to a variable or as a string
+    const tokenPatterns = [
+      /const token = ['"]([^'"]+)['"]/,
+      /token = ['"]([^'"]+)['"]/,
+      /['"]token['"]:\s*['"]([^'"]+)['"]/,
+      /['"]([A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]+)['"]/
+    ];
+    
+    // Try each pattern
+    for (const pattern of tokenPatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        const token = match[1];
+        console.log(`Found token in HTML (${pattern}), length: ${token.length}`);
+        // Verify it looks like a JWT (xxx.yyy.zzz format)
+        if (/^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]+$/.test(token)) {
+          console.log('Token appears to be a valid JWT format');
+          return token;
+        }
+        console.log('Token does not match JWT format, continuing search');
+      }
+    }
+    
+    // If no direct token find, search for a JSON object containing a token
+    const jsonMatch = html.match(/(\{[\s\S]*?"token"[\s\S]*?\})/);
+    if (jsonMatch) {
+      try {
+        const jsonStr = jsonMatch[1].replace(/'/g, '"');
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.token) {
+          console.log(`Found token in JSON object, length: ${parsed.token.length}`);
+          return parsed.token;
+        }
+      } catch (e) {
+        console.log('Failed to parse JSON object:', e);
+      }
+    }
+    
+    console.log('No token found in HTML response');
+    return null;
+  } catch (e) {
+    console.error('Error extracting token from HTML:', e);
+    return null;
+  }
+}
 
 const AuthCallback: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const dispatch = useDispatch();
+  const [isProcessing, setIsProcessing] = useState(true);
+
+  const addDebugInfo = (info: string) => {
+    console.log(`[Auth Debug] ${info}`);
+    setDebugInfo((prev) => [...prev, info]);
+  };
+
+  const handleCallback = async () => {
+    addDebugInfo('Starting auth callback processing');
+    setIsProcessing(true);
+    
+    try {
+      // Extract code from URL
+      const params = new URLSearchParams(location.search);
+      const code = params.get('code');
+      const error = params.get('error');
+      
+      if (error) {
+        addDebugInfo(`Auth error from Google: ${error}`);
+        const reason = params.get('error_reason') || '';
+        
+        // Handle specific error types
+        if (error === 'access_denied') {
+          throw new Error('You denied the authentication request. Please try again and allow access.');
+        } else {
+          throw new Error(`Authentication failed: ${error}${reason ? ` (${reason})` : ''}`);
+        }
+      }
+      
+      if (!code) {
+        addDebugInfo('No authorization code found in URL');
+        throw new Error('No authorization code received. Please try logging in again.');
+      }
+      
+      addDebugInfo(`Got authorization code: ${code.substring(0, 5)}...`);
+      
+      // Exchange code for token
+      try {
+        addDebugInfo('Attempting to exchange code for token');
+        const response = await api.post('/auth/google/callback', { code });
+        
+        if (response.data && response.data.token) {
+          addDebugInfo('Successfully received token as JSON');
+          
+          // Store the token, user data, and redirect
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('userData', JSON.stringify(response.data.user || {}));
+          
+          // Update Redux store
+          dispatch(setLogin({
+            isLoggedIn: true,
+            userData: response.data.user || {}
+          }));
+          
+          // If this is a popup, communicate back to opener and close
+          if (window.opener && !window.opener.closed) {
+            addDebugInfo('Sending success message to opener window');
+            window.opener.postMessage({ type: 'AUTH_SUCCESS', token: response.data.token, user: response.data.user }, '*');
+            setTimeout(() => window.close(), 1000);
+          } else {
+            // Otherwise redirect to dashboard
+            addDebugInfo('Redirecting to dashboard');
+            navigate('/dashboard');
+          }
+          return;
+        }
+      } catch (err: any) {
+        // Handle JSON parsing error - the response might be HTML
+        addDebugInfo(`Error with JSON response: ${err.message}`);
+        
+        if (err.response && typeof err.response.data === 'string') {
+          addDebugInfo('Response is HTML, attempting to extract token');
+          const token = extractTokenFromHtml(err.response.data);
+          
+          if (token) {
+            addDebugInfo('Successfully extracted token from HTML');
+            
+            // Try to get user info with the token
+            try {
+              api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+              const userResponse = await api.get('/auth/me');
+              
+              if (userResponse.data) {
+                // Store the token, user data, and redirect
+                localStorage.setItem('token', token);
+                localStorage.setItem('userData', JSON.stringify(userResponse.data));
+                
+                // Update Redux store
+                dispatch(setLogin({
+                  isLoggedIn: true,
+                  userData: userResponse.data
+                }));
+                
+                // If this is a popup, communicate back to opener and close
+                if (window.opener && !window.opener.closed) {
+                  addDebugInfo('Sending success message to opener window');
+                  window.opener.postMessage({ type: 'AUTH_SUCCESS', token, user: userResponse.data }, '*');
+                  setTimeout(() => window.close(), 1000);
+                } else {
+                  // Otherwise redirect to dashboard
+                  addDebugInfo('Redirecting to dashboard');
+                  navigate('/dashboard');
+                }
+                return;
+              }
+            } catch (userErr) {
+              addDebugInfo(`Failed to get user info with token: ${userErr}`);
+            }
+          }
+        }
+        
+        // If we couldn't extract a token from HTML or there's some other issue
+        throw new Error(err.response?.data?.message || err.message || 'Failed to exchange code for token');
+      }
+    } catch (error: any) {
+      console.error('Auth callback error:', error);
+      setError(error.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   useEffect(() => {
-    const handleCallback = async () => {
-      try {
-        // Get code and state from URL
-        const searchParams = new URLSearchParams(location.search);
-        const code = searchParams.get('code');
-        const state = searchParams.get('state');
-        const errorParam = searchParams.get('error');
-
-        // Check for error parameter from Google
-        if (errorParam) {
-          console.error('Google returned an error:', errorParam);
-          navigate(`/login?error=${errorParam}`);
-          return;
-        }
-
-        // Verify we have a code
-        if (!code) {
-          const errorMsg = 'No authorization code received from Google';
-          console.error(errorMsg);
-          navigate('/login?error=auth_failed&reason=missing_code');
-          return;
-        }
-
-        // Make API call to exchange the code for tokens
-        setProcessing(true);
+    // Clear any stale auth data
+    localStorage.removeItem('token');
+    localStorage.removeItem('userData');
+    
+    handleCallback();
+    
+    // Listen for messages from other windows (if this is the opener)
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'AUTH_SUCCESS') {
+        console.log('Received auth success message from popup');
         
-        try {
-          console.log('Processing OAuth code:', code.substring(0, 10) + '...');
-          
-          // Call the backend to process the OAuth code
-          const response = await fetch(`https://api.quits.cc/api/auth/google/callback?code=${encodeURIComponent(code)}`);
-          
-          // Log the response status and content type for debugging
-          console.log('Auth callback response status:', response.status);
-          console.log('Content-Type:', response.headers.get('content-type'));
-          
-          // Check if response is JSON before trying to parse it
-          const contentType = response.headers.get('content-type');
-          
-          // Handle HTML responses (which indicate an error)
-          if (contentType && contentType.includes('text/html')) {
-            const htmlText = await response.text();
-            console.error('Received HTML response instead of JSON:', htmlText.substring(0, 200) + '...');
-            throw new Error('Received HTML instead of JSON response. The API server might be returning an error page.');
-          }
-          
-          // Parse JSON response
-          const result = await response.json();
-          console.log('Auth callback result:', result);
-          
-          if (!response.ok) {
-            throw new Error(result.message || 'Authentication failed');
-          }
-          
-          // If successful, store the token
-          if (result.success && result.token) {
-            console.log('Token received, storing and redirecting');
-            authService.setToken(result.token);
-            
-            // Redirect to dashboard
-            setTimeout(() => {
-              navigate('/dashboard');
-            }, 500);
-            return;
-          }
-          
-          // Handle special case for pending scan
-          if (result && 'pending' in result && result.pending) {
-            console.log('Pending scan detected, redirecting to scanning page');
-            // Redirect to scanning page
-            navigate('/scanning');
-            return;
-          }
-          
-          // If we get here without a token, something went wrong
-          throw new Error('No valid authentication token received');
-        } catch (error: any) {
-          console.error('Auth callback error:', error);
-          
-          // Check if the error is from parsing JSON
-          if (error instanceof SyntaxError && error.message.includes('JSON')) {
-            console.error('Failed to parse JSON response, likely received HTML error page');
-            // Try direct authentication as a fallback
-            navigate('/login?error=api_error&reason=invalid_response_format');
-            return;
-          }
-          
-          // Handle specific errors
-          if (error.message && error.message.includes('invalid_grant')) {
-            navigate('/login?error=invalid_grant');
-            return;
-          }
-          
-          if (error.message && error.message.includes('auth_code_already_used')) {
-            navigate('/login?error=invalid_grant&reason=code_reused');
-            return;
-          }
-          
-          if (error.message && error.message.includes('auth_failed')) {
-            navigate('/login?error=auth_failed');
-            return;
-          }
-          
-          // Use direct URL as fallback for API errors
-          if (error.message && error.message.includes('API')) {
-            console.log('API error detected, trying alternative approach');
-            // Try using a direct Google auth URL as a last resort
-            const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
-            console.log('Redirecting to login with API error message');
-            navigate('/login?error=api_error&reason=endpoint_unavailable');
-            return;
-          }
-          
-          // Generic error handler
-          setError(`Authentication error: ${error.message}`);
-          setProcessing(false);
+        // Store the token and user data
+        localStorage.setItem('token', event.data.token);
+        if (event.data.user) {
+          localStorage.setItem('userData', JSON.stringify(event.data.user));
         }
-      } catch (error: any) {
-        console.error('Error processing callback:', error);
-        setError(`An unexpected error occurred: ${error.message}`);
-        setProcessing(false);
+        
+        // Update Redux store
+        dispatch(setLogin({
+          isLoggedIn: true,
+          userData: event.data.user || {}
+        }));
+        
+        // Redirect to dashboard
+        navigate('/dashboard');
       }
     };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [dispatch, location, navigate]);
 
-    // Execute the callback handler
-    handleCallback();
-  }, [location, navigate]);
+  const handleRetry = () => {
+    navigate('/login');
+  };
+
+  if (isProcessing) {
+    return (
+      <LoadingContainer>
+        <h1>Authenticating...</h1>
+        <Spinner />
+        <p>Please wait while we complete the authentication process</p>
+      </LoadingContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <LoadingContainer>
+        <h1>Authentication Error</h1>
+        <ErrorContainer>
+          <p>{error}</p>
+        </ErrorContainer>
+        <p>We encountered an error while trying to log you in.</p>
+        <div>
+          <RetryButton onClick={handleRetry}>
+            Return to Login
+          </RetryButton>
+        </div>
+        <DebugContainer>
+          <h4>Debug Information</h4>
+          {debugInfo.map((info, index) => (
+            <div key={index}>{info}</div>
+          ))}
+        </DebugContainer>
+      </LoadingContainer>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8">
-      <Helmet>
-        <title>Authenticating - Quits</title>
-      </Helmet>
-      
-      <div className="max-w-md w-full space-y-8 text-center">
-        {error ? (
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <svg className="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">Authentication Failed</h3>
-            <p className="mt-2 text-sm text-gray-500">{error}</p>
-            <div className="mt-6">
-              <button
-                onClick={() => navigate('/login')}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                Return to Login
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <div className="mx-auto h-10 w-10">
-              <svg className="animate-spin h-10 w-10 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">Authenticating...</h3>
-            <p className="mt-2 text-sm text-gray-500">Please wait while we complete your authentication process.</p>
-          </div>
-        )}
-      </div>
-    </div>
+    <LoadingContainer>
+      <h1>Authentication Complete</h1>
+      <p>Redirecting to dashboard...</p>
+      <Spinner />
+    </LoadingContainer>
   );
 };
 

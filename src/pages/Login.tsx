@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import authService from '../services/authService';
+import api from '../services/api';
 
 const Login: React.FC = () => {
   const location = useLocation();
@@ -9,6 +10,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Check for error parameters in URL
@@ -51,18 +53,37 @@ const Login: React.FC = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
       
-      // Use authService to get Google auth URL
-      const authUrl = await authService.getGoogleAuthUrl();
-      
-      // Redirect to Google for authentication
-      window.location.href = authUrl;
-    } catch (err: any) {
+      const response = await api.get('/auth/google/login');
+      if (response.data && response.data.url) {
+        const googleAuthUrl = response.data.url;
+        console.log('Opening Google Auth URL:', googleAuthUrl);
+        
+        // Open the Google auth URL in a popup
+        const width = 500;
+        const height = 600;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        
+        const popup = window.open(
+          googleAuthUrl,
+          'googleAuth',
+          `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+        );
+        
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          setError('Popup blocked! Please allow popups for this site and try again.');
+          setIsLoading(false);
+        }
+      } else {
+        throw new Error('Failed to get Google authentication URL');
+      }
+    } catch (err) {
       console.error('Google login error:', err);
-      setError('Failed to start Google login process. Please try again.');
-      setLoading(false);
+      setError('Failed to start Google login. Please try again.');
+      setIsLoading(false);
     }
   };
 
@@ -87,6 +108,55 @@ const Login: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Listen for messages from the popup window
+  const handleAuthMessage = useCallback((event: MessageEvent) => {
+    if (event.data && event.data.type === 'AUTH_SUCCESS') {
+      console.log('Authentication successful via popup');
+      setIsLoading(false);
+      
+      // The auth callback component will have already set the token and user data
+      // Just need to redirect to dashboard
+      navigate('/dashboard');
+    }
+  }, [navigate]);
+  
+  useEffect(() => {
+    // Add event listener for messages from the popup
+    window.addEventListener('message', handleAuthMessage);
+    
+    // Parse URL parameters for error messages
+    const params = new URLSearchParams(location.search);
+    const errorParam = params.get('error');
+    const reason = params.get('reason');
+    
+    if (errorParam) {
+      // Clear any lingering auth data
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      
+      let errorMessage = 'Authentication failed. Please try again.';
+      
+      if (errorParam === 'invalid_grant') {
+        errorMessage = 'Your authorization expired or was already used. Please try again.';
+      } else if (errorParam === 'auth_failed') {
+        errorMessage = reason || 'Authentication failed. Please try again.';
+      } else if (errorParam === 'access_denied') {
+        errorMessage = 'You denied the authorization request. Please try again and allow access.';
+      }
+      
+      setError(errorMessage);
+      
+      // Remove the error parameters from URL to prevent showing the error again on refresh
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+    
+    // Clean up the event listener
+    return () => {
+      window.removeEventListener('message', handleAuthMessage);
+    };
+  }, [location, handleAuthMessage]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -127,27 +197,18 @@ const Login: React.FC = () => {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 relative"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-lg p-3 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mb-4"
             >
-              {loading ? (
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <svg className="animate-spin h-5 w-5 text-primary-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </span>
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-t-2 border-b-2 border-gray-700 rounded-full animate-spin"></div>
+                  <span>Connecting...</span>
+                </>
               ) : (
                 <>
-                  <span className="mr-2">
-                    <svg className="h-5 w-5" viewBox="0 0 24 24">
-                      <path
-                        d="M12.2461 14.5C13.0971 14.5 13.8341 14.176 14.4281 13.61L17.5861 16.755C16.1051 18.162 14.2581 19 12.2461 19C8.66413 19 5.59713 16.632 4.63013 13.345L1.31213 16.656V11.001H6.96713L4.21613 13.751C4.84613 16.123 7.29013 18 10.2461 18C11.4001 18 12.4951 17.701 13.4361 17.145L10.6951 14.415C10.2211 14.461 9.74113 14.5 9.25013 14.5C7.76013 14.5 6.45713 14.051 5.44113 13.268L5.44213 13.267C4.41313 12.474 3.75013 11.32 3.75013 10C3.75013 8.68 4.41313 7.526 5.44213 6.733L5.44113 6.732C6.45713 5.949 7.76013 5.5 9.25013 5.5C11.6301 5.5 13.6051 7.007 14.1221 9.079H9.25013V11.825H17.1851C17.3671 11.278 17.5001 10.713 17.5001 10C17.5001 7.791 16.3761 5.805 14.6381 4.58L14.6401 4.579C13.1341 3.497 11.2751 3 9.25013 3C6.43513 3 3.92413 4.243 2.37313 6.251L2.37213 6.25C0.837131 8.234 0.000131279 10.724 0.000131279 13.5C0.000131279 16.276 0.837131 18.766 2.37213 20.75L2.37313 20.749C3.92413 22.757 6.43513 24 9.25013 24C11.2751 24 13.1341 23.503 14.6401 22.421L14.6381 22.42C16.8071 20.982 18.3471 18.585 18.8471 16H12.2461V14.5Z"
-                        fill="#4285F4"
-                      />
-                    </svg>
-                  </span>
-                  Continue with Google
+                  <img src="/google-icon.svg" alt="Google Logo" className="w-5 h-5" />
+                  <span>Continue with Google</span>
                 </>
               )}
             </button>
