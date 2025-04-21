@@ -10,7 +10,9 @@ interface Subscription {
   price: number;
   currency: string;
   billing_cycle: string;
+  billingCycle?: string;
   next_billing_date: string | null;
+  nextBillingDate?: string | null;
   provider: string;
   category: string;
   is_manual: boolean;
