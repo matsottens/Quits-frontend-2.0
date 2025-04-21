@@ -240,6 +240,11 @@ const apiService = {
     return `${baseUrl}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(redirectUrl)}&_t=${timestamp}`;
   },
   
+  // Add backward compatibility alias for verifyToken
+  verifyToken: async (token: string) => {
+    return await apiService.auth.verifyToken(token);
+  },
+  
   // Auth endpoints
   auth: {
     // Get Google Auth URL directly (no backend call needed)
