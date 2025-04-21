@@ -19,6 +19,7 @@ interface AuthContextType {
   login: (token: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
+  validateToken: (token: string) => boolean;
 }
 
 interface User {
@@ -69,21 +70,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     checkAuth();
   }, []);
 
-  const login = async (token: string): Promise<boolean> => {
+  // Function to validate a JWT token structure and expiration
+  const validateToken = (token: string): boolean => {
+    if (!token) return false;
+    
     try {
-      // Decode the token to get user info
+      // Decode the token to verify its structure
       const decoded: any = jwtDecode(token);
       
+      // Check if token has the required fields
       if (!decoded || !decoded.id || !decoded.email) {
-        console.error('Invalid token format');
+        console.error('Token missing required fields');
         return false;
       }
       
       // Check token expiration
       if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-        console.error('Token expired');
+        console.error('Token has expired');
         return false;
       }
+      
+      return true;
+    } catch (error) {
+      console.error('Token validation error:', error);
+      return false;
+    }
+  };
+
+  const login = async (token: string): Promise<boolean> => {
+    try {
+      // First validate the token structure
+      if (!validateToken(token)) {
+        return false;
+      }
+      
+      // Decode the token to get user info
+      const decoded: any = jwtDecode(token);
       
       // Store token in localStorage
       localStorage.setItem('token', token);
@@ -139,7 +161,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated,
     login,
     logout,
-    loading
+    loading,
+    validateToken
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

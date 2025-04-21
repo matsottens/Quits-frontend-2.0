@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -39,7 +39,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           // If token exists but is invalid, clear it
           console.log('Invalid token found in localStorage, clearing it');
           localStorage.removeItem('token');
-          localStorage.removeItem('quits_auth_token');
         }
         
         setIsValid(valid);

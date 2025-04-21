@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import GoogleLogo from '../components/GoogleLogo';
 import api from '../services/api';
