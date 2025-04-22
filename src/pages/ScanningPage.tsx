@@ -464,6 +464,50 @@ const ScanningPage = () => {
     }
   };
 
+  // Add a new function to force complete the scan for debugging
+  const forceCompleteScan = async () => {
+    try {
+      setError("Forcing scan completion with debug endpoint...");
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('No authentication token found. Please log in again.');
+        return;
+      }
+
+      // Get the current scan ID
+      const currentScanId = scanId || localStorage.getItem('current_scan_id');
+      if (!currentScanId) {
+        setError('No scan ID available. Please start a new scan first.');
+        return;
+      }
+
+      const response = await fetch(`https://api.quits.cc/api/debug-scan?scanId=${currentScanId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        setError(`Debug scan failed: ${response.status} - ${text}`);
+        return;
+      }
+
+      const data = await response.json();
+      setError(null);
+      console.log('Debug scan result:', data);
+      alert(`Scan force-completed. A test subscription has been added to your account.`);
+      
+      // Check status again to refresh UI
+      checkScanStatus(currentScanId);
+    } catch (err) {
+      console.error('Error forcing scan completion:', err);
+      setError(`Error completing scan: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -500,6 +544,12 @@ const ScanningPage = () => {
                       className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
                       Test Gmail API
+                    </button>
+                    <button 
+                      onClick={forceCompleteScan}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                    >
+                      Force Complete Scan
                     </button>
                   </div>
                 )}
@@ -546,6 +596,19 @@ const ScanningPage = () => {
                           Found <strong>{scanStats.subscriptions_found}</strong> subscription{scanStats.subscriptions_found !== 1 ? 's' : ''}!
                         </p>
                       )}
+                    </div>
+                  )}
+                  
+                  {/* Add button to force complete scan if stuck */}
+                  {scanningStatus === 'scanning' && progress === 30 && (
+                    <div className="mt-4">
+                      <p className="text-amber-600 text-sm mb-2">Scan seems stuck at 30%. You can:</p>
+                      <button
+                        onClick={forceCompleteScan}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                      >
+                        Force Complete Scan
+                      </button>
                     </div>
                   )}
                 </div>
