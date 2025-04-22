@@ -221,8 +221,22 @@ const ScanningPage = () => {
         return;
       }
       
+      // Map API status to UI status
+      let uiStatus: ScanningStatus = 'scanning';
+      if (status === 'completed' || status === 'complete') {
+        uiStatus = 'complete';
+      } else if (status === 'error') {
+        uiStatus = 'error';
+      } else if (status === 'analyzing') {
+        uiStatus = 'analyzing';
+      } else if (status === 'in_progress' || status === 'scanning') {
+        uiStatus = 'scanning'; 
+      } else if (status === 'pending' || status === 'initial') {
+        uiStatus = 'initial';
+      }
+      
       // Update state based on status
-      setScanningStatus(status === 'completed' ? 'complete' : status);
+      setScanningStatus(uiStatus);
       setProgress(scanProgress || 0);
       
       // Update scan stats if available
@@ -494,17 +508,19 @@ const ScanningPage = () => {
           )}
 
           <>
-            {(scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing') && (
+            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'in_progress' || scanningStatus === 'analyzing') && (
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   {scanningStatus === 'initial' && 'Preparing to scan your emails'}
-                  {scanningStatus === 'scanning' && 'Scanning your emails'}
+                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Scanning your emails'}
                   {scanningStatus === 'analyzing' && 'Analyzing subscription data'}
+                  {scanningStatus === 'idle' && 'Starting scan...'}
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
                   {scanningStatus === 'initial' && 'Getting ready to find your subscriptions...'}
-                  {scanningStatus === 'scanning' && 'Looking for subscription confirmation emails...'}
+                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Looking for subscription confirmation emails...'}
                   {scanningStatus === 'analyzing' && 'Using AI to extract subscription details...'}
+                  {scanningStatus === 'idle' && 'Initializing scan process...'}
                 </p>
                 <div className="mt-8">
                   <div className="relative">
@@ -520,7 +536,7 @@ const ScanningPage = () => {
                   </div>
                   
                   {/* Show scan stats when emails are being processed */}
-                  {scanningStatus === 'scanning' && scanStats.emails_found > 0 && (
+                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && scanStats.emails_found > 0 && (
                     <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
                       <p>Found <strong>{scanStats.emails_found}</strong> emails</p>
                       <p>Processing <strong>{scanStats.emails_to_process}</strong> recent emails</p>
