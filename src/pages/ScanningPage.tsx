@@ -56,6 +56,11 @@ const ScanningPage = () => {
   const scanStartTimeRef = useRef<number | null>(null);
   const MIN_SCAN_DURATION_MS = 5000; // Minimum expected scan duration (5 seconds)
 
+  // Add these new state variables near the top where the others are defined
+  const [lastProgressUpdate, setLastProgressUpdate] = useState<number>(Date.now());
+  const [lastProgress, setLastProgress] = useState<number>(0);
+  const MAX_PROGRESS_STALL_TIME = 20000; // 20 seconds without progress change before auto-forcing completion
+
   // Clear any active polling when component unmounts
   useEffect(() => {
     // Debug logging for scanId
@@ -206,6 +211,33 @@ const ScanningPage = () => {
       
       const { status, progress: scanProgress, stats } = statusResponse;
       
+      // Check if scan is stuck at the same progress for too long
+      const now = Date.now();
+      if (scanProgress === lastProgress && status === 'in_progress') {
+        const stallTime = now - lastProgressUpdate;
+        console.log(`Scan progress has been at ${scanProgress}% for ${stallTime/1000} seconds`);
+        
+        // If scan is stuck for more than MAX_PROGRESS_STALL_TIME, force completion
+        if (stallTime > MAX_PROGRESS_STALL_TIME && scanProgress > 30) {
+          console.log(`Scan appears stuck at ${scanProgress}%. Auto-forcing completion...`);
+          setError(`Scan appears stuck at ${scanProgress}%. Force-completing automatically...`);
+          
+          // Force complete the scan
+          try {
+            await forceCompleteScan();
+            return; // Exit function as forceCompleteScan will trigger another status check
+          } catch (forceError) {
+            console.error('Error force-completing scan:', forceError);
+            // Continue with normal flow if force-complete fails
+          }
+        }
+      } 
+      // Update progress timestamp if progress has changed
+      else if (scanProgress !== lastProgress) {
+        setLastProgressUpdate(now);
+        setLastProgress(scanProgress || 0);
+      }
+      
       // Check for too quick completion (potential issues)
       const scanDuration = scanStartTimeRef.current ? Date.now() - scanStartTimeRef.current : null;
       if ((status === 'complete' || status === 'completed') && 
@@ -327,19 +359,24 @@ const ScanningPage = () => {
     try {
       const initiateScanning = () => {
         console.log('initiateScanning called, current status:', scanningStatus, 'scanId:', scanId, 'scanInitiated:', scanInitiatedRef.current);
-        if (scanningStatus === 'idle') {
-          // If we have a scanId from localStorage but no active scanning
-          if (scanId && !scanInitiatedRef.current) {
-            console.log(`Found existing scan ID ${scanId} in localStorage, resuming polling`);
-            setScanningStatus('scanning');
-            scanInitiatedRef.current = true;
-            pollScanStatus(scanId);
-          } 
-          // Otherwise start a new scan
-          else if (!scanInitiatedRef.current) {
-            console.log('No existing scan found, starting new scan');
+        
+        // If we have a scanId from localStorage but no active scanning
+        if (scanId && !scanInitiatedRef.current) {
+          console.log(`Found existing scan ID ${scanId} in localStorage, resuming polling`);
+          setScanningStatus('scanning');
+          scanInitiatedRef.current = true;
+          pollScanStatus(scanId);
+        } 
+        // Otherwise start a new scan after a short delay
+        else if (!scanInitiatedRef.current) {
+          console.log('Starting new scan automatically after a short delay...');
+          setError('Starting scan automatically in 2 seconds...');
+          
+          setTimeout(() => {
+            console.log('Auto-starting scan now');
+            setError(null);
             startScanning();
-          }
+          }, 2000);
         }
       };
       
@@ -347,6 +384,14 @@ const ScanningPage = () => {
     } catch (err) {
       console.error('Error in initiate scanning effect:', err);
       setError('Error starting scan: ' + (err instanceof Error ? err.message : String(err)));
+      
+      // Auto-retry if there's an error starting the scan
+      setTimeout(() => {
+        console.log('Auto-retrying after error');
+        setError('Retrying scan automatically...');
+        scanInitiatedRef.current = false;
+        startScanning();
+      }, 3000);
     }
     
     // Cleanup on unmount
