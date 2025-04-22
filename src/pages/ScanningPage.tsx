@@ -61,6 +61,9 @@ const ScanningPage = () => {
   const [lastProgress, setLastProgress] = useState<number>(0);
   const MAX_PROGRESS_STALL_TIME = 20000; // 20 seconds without progress change before auto-forcing completion
 
+  // Add is_test_data state variable
+  const [isTestData, setIsTestData] = useState(false);
+
   // Clear any active polling when component unmounts
   useEffect(() => {
     // Debug logging for scanId
@@ -177,76 +180,36 @@ const ScanningPage = () => {
   const checkScanStatus = async (currentScanId = scanId) => {
     try {
       if (!currentScanId) {
-        console.warn('No scan ID available for status check');
-        // Debug info
-        console.log('  → scanId state:', scanId);
-        console.log('  → localStorage scanId:', localStorage.getItem('current_scan_id'));
+        console.error('No scan ID available for status check');
+        setError('Scan ID missing. Please try again.');
         return;
       }
       
-      const statusResponse = await api.email.getScanStatus(currentScanId);
+      console.log('Checking scan status for scanId:', currentScanId);
+      const response = await api.email.getScanStatus(currentScanId);
+      console.log('Scan status response:', response);
       
-      // Handle the case where the scan ID isn't recognized
-      if (statusResponse.error === 'scan_not_found') {
-        console.warn('Scan ID not found or expired:', currentScanId);
-        // Clear the scanId state
-        setScanId(null);
-        setError('Previous scan data not found. Starting a new scan...');
-        setScanningStatus('error');
-        scanInitiatedRef.current = false;
+      const { status, progress: scanProgress, stats, is_test_data } = response;
+      
+      // If no status, retry a few times then show error
+      if (!status) {
+        const newRetryCount = retryCount + 1;
+        setRetryCount(newRetryCount);
+        console.warn(`No status in response, retry ${newRetryCount}/5`);
         
-        // Wait a moment and initiate a new scan
-        setTimeout(() => {
-          handleRetry();
-        }, 2000);
-        return;
-      }
-      
-      // Reset status check failure counter on success
-      setStatusCheckFailures(0);
-      
-      if (statusResponse.error) {
-        throw new Error(statusResponse.error);
-      }
-      
-      const { status, progress: scanProgress, stats } = statusResponse;
-      
-      // Check if scan is stuck at the same progress for too long
-      const now = Date.now();
-      if (scanProgress === lastProgress && status === 'in_progress') {
-        const stallTime = now - lastProgressUpdate;
-        console.log(`Scan progress has been at ${scanProgress}% for ${stallTime/1000} seconds`);
-        
-        // If scan is stuck for more than MAX_PROGRESS_STALL_TIME, force completion
-        if (stallTime > MAX_PROGRESS_STALL_TIME && scanProgress > 30) {
-          console.log(`Scan appears stuck at ${scanProgress}%. Auto-forcing completion...`);
-          setError(`Scan appears stuck at ${scanProgress}%. Force-completing automatically...`);
-          
-          // Force complete the scan
-          try {
-            await forceCompleteScan();
-            return; // Exit function as forceCompleteScan will trigger another status check
-          } catch (forceError) {
-            console.error('Error force-completing scan:', forceError);
-            // Continue with normal flow if force-complete fails
+        if (newRetryCount >= 5) {
+          setScanningStatus('error');
+          setError('Could not get scan status. Please try again.');
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
           }
+          scanInitiatedRef.current = false;
+          return;
         }
-      } 
-      // Update progress timestamp if progress has changed
-      else if (scanProgress !== lastProgress) {
-        setLastProgressUpdate(now);
-        setLastProgress(scanProgress || 0);
-      }
-      
-      // Check for too quick completion (potential issues)
-      const scanDuration = scanStartTimeRef.current ? Date.now() - scanStartTimeRef.current : null;
-      if ((status === 'complete' || status === 'completed') && 
-          scanDuration !== null && 
-          scanDuration < MIN_SCAN_DURATION_MS && 
-          (!stats || (stats.emails_processed < 5))) {
-        console.warn(`Scan completed too quickly (${scanDuration}ms) with minimal processing (${stats?.emails_processed || 0} emails). This may indicate an issue.`);
-        // Auto-retry after showing an error message
-        setError('The scan completed too quickly, which may indicate a problem. Retrying automatically...');
+        
+        // Auto-retry
+        console.log(`Auto-retrying scan (${newRetryCount}/5)...`);
         setTimeout(() => {
           handleRetry();
         }, 3000);
@@ -270,6 +233,9 @@ const ScanningPage = () => {
       // Update state based on status
       setScanningStatus(uiStatus);
       setProgress(scanProgress || 0);
+      
+      // Store whether we're showing test data
+      setIsTestData(!!is_test_data);
       
       // Update scan stats if available
       if (stats) {
@@ -643,6 +609,20 @@ const ScanningPage = () => {
                       )}
                     </div>
                   )}
+
+                  {/* Add test data warning when applicable */}
+                  {isTestData && (
+                    <div className="mt-4 text-sm text-amber-700 bg-amber-50 p-3 rounded-md border border-amber-200">
+                      <div className="flex items-start">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span>
+                          <strong>Demo Mode:</strong> No real subscriptions were found in your Gmail account, so we're showing example data for demonstration purposes. These are not your actual subscriptions.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Add button to force complete scan if stuck */}
                   {scanningStatus === 'scanning' && (
@@ -699,6 +679,21 @@ const ScanningPage = () => {
                 <p className="mt-4 text-lg text-gray-600">
                   We detected these subscriptions in your emails. Review and confirm them to add to your dashboard.
                 </p>
+                
+                {/* Add test data warning when applicable */}
+                {isTestData && (
+                  <div className="mt-4 mb-6 text-sm text-amber-700 bg-amber-50 p-3 rounded-md border border-amber-200">
+                    <div className="flex items-start">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>
+                        <strong>Demo Mode:</strong> No real subscriptions were found in your Gmail account, so we're showing example data for demonstration purposes. These are not your actual subscriptions.
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="mt-8 space-y-6">
                   {suggestions.map((suggestion) => (
                     <div key={suggestion.id} className="bg-white shadow rounded-lg p-6">
