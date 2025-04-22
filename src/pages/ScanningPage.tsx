@@ -4,7 +4,7 @@ import api from '../services/api';
 import Header from '../components/Header';
 
 // Define the ScanningStatus type
-type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'analyzing' | 'complete' | 'error';
+type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'complete' | 'error';
 
 interface SubscriptionSuggestion {
   id: string;
@@ -508,17 +508,17 @@ const ScanningPage = () => {
           )}
 
           <>
-            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'in_progress' || scanningStatus === 'analyzing') && (
+            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing') && (
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   {scanningStatus === 'initial' && 'Preparing to scan your emails'}
-                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Scanning your emails'}
+                  {scanningStatus === 'scanning' && 'Scanning your emails'}
                   {scanningStatus === 'analyzing' && 'Analyzing subscription data'}
                   {scanningStatus === 'idle' && 'Starting scan...'}
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
                   {scanningStatus === 'initial' && 'Getting ready to find your subscriptions...'}
-                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Looking for subscription confirmation emails...'}
+                  {scanningStatus === 'scanning' && 'Looking for subscription confirmation emails...'}
                   {scanningStatus === 'analyzing' && 'Using AI to extract subscription details...'}
                   {scanningStatus === 'idle' && 'Initializing scan process...'}
                 </p>
@@ -536,7 +536,7 @@ const ScanningPage = () => {
                   </div>
                   
                   {/* Show scan stats when emails are being processed */}
-                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && scanStats.emails_found > 0 && (
+                  {scanningStatus === 'scanning' && scanStats.emails_found > 0 && (
                     <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
                       <p>Found <strong>{scanStats.emails_found}</strong> emails</p>
                       <p>Processing <strong>{scanStats.emails_to_process}</strong> recent emails</p>
