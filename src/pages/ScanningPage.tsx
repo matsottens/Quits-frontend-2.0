@@ -61,15 +61,37 @@ const ScanningPage = () => {
   const [lastProgress, setLastProgress] = useState<number>(0);
   const MAX_PROGRESS_STALL_TIME = 20000; // 20 seconds without progress change before auto-forcing completion
 
-  // Add is_test_data state variable
-  const [isTestData, setIsTestData] = useState(false);
-
   // Constants
   const MAX_ERROR_RETRY_COUNT = 3;
   const ERROR_RETRY_DELAY_MS = 3000;
   const POLLING_INTERVAL_MS = 2000;
   const INITIAL_POLLING_INTERVAL_MS = 1000;
   const PROGRESS_COMPLETE = 100;
+
+  // Add these new constants at the top with other constants
+  const MAX_SCAN_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+  const MAX_POLLING_COUNT = 60; // Maximum number of times to poll (at 3 second intervals)
+
+  // Add a new state variable to track polling count
+  const [pollingCount, setPollingCount] = useState(0);
+
+  // Add a new function to check if the scan has timed out
+  const checkScanTimeout = useCallback(() => {
+    const hasTimedOut = pollingCount >= MAX_POLLING_COUNT || 
+      (scanStartTimeRef.current && (Date.now() - scanStartTimeRef.current > MAX_SCAN_DURATION_MS));
+    
+    if (hasTimedOut && scanningStatus !== 'completed' && scanningStatus !== 'error') {
+      console.log('Scan timed out after too many polling attempts or maximum duration');
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      setScanningStatus('error');
+      setError('The scan is taking longer than expected. This may be due to Gmail API limitations or server issues. Please try again later.');
+      return true;
+    }
+    return false;
+  }, [pollingCount, scanningStatus]);
 
   // Clear any active polling when component unmounts
   useEffect(() => {
@@ -172,12 +194,24 @@ const ScanningPage = () => {
       pollingIntervalRef.current = null;
     }
     
+    setPollingCount(0); // Reset polling count
+    
     // Set initial poll immediately with the current scan ID
     if (currentScanId) {
       checkScanStatus(currentScanId);
       
       // Then poll every 3 seconds
-      pollingIntervalRef.current = setInterval(() => checkScanStatus(currentScanId), 3000);
+      pollingIntervalRef.current = setInterval(() => {
+        setPollingCount(prev => {
+          const newCount = prev + 1;
+          // Check for timeout on each polling increment
+          if (newCount >= MAX_POLLING_COUNT) {
+            checkScanTimeout();
+          }
+          return newCount;
+        });
+        checkScanStatus(currentScanId);
+      }, 3000);
     } else {
       console.warn('Cannot start polling: No scan ID available');
     }
@@ -186,6 +220,11 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async (currentScanId = scanId) => {
     try {
+      // Check if scan has timed out before making the API call
+      if (checkScanTimeout()) {
+        return;
+      }
+
       if (!currentScanId) {
         console.error('No scan ID available for status check');
         setError('Scan ID missing. Please try again.');
@@ -196,7 +235,7 @@ const ScanningPage = () => {
       const response = await api.email.getScanStatus(currentScanId);
       console.log('Scan status response:', response);
       
-      const { status, progress: scanProgress, stats, is_test_data } = response;
+      const { status, progress: scanProgress, stats } = response;
       
       // If no status, retry a few times then show error
       if (!status) {
@@ -275,9 +314,6 @@ const ScanningPage = () => {
         // Fallback to server-provided progress
         setProgress(scanProgress || 0);
       }
-      
-      // Store whether we're showing test data
-      setIsTestData(!!is_test_data);
       
       // If scan appears stuck at around 30% for too long, show the force complete option
       if (progress > 25 && progress < 35) {
@@ -526,24 +562,23 @@ const ScanningPage = () => {
     }
   };
 
-  // Add a new function to force complete the scan for debugging
-  const forceCompleteScan = async () => {
+  // Add a new diagnostic function 
+  const diagnoseScan = async () => {
     try {
-      setError("Forcing scan completion with debug endpoint...");
+      setError('Running diagnostic checks...');
       const token = localStorage.getItem('token');
       if (!token) {
         setError('No authentication token found. Please log in again.');
         return;
       }
 
-      // Get the current scan ID
       const currentScanId = scanId || localStorage.getItem('current_scan_id');
       if (!currentScanId) {
-        setError('No scan ID available. Please start a new scan first.');
+        setError('No scan ID available for diagnostics.');
         return;
       }
 
-      const response = await fetch(`https://api.quits.cc/api/debug-scan?scanId=${currentScanId}`, {
+      const response = await fetch(`https://api.quits.cc/api/debug-gmail?scanId=${currentScanId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -553,20 +588,58 @@ const ScanningPage = () => {
 
       if (!response.ok) {
         const text = await response.text();
-        setError(`Debug scan failed: ${response.status} - ${text}`);
+        setError(`Diagnostic check failed: ${response.status} - ${text}`);
         return;
       }
 
       const data = await response.json();
-      setError(null);
-      console.log('Debug scan result:', data);
-      alert(`Scan force-completed. A test subscription has been added to your account.`);
+      console.log('Diagnostic results:', data);
       
-      // Check status again to refresh UI
-      checkScanStatus(currentScanId);
+      // Format diagnostic info for display
+      let diagnosticMessage = `Scan Diagnostics for ID: ${currentScanId}\n\n`;
+      
+      // Check Gmail connection
+      diagnosticMessage += `Gmail Connection: ${data.gmail.connected ? '✅ Connected' : '❌ Not Connected'}\n`;
+      if (data.gmail.error) {
+        diagnosticMessage += `Gmail Error: ${data.gmail.error}\n`;
+      }
+      
+      // Check database connection and scan
+      diagnosticMessage += `\nDatabase Connection: ${data.database.connected ? '✅ Connected' : '❌ Not Connected'}\n`;
+      if (data.database.error) {
+        diagnosticMessage += `Database Error: ${data.database.error}\n`;
+      }
+      
+      // Check scan status if found
+      if (data.database.scan && data.database.scan.found) {
+        const scanData = data.database.scan.scan_data;
+        diagnosticMessage += `\nScan Status: ${scanData.status}\n`;
+        diagnosticMessage += `Progress: ${scanData.progress}%\n`;
+        diagnosticMessage += `Emails Found: ${scanData.emails_found}\n`;
+        diagnosticMessage += `Emails Processed: ${scanData.emails_processed} / ${scanData.emails_to_process}\n`;
+        diagnosticMessage += `Last Updated: ${new Date(scanData.updated_at).toLocaleString()}\n`;
+      } else if (data.database.scan && data.database.scan.found_in_legacy_table) {
+        diagnosticMessage += `\nScan found in legacy table\n`;
+      } else {
+        diagnosticMessage += `\nScan not found in database\n`;
+      }
+      
+      // Show diagnostic info to user
+      alert(diagnosticMessage);
+      
+      // Update error message with a summary
+      if (!data.gmail.connected) {
+        setError(`Gmail connection issue: ${data.gmail.error}. Please reconnect your Gmail account.`);
+      } else if (data.database.error) {
+        setError(`Database issue: ${data.database.error}. Please try again later.`);
+      } else if (!data.database.scan || (!data.database.scan.found && !data.database.scan.found_in_legacy_table)) {
+        setError(`Scan record not found in database. Please try again.`);
+      } else {
+        setError(`Diagnostic completed. Check console for details.`);
+      }
     } catch (err) {
-      console.error('Error forcing scan completion:', err);
-      setError(`Error completing scan: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('Error running diagnostics:', err);
+      setError(`Error running diagnostics: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -608,10 +681,10 @@ const ScanningPage = () => {
                       Test Gmail API
                     </button>
                     <button 
-                      onClick={forceCompleteScan}
-                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                      onClick={diagnoseScan}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                     >
-                      Force Complete Scan
+                      Diagnose Scan
                     </button>
                   </div>
                 )}
@@ -668,43 +741,6 @@ const ScanningPage = () => {
                       )}
                     </div>
                   )}
-
-                  {/* Show "scan appears stuck" message with Force Complete button when appropriate */}
-                  {scanningStatus === 'scanning' && progress > 25 && progress < 35 && 
-                   lastProgressUpdate && Date.now() - lastProgressUpdate > MAX_PROGRESS_STALL_TIME && 
-                   scanStartTimeRef.current && Date.now() - scanStartTimeRef.current > MIN_SCAN_DURATION_MS && (
-                    <div className="mt-4 text-sm text-amber-700 bg-amber-50 p-3 rounded-md border border-amber-200">
-                      <div className="flex items-start">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <div>
-                          <p><strong>Scan appears to be stuck at {progress}%</strong></p>
-                          <p className="mt-1">This can happen due to Gmail API rate limits or temporary issues.</p>
-                          <button 
-                            onClick={forceCompleteScan}
-                            className="mt-2 inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
-                          >
-                            Force Complete Scan
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Add test data warning when applicable */}
-                  {isTestData && (
-                    <div className="mt-4 text-sm text-amber-700 bg-amber-50 p-3 rounded-md border border-amber-200">
-                      <div className="flex items-start">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <span>
-                          <strong>Demo Mode:</strong> No real subscriptions were found in your Gmail account, so we're showing example data for demonstration purposes. These are not your actual subscriptions.
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -728,6 +764,12 @@ const ScanningPage = () => {
                   >
                     Go to Dashboard
                   </button>
+                  <button
+                    onClick={diagnoseScan}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Run Diagnostics
+                  </button>
                 </div>
               </div>
             )}
@@ -740,20 +782,6 @@ const ScanningPage = () => {
                 <p className="mt-4 text-lg text-gray-600">
                   We detected these subscriptions in your emails. Review and confirm them to add to your dashboard.
                 </p>
-                
-                {/* Add test data warning when applicable */}
-                {isTestData && (
-                  <div className="mt-4 mb-6 text-sm text-amber-700 bg-amber-50 p-3 rounded-md border border-amber-200">
-                    <div className="flex items-start">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-500 mr-2 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <span>
-                        <strong>Demo Mode:</strong> No real subscriptions were found in your Gmail account, so we're showing example data for demonstration purposes. These are not your actual subscriptions.
-                      </span>
-                    </div>
-                  </div>
-                )}
                 
                 <div className="mt-8 space-y-6">
                   {suggestions.map((suggestion) => (
@@ -817,7 +845,12 @@ const ScanningPage = () => {
                   No subscriptions found
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
-                  We couldn't find any subscription confirmation emails. You can add subscriptions manually from your dashboard.
+                  We scanned your email but couldn't find any recurring subscriptions. 
+                  We looked through {scanStats.emails_processed} emails for subscription receipts, 
+                  confirmations, and billing notifications.
+                </p>
+                <p className="mt-2 text-base text-gray-600">
+                  You can add subscriptions manually from your dashboard, or try scanning again with a different email account.
                 </p>
 
                 {/* Add scan statistics */}
@@ -838,7 +871,7 @@ const ScanningPage = () => {
                       </div>
                       <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500">Subscriptions detected</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats.subscriptions_found || 0}</dd>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">0</dd>
                       </div>
                     </dl>
                   </div>
