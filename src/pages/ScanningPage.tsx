@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Header from '../components/Header';
+import { API_URL } from '../config';
+import { useAuth } from '../contexts/AuthContext';
 
 // Define the ScanningStatus type
 type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'complete' | 'completed' | 'error';
@@ -25,6 +27,7 @@ interface ScanStats {
   skipped_count: number;
   detected_subscriptions: number;
   emails_to_process: number;
+  emails_processed: number;
   start_time?: string;
   end_time?: string;
   analysis_results?: Array<{
@@ -36,7 +39,7 @@ interface ScanStats {
 }
 
 interface ScanStatus {
-  status: string;
+  status: ScanningStatus;
   progress: number;
   stats: ScanStats;
   is_test_data?: boolean;
@@ -44,6 +47,7 @@ interface ScanStatus {
 
 const ScanningPage = () => {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [scanningStatus, setScanningStatus] = useState<ScanningStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -212,7 +216,7 @@ const ScanningPage = () => {
     
     // Set initial poll immediately with the current scan ID
     if (currentScanId) {
-      checkScanStatus(currentScanId);
+      checkScanStatus();
       
       // Then poll every 3 seconds
       pollingIntervalRef.current = setInterval(() => {
@@ -224,7 +228,7 @@ const ScanningPage = () => {
           }
           return newCount;
         });
-        checkScanStatus(currentScanId);
+        checkScanStatus();
       }, 3000);
     } else {
       console.warn('Cannot start polling: No scan ID available');
