@@ -232,15 +232,45 @@ const ScanningPage = () => {
       
       // Update state based on status
       setScanningStatus(uiStatus);
-      setProgress(scanProgress || 0);
-      
-      // Store whether we're showing test data
-      setIsTestData(!!is_test_data);
       
       // Update scan stats if available
       if (stats) {
         setScanStats(stats);
+        
+        // Calculate progress based on email processing
+        if (stats.emails_to_process > 0 && stats.emails_processed >= 0) {
+          // Calculate progress based on emails processed (range 0-100)
+          // 0-10%: Initial setup
+          // 10-90%: Email processing (based on actual processed/total ratio)
+          // 90-100%: Final analysis and completion
+          let calculatedProgress = 0;
+          
+          if (uiStatus === 'initial' || uiStatus === 'idle') {
+            calculatedProgress = 10; // Initial setup
+          } else if (uiStatus === 'complete' || uiStatus === 'completed') {
+            calculatedProgress = 100; // Completed
+          } else {
+            // Calculate progress based on emails processed
+            const processingProgress = stats.emails_processed / stats.emails_to_process;
+            calculatedProgress = 10 + (processingProgress * 80); // Scale to 10-90% range
+            
+            // Ensure progress doesn't go backward
+            calculatedProgress = Math.max(calculatedProgress, progress);
+          }
+          
+          // Update progress with calculated value
+          setProgress(Math.min(100, Math.round(calculatedProgress)));
+        } else {
+          // Fallback to server-provided progress if we don't have email stats
+          setProgress(scanProgress || 0);
+        }
+      } else {
+        // Fallback to server-provided progress
+        setProgress(scanProgress || 0);
       }
+      
+      // Store whether we're showing test data
+      setIsTestData(!!is_test_data);
       
       // If complete/completed, stop polling and get suggestions
       if (status === 'complete' || status === 'completed') {
@@ -596,7 +626,7 @@ const ScanningPage = () => {
                     </div>
                   </div>
                   
-                  {/* Show scan stats when emails are being processed */}
+                  {/* Add scan stats when emails are being processed */}
                   {scanningStatus === 'scanning' && scanStats.emails_found > 0 && (
                     <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
                       <p>Found <strong>{scanStats.emails_found}</strong> emails</p>
@@ -606,6 +636,14 @@ const ScanningPage = () => {
                         <p className="text-green-600 font-medium">
                           Found <strong>{scanStats.subscriptions_found}</strong> subscription{scanStats.subscriptions_found !== 1 ? 's' : ''}!
                         </p>
+                      )}
+                      {scanStats.emails_to_process > 0 && (
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 my-2">
+                          <div 
+                            className="bg-green-500 h-2.5 rounded-full transition-all duration-300" 
+                            style={{ width: `${Math.min(100, (scanStats.emails_processed / scanStats.emails_to_process) * 100)}%` }}
+                          ></div>
+                        </div>
                       )}
                     </div>
                   )}
@@ -620,27 +658,6 @@ const ScanningPage = () => {
                         <span>
                           <strong>Demo Mode:</strong> No real subscriptions were found in your Gmail account, so we're showing example data for demonstration purposes. These are not your actual subscriptions.
                         </span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Add button to force complete scan if stuck */}
-                  {scanningStatus === 'scanning' && (
-                    <div className="mt-4">
-                      <p className="text-amber-600 text-sm mb-2">Scan appears to be stuck at {progress}%. You can:</p>
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={forceCompleteScan}
-                          className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
-                        >
-                          Force Complete Scan
-                        </button>
-                        <button
-                          onClick={() => navigate('/dashboard')}
-                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
-                        >
-                          Go to Dashboard
-                        </button>
                       </div>
                     </div>
                   )}
