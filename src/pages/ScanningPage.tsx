@@ -19,6 +19,29 @@ interface SubscriptionSuggestion {
   next_billing_date: string | null;
 }
 
+interface ScanStats {
+  total_emails: number;
+  processed_count: number;
+  skipped_count: number;
+  detected_subscriptions: number;
+  emails_to_process: number;
+  start_time?: string;
+  end_time?: string;
+  analysis_results?: Array<{
+    from: string;
+    subject: string;
+    analysis: any;
+    timestamp: string;
+  }>;
+}
+
+interface ScanStatus {
+  status: string;
+  progress: number;
+  stats: ScanStats;
+  is_test_data?: boolean;
+}
+
 const ScanningPage = () => {
   const navigate = useNavigate();
   const [scanningStatus, setScanningStatus] = useState<ScanningStatus>('idle');
@@ -40,17 +63,8 @@ const ScanningPage = () => {
   const MAX_STATUS_CHECK_FAILURES = 5;
 
   // Add these new state variables near the top
-  const [scanStats, setScanStats] = useState<{
-    emails_found: number;
-    emails_to_process: number;
-    emails_processed: number;
-    subscriptions_found: number;
-  }>({
-    emails_found: 0,
-    emails_to_process: 0,
-    emails_processed: 0,
-    subscriptions_found: 0
-  });
+  const [scanStats, setScanStats] = useState<ScanStats | null>(null);
+  const [isTestData, setIsTestData] = useState<boolean>(false);
 
   // Add a timer ref to track scan duration
   const scanStartTimeRef = useRef<number | null>(null);
@@ -218,168 +232,55 @@ const ScanningPage = () => {
   };
 
   // Check the scanning status
-  const checkScanStatus = async (currentScanId = scanId) => {
+  const checkScanStatus = async () => {
     try {
-      // Check if scan has timed out before making the API call
-      if (checkScanTimeout()) {
-        return;
+      const response = await fetch(`${API_URL}/scan-status/${scanId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data: ScanStatus = await response.json();
+      setScanningStatus(data.status);
+      setIsTestData(data.is_test_data || false);
+
+      let calculatedProgress = 0;
+      if (data.stats) {
+        // Initial setup phase: 0-10%
+        if (data.stats.emails_to_process === 0) {
+          calculatedProgress = 5;
+        } else {
+          // Email processing phase: 10-90%
+          const processedRatio = data.stats.emails_processed / data.stats.emails_to_process;
+          calculatedProgress = 10 + (processedRatio * 80); // Scale to 10-90% range
+        }
+
+        // Ensure progress doesn't regress
+        calculatedProgress = Math.max(calculatedProgress, progress);
+        
+        // Final analysis phase: 90-100%
+        if (data.status === 'completed') {
+          calculatedProgress = 100;
+        }
+      } else {
+        calculatedProgress = data.progress;
       }
 
-      if (!currentScanId) {
-        console.error('No scan ID available for status check');
-        setError('Scan ID missing. Please try again.');
-        return;
-      }
-      
-      console.log('Checking scan status for scanId:', currentScanId);
-      const response = await api.email.getScanStatus(currentScanId);
-      console.log('Scan status response:', response);
-      
-      const { status, progress: scanProgress, stats } = response;
-      
-      // If no status, retry a few times then show error
-      if (!status) {
-        const newRetryCount = retryCount + 1;
-        setRetryCount(newRetryCount);
-        console.warn(`No status in response, retry ${newRetryCount}/5`);
-        
-        if (newRetryCount >= 5) {
-          setScanningStatus('error');
-          setError('Could not get scan status. Please try again.');
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
-          scanInitiatedRef.current = false;
-          return;
-        }
-        
-        // Auto-retry
-        console.log(`Auto-retrying scan (${newRetryCount}/5)...`);
-        setTimeout(() => {
-          handleRetry();
-        }, 3000);
-        return;
-      }
-      
-      // Map API status to UI status
-      let uiStatus: ScanningStatus = 'scanning';
-      if (status === 'completed' || status === 'complete') {
-        uiStatus = 'completed';
-      } else if (status === 'error') {
-        uiStatus = 'error';
-      } else if (status === 'analyzing') {
-        uiStatus = 'analyzing';
-      } else if (status === 'in_progress' || status === 'scanning') {
-        uiStatus = 'scanning'; 
-      } else if (status === 'pending' || status === 'initial') {
-        uiStatus = 'initial';
-      }
-      
-      // Update state based on status
-      setScanningStatus(uiStatus);
+      // Ensure progress doesn't exceed 100%
+      calculatedProgress = Math.min(calculatedProgress, 100);
+      setProgress(calculatedProgress);
       
       // Update scan stats if available
-      if (stats) {
-        setScanStats(stats);
-        
-        // Calculate progress based on email processing
-        if (stats.emails_to_process > 0 && stats.emails_processed >= 0) {
-          // Calculate progress based on emails processed (range 0-100)
-          // 0-10%: Initial setup
-          // 10-90%: Email processing (based on actual processed/total ratio)
-          // 90-100%: Final analysis and completion
-          let calculatedProgress = 0;
-          
-          if (uiStatus === 'initial') {
-            calculatedProgress = 10; // Initial setup
-          } else if (uiStatus === 'completed') {
-            calculatedProgress = 100; // Completed
-          } else {
-            // Calculate progress based on emails processed
-            const processingProgress = stats.emails_processed / stats.emails_to_process;
-            calculatedProgress = 10 + (processingProgress * 80); // Scale to 10-90% range
-            
-            // Ensure progress doesn't go backward
-            calculatedProgress = Math.max(calculatedProgress, progress);
-          }
-          
-          // Update progress with calculated value
-          setProgress(Math.min(100, Math.round(calculatedProgress)));
-        } else {
-          // Fallback to server-provided progress if we don't have email stats
-          setProgress(scanProgress || 0);
-        }
-      } else {
-        // Fallback to server-provided progress
-        setProgress(scanProgress || 0);
+      if (data.stats) {
+        setScanStats(data.stats);
       }
-      
-      // If scan appears stuck at around 30% for too long, show the force complete option
-      if (progress > 25 && progress < 35) {
-        const now = Date.now();
-        if (lastProgress !== progress) {
-          // Progress changed, update the timestamp
-          setLastProgressUpdate(now);
-          setLastProgress(progress);
-        }
-      } else {
-        // Progress is outside the 30% range, reset the stall check
-        setLastProgressUpdate(Date.now());
-        setLastProgress(progress);
+
+      // Continue polling if scan is not complete
+      if (data.status !== 'completed' && data.status !== 'error') {
+        setTimeout(checkScanStatus, 2000);
       }
-      
-      // If complete/completed, stop polling and get suggestions
-      if (status === 'completed') {
-        console.log('Scan complete! Clearing polling interval and getting subscription suggestions');
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        
-        try {
-          // Get subscription suggestions
-          const suggestionsResponse = await api.email.getSubscriptionSuggestions();
-          
-          if (suggestionsResponse.error) {
-            console.warn('Error in suggestions response:', suggestionsResponse.error);
-            setSuggestions([]); // Set empty array as fallback
-          } else {
-            setSuggestions(suggestionsResponse.suggestions || []);
-          }
-        } catch (suggestionError) {
-          console.error('Error fetching suggestions:', suggestionError);
-          setError('Scanning completed, but there was a problem retrieving your subscription suggestions.');
-          setSuggestions([]); // Set empty array as fallback
-        }
-      }
-      
-      // If error, stop polling
-      if (status === 'error') {
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        setError('An error occurred during email scanning.');
-      }
-    } catch (err) {
-      console.error('Error checking scan status:', err);
-      
-      // Increment failure counter
-      const newFailures = statusCheckFailures + 1;
-      setStatusCheckFailures(newFailures);
-      
-      // After 5 consecutive failures, stop polling and show error
-      if (newFailures >= 5) {
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        setScanningStatus('error');
-        setError('Lost connection to the scanning service. Please try again.');
-        scanInitiatedRef.current = false;
-      }
-      // Otherwise, continue polling
+    } catch (error) {
+      console.error('Error checking scan status:', error);
+      setScanningStatus('error');
     }
   };
 
@@ -721,21 +622,21 @@ const ScanningPage = () => {
                   </div>
                   
                   {/* Add scan stats when emails are being processed */}
-                  {scanningStatus === 'scanning' && scanStats.emails_found > 0 && (
+                  {scanningStatus === 'scanning' && scanStats && scanStats.total_emails > 0 && (
                     <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
-                      <p>Found <strong>{scanStats.emails_found}</strong> emails</p>
+                      <p>Found <strong>{scanStats.total_emails}</strong> emails</p>
                       <p>Processing <strong>{scanStats.emails_to_process}</strong> recent emails</p>
-                      <p>Processed <strong>{scanStats.emails_processed}</strong> so far</p>
-                      {scanStats.subscriptions_found > 0 && (
+                      <p>Processed <strong>{scanStats.processed_count}</strong> so far</p>
+                      {scanStats.detected_subscriptions > 0 && (
                         <p className="text-green-600 font-medium">
-                          Found <strong>{scanStats.subscriptions_found}</strong> subscription{scanStats.subscriptions_found !== 1 ? 's' : ''}!
+                          Found <strong>{scanStats.detected_subscriptions}</strong> subscription{scanStats.detected_subscriptions !== 1 ? 's' : ''}!
                         </p>
                       )}
                       {scanStats.emails_to_process > 0 && (
                         <div className="w-full bg-gray-200 rounded-full h-2.5 my-2">
                           <div 
                             className="bg-green-500 h-2.5 rounded-full transition-all duration-300" 
-                            style={{ width: `${Math.min(100, (scanStats.emails_processed / scanStats.emails_to_process) * 100)}%` }}
+                            style={{ width: `${Math.min(100, (scanStats.processed_count / scanStats.emails_to_process) * 100)}%` }}
                           ></div>
                         </div>
                       )}
@@ -846,7 +747,7 @@ const ScanningPage = () => {
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
                   We scanned your email but couldn't find any recurring subscriptions. 
-                  We looked through {scanStats.emails_processed} emails for subscription receipts, 
+                  We looked through {scanStats?.processed_count} emails for subscription receipts, 
                   confirmations, and billing notifications.
                 </p>
                 <p className="mt-2 text-base text-gray-600">
@@ -863,15 +764,15 @@ const ScanningPage = () => {
                     <dl className="sm:divide-y sm:divide-gray-200">
                       <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500">Total emails found</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats.emails_found || 0}</dd>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.total_emails || 0}</dd>
                       </div>
                       <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500">Emails processed</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats.emails_processed || 0}</dd>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.processed_count || 0}</dd>
                       </div>
                       <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500">Subscriptions detected</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">0</dd>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.detected_subscriptions || 0}</dd>
                       </div>
                     </dl>
                   </div>
