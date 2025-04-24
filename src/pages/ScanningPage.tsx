@@ -4,7 +4,7 @@ import api from '../services/api';
 import Header from '../components/Header';
 
 // Define the ScanningStatus type
-type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'complete' | 'error';
+type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'complete' | 'completed' | 'error';
 
 interface SubscriptionSuggestion {
   id: string;
@@ -219,7 +219,7 @@ const ScanningPage = () => {
       // Map API status to UI status
       let uiStatus: ScanningStatus = 'scanning';
       if (status === 'completed' || status === 'complete') {
-        uiStatus = 'complete';
+        uiStatus = 'completed';
       } else if (status === 'error') {
         uiStatus = 'error';
       } else if (status === 'analyzing') {
@@ -245,9 +245,9 @@ const ScanningPage = () => {
           // 90-100%: Final analysis and completion
           let calculatedProgress = 0;
           
-          if (uiStatus === 'initial' || uiStatus === 'idle') {
+          if (uiStatus === 'initial') {
             calculatedProgress = 10; // Initial setup
-          } else if (uiStatus === 'complete' || uiStatus === 'completed') {
+          } else if (uiStatus === 'completed') {
             calculatedProgress = 100; // Completed
           } else {
             // Calculate progress based on emails processed
@@ -273,7 +273,7 @@ const ScanningPage = () => {
       setIsTestData(!!is_test_data);
       
       // If complete/completed, stop polling and get suggestions
-      if (status === 'complete' || status === 'completed') {
+      if (status === 'completed') {
         console.log('Scan complete! Clearing polling interval and getting subscription suggestions');
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
@@ -688,7 +688,7 @@ const ScanningPage = () => {
               </div>
             )}
 
-            {scanningStatus === 'complete' && suggestions.length > 0 && (
+            {scanningStatus === 'completed' && suggestions.length > 0 && (
               <div>
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   Found {suggestions.length} subscription{suggestions.length === 1 ? '' : 's'}
@@ -767,7 +767,7 @@ const ScanningPage = () => {
               </div>
             )}
 
-            {scanningStatus === 'complete' && suggestions.length === 0 && (
+            {scanningStatus === 'completed' && suggestions.length === 0 && (
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   No subscriptions found
