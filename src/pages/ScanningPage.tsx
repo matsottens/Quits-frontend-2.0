@@ -22,20 +22,10 @@ interface SubscriptionSuggestion {
 }
 
 interface ScanStats {
-  total_emails: number;
-  processed_count: number;
-  skipped_count: number;
-  detected_subscriptions: number;
-  emails_to_process: number;
-  emails_processed: number;
-  start_time?: string;
-  end_time?: string;
-  analysis_results?: Array<{
-    from: string;
-    subject: string;
-    analysis: any;
-    timestamp: string;
-  }>;
+  emailsFound: number;
+  emailsToProcess: number;
+  emailsProcessed: number;
+  subscriptionsFound: number;
 }
 
 interface ScanStatus {
@@ -240,51 +230,64 @@ const ScanningPage = () => {
     try {
       const response = await fetch(`${API_URL}/scan-status/${scanId}`, {
         headers: {
-          Authorization: `Bearer ${token}`,
-        },
+          Authorization: `Bearer ${token}`
+        }
       });
-      const data: ScanStatus = await response.json();
-      setScanningStatus(data.status);
-      setIsTestData(data.is_test_data || false);
 
-      let calculatedProgress = 0;
+      if (!response.ok) {
+        throw new Error('Failed to check scan status');
+      }
+
+      const data = await response.json();
+      console.log('SCAN-DEBUG: Status response:', data);
+
+      // Update scanning status
+      setScanningStatus(data.status);
+
+      // Update progress based on stats
       if (data.stats) {
-        // Initial setup phase: 0-10%
-        if (data.stats.emails_to_process === 0) {
-          calculatedProgress = 5;
+        const { emails_found, emails_to_process, emails_processed } = data.stats;
+        
+        // Calculate progress based on email processing
+        let calculatedProgress = 0;
+        
+        if (emails_found > 0 && emails_to_process > 0) {
+          // 0-10%: Initial setup
+          // 10-90%: Email processing
+          // 90-100%: Final analysis
+          const processingProgress = emails_processed / emails_to_process;
+          calculatedProgress = Math.min(90, Math.max(10, Math.floor(10 + (processingProgress * 80))));
         } else {
-          // Email processing phase: 10-90%
-          const processedRatio = data.stats.emails_processed / data.stats.emails_to_process;
-          calculatedProgress = 10 + (processedRatio * 80); // Scale to 10-90% range
+          // Fallback to server-provided progress
+          calculatedProgress = data.progress || 0;
         }
 
         // Ensure progress doesn't regress
-        calculatedProgress = Math.max(calculatedProgress, progress);
-        
-        // Final analysis phase: 90-100%
-        if (data.status === 'completed') {
-          calculatedProgress = 100;
+        if (calculatedProgress > progress) {
+          setProgress(calculatedProgress);
         }
+
+        // Update stats display
+        setScanStats({
+          emailsFound: emails_found,
+          emailsToProcess: emails_to_process,
+          emailsProcessed: emails_processed,
+          subscriptionsFound: data.stats.subscriptions_found || 0
+        });
+      }
+
+      // If scan is complete, navigate to dashboard
+      if (data.status === 'completed') {
+        navigate('/dashboard');
+      } else if (data.status === 'error') {
+        setError(data.error || 'Scan failed');
       } else {
-        calculatedProgress = data.progress;
-      }
-
-      // Ensure progress doesn't exceed 100%
-      calculatedProgress = Math.min(calculatedProgress, 100);
-      setProgress(calculatedProgress);
-      
-      // Update scan stats if available
-      if (data.stats) {
-        setScanStats(data.stats);
-      }
-
-      // Continue polling if scan is not complete
-      if (data.status !== 'completed' && data.status !== 'error') {
+        // Continue polling
         setTimeout(checkScanStatus, 2000);
       }
     } catch (error) {
       console.error('Error checking scan status:', error);
-      setScanningStatus('error');
+      setError('Failed to check scan status');
     }
   };
 
@@ -626,21 +629,21 @@ const ScanningPage = () => {
                   </div>
                   
                   {/* Add scan stats when emails are being processed */}
-                  {scanningStatus === 'scanning' && scanStats && scanStats.total_emails > 0 && (
+                  {scanningStatus === 'scanning' && scanStats && scanStats.emailsToProcess > 0 && (
                     <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
-                      <p>Found <strong>{scanStats.total_emails}</strong> emails</p>
-                      <p>Processing <strong>{scanStats.emails_to_process}</strong> recent emails</p>
-                      <p>Processed <strong>{scanStats.processed_count}</strong> so far</p>
-                      {scanStats.detected_subscriptions > 0 && (
+                      <p>Found <strong>{scanStats.emailsFound}</strong> emails in your inbox</p>
+                      <p>Processing <strong>{scanStats.emailsToProcess}</strong> recent emails</p>
+                      <p>Processed <strong>{scanStats.emailsProcessed}</strong> so far</p>
+                      {scanStats.subscriptionsFound > 0 && (
                         <p className="text-green-600 font-medium">
-                          Found <strong>{scanStats.detected_subscriptions}</strong> subscription{scanStats.detected_subscriptions !== 1 ? 's' : ''}!
+                          Found <strong>{scanStats.subscriptionsFound}</strong> subscription{scanStats.subscriptionsFound !== 1 ? 's' : ''}!
                         </p>
                       )}
-                      {scanStats.emails_to_process > 0 && (
+                      {scanStats.emailsToProcess > 0 && (
                         <div className="w-full bg-gray-200 rounded-full h-2.5 my-2">
                           <div 
                             className="bg-green-500 h-2.5 rounded-full transition-all duration-300" 
-                            style={{ width: `${Math.min(100, (scanStats.processed_count / scanStats.emails_to_process) * 100)}%` }}
+                            style={{ width: `${Math.min(100, (scanStats.emailsProcessed / scanStats.emailsToProcess) * 100)}%` }}
                           ></div>
                         </div>
                       )}
@@ -751,7 +754,7 @@ const ScanningPage = () => {
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
                   We scanned your email but couldn't find any recurring subscriptions. 
-                  We looked through {scanStats?.processed_count} emails for subscription receipts, 
+                  We looked through {scanStats?.emailsProcessed} emails for subscription receipts, 
                   confirmations, and billing notifications.
                 </p>
                 <p className="mt-2 text-base text-gray-600">
@@ -767,16 +770,16 @@ const ScanningPage = () => {
                   <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
                     <dl className="sm:divide-y sm:divide-gray-200">
                       <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Total emails found</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.total_emails || 0}</dd>
+                        <dt className="text-sm font-medium text-gray-500">Total emails</dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.emailsFound || 0}</dd>
                       </div>
                       <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500">Emails processed</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.processed_count || 0}</dd>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.emailsProcessed || 0} of {scanStats?.emailsToProcess || 0}</dd>
                       </div>
                       <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500">Subscriptions detected</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.detected_subscriptions || 0}</dd>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.subscriptionsFound || 0}</dd>
                       </div>
                     </dl>
                   </div>
