@@ -26,6 +26,7 @@ interface ScanStats {
   emailsToProcess: number;
   emailsProcessed: number;
   subscriptionsFound: number;
+  potentialSubscriptions: number;
 }
 
 interface ScanStatus {
@@ -230,64 +231,53 @@ const ScanningPage = () => {
     try {
       const response = await fetch(`${API_URL}/scan-status/${scanId}`, {
         headers: {
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         }
       });
-
+      
       if (!response.ok) {
         throw new Error('Failed to check scan status');
       }
-
+      
       const data = await response.json();
-      console.log('SCAN-DEBUG: Status response:', data);
-
+      const { status: uiStatus, progress, stats } = data;
+      
       // Update scanning status
-      setScanningStatus(data.status);
-
-      // Update progress based on stats
-      if (data.stats) {
-        const { emails_found, emails_to_process, emails_processed } = data.stats;
-        
-        // Calculate progress based on email processing
-        let calculatedProgress = 0;
-        
-        if (emails_found > 0 && emails_to_process > 0) {
-          // 0-10%: Initial setup
-          // 10-90%: Email processing
-          // 90-100%: Final analysis
-          const processingProgress = emails_processed / emails_to_process;
-          calculatedProgress = Math.min(90, Math.max(10, Math.floor(10 + (processingProgress * 80))));
-        } else {
-          // Fallback to server-provided progress
-          calculatedProgress = data.progress || 0;
-        }
-
-        // Ensure progress doesn't regress
-        if (calculatedProgress > progress) {
-          setProgress(calculatedProgress);
-        }
-
-        // Update stats display
+      setScanningStatus(uiStatus);
+      
+      // Update scan stats if available
+      if (stats) {
         setScanStats({
-          emailsFound: emails_found,
-          emailsToProcess: emails_to_process,
-          emailsProcessed: emails_processed,
-          subscriptionsFound: data.stats.subscriptions_found || 0
+          emailsFound: stats.emails_found || 0,
+          emailsToProcess: stats.emails_to_process || 0,
+          emailsProcessed: stats.emails_processed || 0,
+          subscriptionsFound: stats.subscriptions_found || 0,
+          potentialSubscriptions: stats.potential_subscriptions || 0
         });
-      }
-
-      // If scan is complete, navigate to dashboard
-      if (data.status === 'completed') {
-        navigate('/dashboard');
-      } else if (data.status === 'error') {
-        setError(data.error || 'Scan failed');
+        
+        // Calculate progress based on actual email processing
+        if (stats.emails_to_process > 0) {
+          const calculatedProgress = Math.min(100, Math.floor((stats.emails_processed / stats.emails_to_process) * 100));
+          setProgress(calculatedProgress);
+        } else {
+          setProgress(progress || 0);
+        }
       } else {
-        // Continue polling
+        setProgress(progress || 0);
+      }
+      
+      // If scan is complete, navigate to dashboard
+      if (uiStatus === 'completed') {
+        navigate('/dashboard');
+      } else if (uiStatus === 'error') {
+        setError(data.error || 'An error occurred during scanning');
+      } else {
+        // Continue polling every 2 seconds
         setTimeout(checkScanStatus, 2000);
       }
     } catch (error) {
       console.error('Error checking scan status:', error);
-      setError('Failed to check scan status');
+      setError('Failed to check scan status. Please try again.');
     }
   };
 
@@ -636,7 +626,12 @@ const ScanningPage = () => {
                       <p>Processed <strong>{scanStats.emailsProcessed}</strong> so far</p>
                       {scanStats.subscriptionsFound > 0 && (
                         <p className="text-green-600 font-medium">
-                          Found <strong>{scanStats.subscriptionsFound}</strong> subscription{scanStats.subscriptionsFound !== 1 ? 's' : ''}!
+                          Found <strong>{scanStats.subscriptionsFound}</strong> confirmed subscription{scanStats.subscriptionsFound !== 1 ? 's' : ''}!
+                        </p>
+                      )}
+                      {scanStats.potentialSubscriptions > 0 && (
+                        <p className="text-blue-600 font-medium">
+                          Found <strong>{scanStats.potentialSubscriptions}</strong> potential subscription{scanStats.potentialSubscriptions !== 1 ? 's' : ''} to review
                         </p>
                       )}
                       {scanStats.emailsToProcess > 0 && (
