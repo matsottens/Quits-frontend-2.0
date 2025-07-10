@@ -476,11 +476,9 @@ const apiService = {
       try {
         const token = localStorage.getItem('token');
         const gmailToken = extractGmailToken(token);
-        
         console.log('Starting email scanning with token');
-        
-        // First attempt with standard fetch
-        const response = await fetch(`${API_URL}/api/email-scan`, {
+        // Try /api/email-scan first
+        let response = await fetch(`${API_URL}/api/email-scan`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -492,13 +490,27 @@ const apiService = {
             useRealData: true
           })
         });
-        
+        if (!response.ok) {
+          // If /api/email-scan fails, try /api/scan
+          console.warn('scanEmails: /api/email-scan failed, trying /api/scan');
+          response = await fetch(`${API_URL}/api/scan`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              ...options,
+              useRealData: true
+            })
+          });
+        }
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Email scan failed:', response.status, errorText);
           throw new Error(`Scan failed: ${response.status}`);
         }
-        
         const data = await response.json();
         console.log('Email scan response:', data);
         return data;
