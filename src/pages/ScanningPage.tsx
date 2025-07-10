@@ -259,7 +259,7 @@ const ScanningPage = () => {
         if (stats.emails_to_process > 0) {
           const calculatedProgress = Math.min(100, Math.floor((stats.emails_processed / stats.emails_to_process) * 100));
           setProgress(calculatedProgress);
-        } else {
+          } else {
           setProgress(progress || 0);
         }
       } else {
@@ -640,8 +640,8 @@ const ScanningPage = () => {
                             className="bg-green-500 h-2.5 rounded-full transition-all duration-300" 
                             style={{ width: `${Math.min(100, (scanStats.emailsProcessed / scanStats.emailsToProcess) * 100)}%` }}
                           ></div>
-                        </div>
-                      )}
+                    </div>
+                  )}
                     </div>
                   )}
                 </div>
@@ -803,4 +803,4 @@ const ScanningPage = () => {
   );
 };
 
-export default ScanningPage;
+export default ScanningPage; 
