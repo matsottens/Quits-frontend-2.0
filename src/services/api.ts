@@ -515,52 +515,60 @@ const apiService = {
         console.log('Email scan response:', data);
         return data;
       } catch (error) {
-        console.error('Email scanning error:', error);
-        
-        // Check if the error message suggests authentication issues
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        
-        if (errorMsg.includes('401') || errorMsg.includes('auth')) {
-          console.error('Authentication issue detected - redirecting to login');
-          localStorage.removeItem('token');
-          window.location.href = '/login?reason=auth_failed';
-          throw new Error('Authentication failed. Please log in again.');
+        console.error('Email scan error:', error);
+        throw error;
+      }
+    },
+
+    // Analyze emails with Gemini
+    analyzeEmails: async (scanId: string) => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/analyze-emails`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ scan_id: scanId })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
         }
+
+        return await response.json();
+      } catch (error) {
+        console.error('Email analysis error:', error);
+        throw error;
+      }
+    },
+
+    // Get analyzed subscriptions
+    getAnalyzedSubscriptions: async (scanId?: string) => {
+      try {
+        const token = localStorage.getItem('token');
+        const url = scanId 
+          ? `${API_URL}/api/analyzed-subscriptions?scan_id=${scanId}`
+          : `${API_URL}/api/analyzed-subscriptions`;
         
-        // Fall back to fetch mode
-        try {
-          console.log('Trying fallback mode with minimal headers');
-          const authToken = localStorage.getItem('token');
-          
-          // Even simpler approach with minimal headers
-          const fallbackResponse = await fetch(`${API_URL}/api/email-scan`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${authToken}`,
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({ useRealData: true })
-          });
-          
-          if (!fallbackResponse.ok) {
-            console.error('Fallback mode failed:', await fallbackResponse.text());
-            throw new Error('All email scanning approaches failed');
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-          
-          const fallbackData = await fallbackResponse.json();
-          console.log('Fallback approach succeeded:', fallbackData);
-          return fallbackData;
-        } catch (fallbackError) {
-          console.error('All scanning approaches failed:', fallbackError);
-          
-          // Return mock response to avoid breaking the UI
-          return {
-            status: 'error',
-            message: 'Could not connect to scanning service. Please try again later.',
-            jobId: 'error-' + Date.now(),
-            mock: true
-          };
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch analyzed subscriptions: ${response.status} - ${errorText}`);
         }
+
+        return await response.json();
+      } catch (error) {
+        console.error('Get analyzed subscriptions error:', error);
+        throw error;
       }
     },
 
