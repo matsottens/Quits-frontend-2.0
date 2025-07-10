@@ -803,4 +803,75 @@ const ScanningPage = () => {
   );
 };
 
-export default ScanningPage; 
+export default ScanningPage; Jul 10 17:14:20.49
+GET
+200
+api.quits.cc
+/api/subscription
+10
+Found 5 subscriptions for user 9fc722c0-ad34-42e7-8efd-e0c84ce79f0d
+Jul 10 17:14:20.38
+GET
+200
+api.quits.cc
+/api/auth/me
+Jul 10 17:13:33.40
+GET
+200
+api.quits.cc
+/api/subscription
+10
+Found 5 subscriptions for user 9fc722c0-ad34-42e7-8efd-e0c84ce79f0d
+Jul 10 17:13:33.24
+OPTIONS
+204
+api.quits.cc
+/api/subscription
+Handling OPTIONS preflight request for subscription
+Jul 10 17:13:33.06
+GET
+200
+api.quits.cc
+/api/auth/me
+Jul 10 17:13:32.84
+OPTIONS
+204
+api.quits.cc
+/api/auth/me
+Handling OPTIONS preflight request for auth/me
+Jul 10 17:13:32.68
+GET
+200
+api.quits.cc
+/api/auth/verify
+Jul 10 17:13:32.28
+OPTIONS
+204
+api.quits.cc
+/api/auth/verify
+Handling OPTIONS preflight request for auth/verify
+Jul 10 17:13:29.29
+GET
+200
+api.quits.cc
+/api/google-proxy
+30
+Sending success response with token
+Jul 10 17:13:28.63
+OPTIONS
+204
+api.quits.cc
+/api/google-proxy
+Handling OPTIONS preflight request for Google proxy
+Jul 10 17:12:32.32
+GET
+200
+api.quits.cc
+/api/subscription
+16
+Found 5 subscriptions for user 9fc722c0-ad34-42e7-8efd-e0c84ce79f0d
+Jul 10 17:12:32.26
+GET
+200
+api.quits.cc
+/api/auth/me
