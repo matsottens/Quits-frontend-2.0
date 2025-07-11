@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface ScanProgressBarProps {
   userId: string;
@@ -16,26 +16,44 @@ const statusMessages: Record<string, string> = {
 export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComplete }) => {
   const [status, setStatus] = useState<string | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
+  const startTimeRef = useRef<number>(Date.now());
+  const stoppedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/scan-status?user_id=${userId}`);
-        if (!res.ok) throw new Error('Failed to fetch scan status');
-        const data = await res.json();
-        setStatus(data.status);
-        setScanId(data.scan_id);
-        if (data.status === 'completed' && data.scan_id) {
-          onComplete(data.scan_id);
-        }
-      } catch (e) {
+    stoppedRef.current = false;
+    async function triggerAndPoll() {
+      // Aggressively trigger the scan
+      await fetch('/api/trigger-gemini-scan', { method: 'POST' });
+      // Poll scan status
+      const res = await fetch(`/api/scan-status?user_id=${userId}`);
+      if (!res.ok) {
         setStatus('error');
+        return;
+      }
+      const data = await res.json();
+      setStatus(data.status);
+      setScanId(data.scan_id);
+      if (data.status === 'completed' && data.scan_id) {
+        stoppedRef.current = true;
+        onComplete(data.scan_id);
+      }
+    }
+
+    let timeout: NodeJS.Timeout;
+    const loop = async () => {
+      while (!stoppedRef.current) {
+        const elapsed = Date.now() - startTimeRef.current;
+        await triggerAndPoll();
+        if (stoppedRef.current) break;
+        if (elapsed < 30000) {
+          await new Promise(r => setTimeout(r, 3000)); // every 3s for first 30s
+        } else {
+          await new Promise(r => setTimeout(r, 60000)); // every 60s after
+        }
       }
     };
-    poll();
-    interval = setInterval(poll, 4000);
-    return () => clearInterval(interval);
+    loop();
+    return () => { stoppedRef.current = true; clearTimeout(timeout); };
   }, [userId, onComplete]);
 
   return (
@@ -54,6 +72,5 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
   );
 };
 
-// Add some basic styles (or use your own CSS framework)
 // .progress-bar { width: 80%; height: 8px; background: #eee; border-radius: 4px; margin: 0 auto; }
 // .progress-bar-inner { height: 100%; background: #0070f3; border-radius: 4px; transition: width 0.5s; } 
