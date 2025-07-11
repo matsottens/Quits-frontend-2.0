@@ -39,7 +39,6 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
       }
     }
 
-    let timeout: NodeJS.Timeout;
     const loop = async () => {
       while (!stoppedRef.current) {
         const elapsed = Date.now() - startTimeRef.current;
@@ -53,7 +52,7 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
       }
     };
     loop();
-    return () => { stoppedRef.current = true; clearTimeout(timeout); };
+    return () => { stoppedRef.current = true; };
   }, [userId, onComplete]);
 
   return (
