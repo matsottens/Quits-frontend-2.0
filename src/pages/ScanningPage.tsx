@@ -124,9 +124,11 @@ const ScanningPage = () => {
   const startScanning = async () => {
     console.log('SCAN-DEBUG: startScanning called');
     console.log('SCAN-DEBUG: scanInitiatedRef.current:', scanInitiatedRef.current);
+    console.log('SCAN-DEBUG: Current scanId state:', scanId);
+    console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem('current_scan_id'));
     
     if (scanInitiatedRef.current) {
-      console.log('Scan already initiated, skipping');
+      console.log('SCAN-DEBUG: Scan already initiated, skipping');
       return;
     }
 
@@ -137,6 +139,7 @@ const ScanningPage = () => {
       scanInitiatedRef.current = true;
       geminiTriggeredRef.current = false; // Reset Gemini trigger flag
       scanStartTimeRef.current = Date.now(); // Record scan start time
+      console.log('SCAN-DEBUG: Set scanInitiatedRef.current to true');
       console.log('Starting email scanning process');
       
       console.log('SCAN-DEBUG: About to call api.email.scanEmails()');
@@ -159,15 +162,22 @@ const ScanningPage = () => {
       // Store the scan ID for status checks
       if (response.scanId) {
         const newScanId = response.scanId;
+        console.log('SCAN-DEBUG: Received scanId from API:', newScanId);
+        console.log('SCAN-DEBUG: Previous scanId state:', scanId);
+        console.log('SCAN-DEBUG: Previous localStorage scanId:', localStorage.getItem('current_scan_id'));
+        
         setScanId(newScanId);
         // Save scanId to localStorage
         localStorage.setItem('current_scan_id', newScanId);
+        console.log('SCAN-DEBUG: Updated scanId state to:', newScanId);
+        console.log('SCAN-DEBUG: Updated localStorage to:', localStorage.getItem('current_scan_id'));
         console.log('Scan started with ID:', newScanId);
         
         // Start polling for status updates with the new ID
         pollScanStatus(newScanId);
       } else {
         console.warn('No scan ID returned from API');
+        scanInitiatedRef.current = false; // Reset if no scan ID returned
       }
     } catch (err: any) {
       console.error('Error starting scan:', err);
@@ -242,12 +252,22 @@ const ScanningPage = () => {
   const checkScanStatus = async () => {
     try {
       console.log('SCAN-DEBUG: Checking scan status for scanId:', scanId);
+      console.log('SCAN-DEBUG: Current scanId state:', scanId);
+      console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem('current_scan_id'));
       
       if (!scanId) {
         console.log('SCAN-DEBUG: No scanId available, cannot check status');
         return;
       }
       
+      // Validate scan ID format
+      if (!scanId.startsWith('scan_')) {
+        console.error('SCAN-DEBUG: Invalid scan ID format:', scanId);
+        setError('Invalid scan ID format. Please try again.');
+        return;
+      }
+      
+      console.log('SCAN-DEBUG: Making request to:', `${API_URL}/api/scan-status/${scanId}`);
       const response = await fetch(`${API_URL}/api/scan-status/${scanId}`, {
         headers: {
           'Authorization': `Bearer ${getToken()}`
@@ -259,13 +279,25 @@ const ScanningPage = () => {
       }
       
       const data = await response.json();
-      const { status: uiStatus, progress, stats, scan_id: returnedScanId } = data;
+      const { status: uiStatus, progress, stats, scan_id: returnedScanId, warning } = data;
+      
+      // Log warning if present
+      if (warning) {
+        console.log('SCAN-DEBUG: API warning:', warning);
+      }
       
       // Update scan ID if the API returned a different one (e.g., latest scan)
       if (returnedScanId && returnedScanId !== scanId) {
         console.log('SCAN-DEBUG: API returned different scan ID:', returnedScanId, 'updating from:', scanId);
         setScanId(returnedScanId);
         localStorage.setItem('current_scan_id', returnedScanId);
+        
+        // Show a brief message to the user about the scan ID change
+        if (warning) {
+          setError(warning);
+          // Clear the warning after 3 seconds
+          setTimeout(() => setError(null), 3000);
+        }
         
         // Restart polling with the new scan ID
         if (pollingIntervalRef.current) {

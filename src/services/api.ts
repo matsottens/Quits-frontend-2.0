@@ -476,7 +476,11 @@ const apiService = {
       try {
         const token = localStorage.getItem('token');
         if (!token) throw new Error('No authentication token found');
+        
+        console.log('SCAN-DEBUG: scanEmails called with options:', options);
+        
         // Try /api/email-scan first
+        console.log('SCAN-DEBUG: Trying /api/email-scan endpoint');
         let response = await fetch(`${API_URL}/api/email-scan`, {
           method: 'POST',
           headers: {
@@ -490,9 +494,13 @@ const apiService = {
             useRealData: true
           })
         });
+        
+        console.log('SCAN-DEBUG: /api/email-scan response status:', response.status);
+        
         if (!response.ok) {
           // If /api/email-scan fails, try /api/scan
           console.warn('scanEmails: /api/email-scan failed, trying /api/scan');
+          console.log('SCAN-DEBUG: Trying /api/scan endpoint as fallback');
           response = await fetch(`${API_URL}/api/scan`, {
             method: 'POST',
             headers: {
@@ -506,14 +514,18 @@ const apiService = {
               useRealData: true
             })
           });
+          console.log('SCAN-DEBUG: /api/scan response status:', response.status);
         }
+        
         if (!response.ok) {
           const errorText = await response.text();
           console.error('Email scan failed:', response.status, errorText);
           throw new Error(`Scan failed: ${response.status}`);
         }
+        
         const data = await response.json();
-        console.log('Email scan response:', data);
+        console.log('SCAN-DEBUG: Email scan response data:', data);
+        console.log('SCAN-DEBUG: scanId in response:', data.scanId);
         return data;
       } catch (error) {
         console.error('Email scan error:', error);
