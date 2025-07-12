@@ -259,7 +259,14 @@ const ScanningPage = () => {
       }
       
       const data = await response.json();
-      const { status: uiStatus, progress, stats } = data;
+      const { status: uiStatus, progress, stats, scan_id: returnedScanId } = data;
+      
+      // Update scan ID if the API returned a different one (e.g., latest scan)
+      if (returnedScanId && returnedScanId !== scanId) {
+        console.log('SCAN-DEBUG: API returned different scan ID:', returnedScanId, 'updating from:', scanId);
+        setScanId(returnedScanId);
+        localStorage.setItem('current_scan_id', returnedScanId);
+      }
       
       // Update scanning status
       setScanningStatus(uiStatus);
