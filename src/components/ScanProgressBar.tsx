@@ -26,10 +26,10 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
     
     async function pollScanStatus() {
       try {
-        // First, trigger the Edge Function to start analysis
-        await fetch('/api/trigger-gemini-scan', { method: 'POST' });
+        // Don't trigger the Edge Function immediately - wait for email scan to complete first
+        // The email scan will set the status to 'ready_for_analysis' when it's done
         
-        // Then poll for scan status
+        // Poll for scan status
         const res = await fetch(`/api/scan-status?user_id=${userId}`);
         if (!res.ok) {
           setStatus('error');
@@ -48,6 +48,16 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
         } else if (currentStatus === 'ready_for_analysis' || currentStatus === 'analyzing') {
           setPhase('analyzing');
           setProgress(50 + (data.progress || 0) / 2); // Analysis phase: 50-100%
+          
+          // Only trigger Gemini analysis when status is 'ready_for_analysis'
+          if (currentStatus === 'ready_for_analysis') {
+            console.log('Email scan completed, triggering Gemini analysis');
+            try {
+              await fetch('/api/trigger-gemini-scan', { method: 'POST' });
+            } catch (error) {
+              console.error('Error triggering Gemini analysis:', error);
+            }
+          }
         } else if (currentStatus === 'completed') {
           setPhase('complete');
           setProgress(100);

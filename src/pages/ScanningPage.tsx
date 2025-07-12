@@ -26,7 +26,6 @@ interface ScanStats {
   emailsToProcess: number;
   emailsProcessed: number;
   subscriptionsFound: number;
-  potentialSubscriptions: number;
 }
 
 interface ScanStatus {
@@ -254,8 +253,7 @@ const ScanningPage = () => {
           emailsFound: stats.emails_found || 0,
           emailsToProcess: stats.emails_to_process || 0,
           emailsProcessed: stats.emails_processed || 0,
-          subscriptionsFound: stats.subscriptions_found || 0,
-          potentialSubscriptions: stats.potential_subscriptions || 0
+          subscriptionsFound: stats.subscriptions_found || 0
         });
       }
       
@@ -643,11 +641,6 @@ const ScanningPage = () => {
                       {scanStats.subscriptionsFound > 0 && (
                         <p className="text-green-600 font-medium">
                           Found <strong>{scanStats.subscriptionsFound}</strong> confirmed subscription{scanStats.subscriptionsFound !== 1 ? 's' : ''}!
-                        </p>
-                      )}
-                      {scanStats.potentialSubscriptions > 0 && (
-                        <p className="text-blue-600 font-medium">
-                          Found <strong>{scanStats.potentialSubscriptions}</strong> potential subscription{scanStats.potentialSubscriptions !== 1 ? 's' : ''} to review
                         </p>
                       )}
                       {scanStats.emailsToProcess > 0 && (
