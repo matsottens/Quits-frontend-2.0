@@ -227,8 +227,12 @@ const ScanningPage = () => {
     
     setPollingCount(0); // Reset polling count
     
+    // Use the provided scan ID or fall back to localStorage only if no state
+    const scanIdToUse = currentScanId || localStorage.getItem('current_scan_id');
+    
     // Set initial poll immediately with the current scan ID
-    if (currentScanId) {
+    if (scanIdToUse) {
+      console.log(`SCAN-DEBUG: Starting polling for scan ID: ${scanIdToUse}`);
       checkScanStatus();
       
       // Then poll every 3 seconds
@@ -251,8 +255,8 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async () => {
     try {
-      // Get the current scan ID from localStorage to avoid stale closure issues
-      const currentScanId = localStorage.getItem('current_scan_id') || scanId;
+      // Use the current scanId state, with localStorage as fallback only for page refreshes
+      const currentScanId = scanId || localStorage.getItem('current_scan_id');
       
       console.log('SCAN-DEBUG: Checking scan status for scanId:', currentScanId);
       console.log('SCAN-DEBUG: Current scanId state:', scanId);
@@ -267,6 +271,8 @@ const ScanningPage = () => {
       if (!currentScanId.startsWith('scan_')) {
         console.error('SCAN-DEBUG: Invalid scan ID format:', currentScanId);
         setError('Invalid scan ID format. Please try again.');
+        // Clear invalid scan ID from localStorage
+        localStorage.removeItem('current_scan_id');
         return;
       }
       
@@ -311,8 +317,10 @@ const ScanningPage = () => {
         return; // Exit early to avoid processing with old scan ID
       }
       
-      // Update scanning status
-      setScanningStatus(uiStatus);
+      // Update scanning status - ensure we don't lose the scanning state
+      if (uiStatus && uiStatus !== 'error') {
+        setScanningStatus(uiStatus);
+      }
       
       // Update scan stats if available
       if (stats) {
@@ -325,23 +333,55 @@ const ScanningPage = () => {
       }
       
       // Use the progress from the API (which now handles two-phase calculation)
-      setProgress(progress || 0);
+      if (progress !== undefined && progress !== null) {
+        setProgress(progress);
+      }
       
-      // If scan is complete, navigate to dashboard
+      // Handle different scan statuses
       if (uiStatus === 'completed') {
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
-        navigate('/dashboard');
-      } else if (uiStatus === 'error') {
+        setScanningStatus('completed');
+        setProgress(100);
+        // Clear scan ID from localStorage since scan is complete
+        localStorage.removeItem('current_scan_id');
+        // Navigate to dashboard after a short delay to show completion
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+      } else if (uiStatus === 'error' || uiStatus === 'failed') {
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
+        setScanningStatus('error');
         setError(data.error || 'An error occurred during scanning');
+        // Clear scan ID from localStorage on error
+        localStorage.removeItem('current_scan_id');
+      } else if (uiStatus === 'quota_exhausted') {
+        // Handle quota exhaustion gracefully
+        setScanningStatus('analyzing'); // Keep showing progress bar
+        setError('AI analysis quota temporarily exhausted. Analysis will resume automatically when quota resets.');
+        // Continue polling but with longer intervals
+        const pollInterval = 10000; // 10 seconds for quota exhausted scans
+        
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = setInterval(() => {
+            setPollingCount(prev => {
+              const newCount = prev + 1;
+              if (newCount >= MAX_POLLING_COUNT) {
+                checkScanTimeout();
+              }
+              return newCount;
+            });
+            checkScanStatus();
+          }, pollInterval);
+        }
       } else {
-        // Trigger Gemini analysis when status is 'ready_for_analysis' (only once)
+        // Continue scanning - trigger Gemini analysis when status is 'ready_for_analysis' (only once)
         if (uiStatus === 'ready_for_analysis' && !geminiTriggeredRef.current) {
           console.log('Email scan completed, triggering Gemini analysis');
           geminiTriggeredRef.current = true; // Prevent multiple triggers
@@ -422,15 +462,32 @@ const ScanningPage = () => {
       const initiateScanning = () => {
         console.log('initiateScanning called, current status:', scanningStatus, 'scanId:', scanId, 'scanInitiated:', scanInitiatedRef.current);
         
-        // Clear any old scan ID from localStorage to force a new scan
-        const oldScanId = localStorage.getItem('current_scan_id');
-        if (oldScanId) {
-          console.log(`Clearing old scan ID ${oldScanId} from localStorage to start fresh`);
+        // Check if we have a valid scan ID in localStorage that we should resume
+        const storedScanId = localStorage.getItem('current_scan_id');
+        if (storedScanId && storedScanId.startsWith('scan_')) {
+          console.log(`Found valid scan ID in localStorage: ${storedScanId}, attempting to resume`);
+          setScanId(storedScanId);
+          
+          // Try to resume the existing scan instead of starting a new one
+          if (!scanInitiatedRef.current) {
+            console.log('Resuming existing scan...');
+            setError('Resuming previous scan...');
+            
+            setTimeout(() => {
+              console.log('Resuming scan now');
+              setError(null);
+              scanInitiatedRef.current = true;
+              pollScanStatus(storedScanId);
+            }, 1000);
+            return;
+          }
+        } else if (storedScanId) {
+          // Clear invalid scan ID from localStorage
+          console.log(`Clearing invalid scan ID ${storedScanId} from localStorage`);
           localStorage.removeItem('current_scan_id');
-          setScanId(null);
         }
         
-        // Start a new scan after a short delay
+        // Start a new scan if no valid scan ID found
         if (!scanInitiatedRef.current) {
           console.log('Starting new scan automatically after a short delay...');
           setError('Starting scan automatically in 2 seconds...');
@@ -703,18 +760,20 @@ const ScanningPage = () => {
           )}
 
           <>
-            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing' || scanningStatus === 'in_progress' || scanningStatus === 'ready_for_analysis') && (
+            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing' || scanningStatus === 'in_progress' || scanningStatus === 'ready_for_analysis' || scanningStatus === 'quota_exhausted') && (
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   {scanningStatus === 'initial' && 'Preparing to scan your emails'}
                   {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Reading emails from Gmail'}
                   {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Analyzing subscriptions with AI'}
+                  {scanningStatus === 'quota_exhausted' && 'AI Analysis Paused'}
                   {scanningStatus === 'idle' && 'Starting scan...'}
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
                   {scanningStatus === 'initial' && 'Getting ready to find your subscriptions...'}
                   {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Searching for subscription confirmation emails...'}
                   {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Using AI to extract subscription details...'}
+                  {scanningStatus === 'quota_exhausted' && 'AI quota temporarily exhausted. Analysis will resume automatically...'}
                   {scanningStatus === 'idle' && 'Initializing scan process...'}
                 </p>
                 <div className="mt-8">
@@ -723,7 +782,8 @@ const ScanningPage = () => {
                       <div 
                         style={{ 
                           width: `${progress}%`,
-                          backgroundColor: (scanningStatus === 'scanning' || scanningStatus === 'in_progress') ? '#3B82F6' : '#10B981'
+                          backgroundColor: (scanningStatus === 'scanning' || scanningStatus === 'in_progress') ? '#3B82F6' : 
+                                           scanningStatus === 'quota_exhausted' ? '#F59E0B' : '#10B981'
                         }}
                         className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500"
                       />
@@ -745,6 +805,12 @@ const ScanningPage = () => {
                       <div className="bg-green-50 p-3 rounded">
                         <p className="font-medium text-green-800">Phase 2: AI Analysis</p>
                         <p className="text-green-600">Using AI to extract subscription details...</p>
+                      </div>
+                    )}
+                    {scanningStatus === 'quota_exhausted' && (
+                      <div className="bg-yellow-50 p-3 rounded">
+                        <p className="font-medium text-yellow-800">Phase 2: AI Analysis (Paused)</p>
+                        <p className="text-yellow-600">AI quota temporarily exhausted. Analysis will resume automatically when quota resets...</p>
                       </div>
                     )}
                   </div>
