@@ -254,17 +254,10 @@ const ScanningPage = () => {
           subscriptionsFound: stats.subscriptions_found || 0,
           potentialSubscriptions: stats.potential_subscriptions || 0
         });
-        
-        // Calculate progress based on actual email processing
-        if (stats.emails_to_process > 0) {
-          const calculatedProgress = Math.min(100, Math.floor((stats.emails_processed / stats.emails_to_process) * 100));
-          setProgress(calculatedProgress);
-          } else {
-          setProgress(progress || 0);
-        }
-      } else {
-        setProgress(progress || 0);
       }
+      
+      // Use the progress from the API (which now handles two-phase calculation)
+      setProgress(progress || 0);
       
       // If scan is complete, navigate to dashboard
       if (uiStatus === 'completed') {
@@ -272,8 +265,9 @@ const ScanningPage = () => {
       } else if (uiStatus === 'error') {
         setError(data.error || 'An error occurred during scanning');
       } else {
-        // Continue polling every 2 seconds
-        setTimeout(checkScanStatus, 2000);
+        // Continue polling - more frequently during analysis phase
+        const pollInterval = (uiStatus === 'ready_for_analysis' || uiStatus === 'analyzing') ? 2000 : 3000;
+        setTimeout(checkScanStatus, pollInterval);
       }
     } catch (error) {
       console.error('Error checking scan status:', error);
@@ -591,26 +585,29 @@ const ScanningPage = () => {
           )}
 
           <>
-            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing') && (
+            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing' || scanningStatus === 'in_progress' || scanningStatus === 'ready_for_analysis') && (
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   {scanningStatus === 'initial' && 'Preparing to scan your emails'}
-                  {scanningStatus === 'scanning' && 'Scanning your emails'}
-                  {scanningStatus === 'analyzing' && 'Analyzing subscription data'}
+                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Reading emails from Gmail'}
+                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Analyzing subscriptions with AI'}
                   {scanningStatus === 'idle' && 'Starting scan...'}
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
                   {scanningStatus === 'initial' && 'Getting ready to find your subscriptions...'}
-                  {scanningStatus === 'scanning' && 'Looking for subscription confirmation emails...'}
-                  {scanningStatus === 'analyzing' && 'Using AI to extract subscription details...'}
+                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Searching for subscription confirmation emails...'}
+                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Using AI to extract subscription details...'}
                   {scanningStatus === 'idle' && 'Initializing scan process...'}
                 </p>
                 <div className="mt-8">
                   <div className="relative">
                     <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
                       <div 
-                        style={{ width: `${progress}%` }}
-                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary-500 transition-all duration-500"
+                        style={{ 
+                          width: `${progress}%`,
+                          backgroundColor: (scanningStatus === 'scanning' || scanningStatus === 'in_progress') ? '#3B82F6' : '#10B981'
+                        }}
+                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500"
                       />
                     </div>
                     <div className="text-right">
@@ -618,8 +615,24 @@ const ScanningPage = () => {
                     </div>
                   </div>
                   
+                  {/* Phase indicator */}
+                  <div className="mt-4 text-sm text-gray-700">
+                    {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && (
+                      <div className="bg-blue-50 p-3 rounded">
+                        <p className="font-medium text-blue-800">Phase 1: Reading Emails</p>
+                        <p className="text-blue-600">Searching your Gmail for subscription emails...</p>
+                      </div>
+                    )}
+                    {(scanningStatus === 'ready_for_analysis' || scanningStatus === 'analyzing') && (
+                      <div className="bg-green-50 p-3 rounded">
+                        <p className="font-medium text-green-800">Phase 2: AI Analysis</p>
+                        <p className="text-green-600">Using AI to extract subscription details...</p>
+                      </div>
+                    )}
+                  </div>
+                  
                   {/* Add scan stats when emails are being processed */}
-                  {scanningStatus === 'scanning' && scanStats && scanStats.emailsToProcess > 0 && (
+                  {scanStats && scanStats.emailsToProcess > 0 && (
                     <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
                       <p>Found <strong>{scanStats.emailsFound}</strong> emails in your inbox</p>
                       <p>Processing <strong>{scanStats.emailsToProcess}</strong> recent emails</p>
@@ -640,8 +653,8 @@ const ScanningPage = () => {
                             className="bg-green-500 h-2.5 rounded-full transition-all duration-300" 
                             style={{ width: `${Math.min(100, (scanStats.emailsProcessed / scanStats.emailsToProcess) * 100)}%` }}
                           ></div>
-                    </div>
-                  )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
