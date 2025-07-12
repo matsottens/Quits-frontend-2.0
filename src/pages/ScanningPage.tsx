@@ -251,24 +251,27 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async () => {
     try {
-      console.log('SCAN-DEBUG: Checking scan status for scanId:', scanId);
+      // Get the current scan ID from localStorage to avoid stale closure issues
+      const currentScanId = localStorage.getItem('current_scan_id') || scanId;
+      
+      console.log('SCAN-DEBUG: Checking scan status for scanId:', currentScanId);
       console.log('SCAN-DEBUG: Current scanId state:', scanId);
       console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem('current_scan_id'));
       
-      if (!scanId) {
+      if (!currentScanId) {
         console.log('SCAN-DEBUG: No scanId available, cannot check status');
         return;
       }
       
       // Validate scan ID format
-      if (!scanId.startsWith('scan_')) {
-        console.error('SCAN-DEBUG: Invalid scan ID format:', scanId);
+      if (!currentScanId.startsWith('scan_')) {
+        console.error('SCAN-DEBUG: Invalid scan ID format:', currentScanId);
         setError('Invalid scan ID format. Please try again.');
         return;
       }
       
-      console.log('SCAN-DEBUG: Making request to:', `${API_URL}/api/scan-status/${scanId}`);
-      const response = await fetch(`${API_URL}/api/scan-status/${scanId}`, {
+      console.log('SCAN-DEBUG: Making request to:', `${API_URL}/api/scan-status/${currentScanId}`);
+      const response = await fetch(`${API_URL}/api/scan-status/${currentScanId}`, {
         headers: {
           'Authorization': `Bearer ${getToken()}`
         }
@@ -287,8 +290,8 @@ const ScanningPage = () => {
       }
       
       // Update scan ID if the API returned a different one (e.g., latest scan)
-      if (returnedScanId && returnedScanId !== scanId) {
-        console.log('SCAN-DEBUG: API returned different scan ID:', returnedScanId, 'updating from:', scanId);
+      if (returnedScanId && returnedScanId !== currentScanId) {
+        console.log('SCAN-DEBUG: API returned different scan ID:', returnedScanId, 'updating from:', currentScanId);
         setScanId(returnedScanId);
         localStorage.setItem('current_scan_id', returnedScanId);
         
@@ -349,7 +352,7 @@ const ScanningPage = () => {
                 'Authorization': `Bearer ${getToken()}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ scan_id: scanId })
+              body: JSON.stringify({ scan_id: currentScanId })
             });
             
             if (!triggerResponse.ok) {
