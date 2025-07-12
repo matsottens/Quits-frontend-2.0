@@ -706,7 +706,7 @@ const apiService = {
       try {
         // Use fetch instead of axios to avoid CORS issues
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscription`, {
+        const response = await fetch(`${API_URL}/api/subscription/`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
