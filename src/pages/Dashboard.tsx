@@ -16,6 +16,9 @@ interface Subscription {
   provider: string;
   category: string;
   is_manual: boolean;
+  analysis_status?: string;
+  is_pending?: boolean;
+  confidence_score?: number;
 }
 
 const Dashboard = () => {
@@ -427,6 +430,16 @@ const Dashboard = () => {
                           {subscription.is_manual && (
                             <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                               Manual
+                            </span>
+                          )}
+                          {subscription.is_pending && (
+                            <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                              Analyzing...
+                            </span>
+                          )}
+                          {subscription.confidence_score && !subscription.is_pending && (
+                            <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                              {Math.round(subscription.confidence_score * 100)}% confident
                             </span>
                           )}
                         </div>
