@@ -266,6 +266,14 @@ const ScanningPage = () => {
         console.log('SCAN-DEBUG: API returned different scan ID:', returnedScanId, 'updating from:', scanId);
         setScanId(returnedScanId);
         localStorage.setItem('current_scan_id', returnedScanId);
+        
+        // Restart polling with the new scan ID
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        pollScanStatus(returnedScanId);
+        return; // Exit early to avoid processing with old scan ID
       }
       
       // Update scanning status
@@ -286,8 +294,16 @@ const ScanningPage = () => {
       
       // If scan is complete, navigate to dashboard
       if (uiStatus === 'completed') {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
         navigate('/dashboard');
       } else if (uiStatus === 'error') {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
         setError(data.error || 'An error occurred during scanning');
       } else {
         // Trigger Gemini analysis when status is 'ready_for_analysis' (only once)
@@ -317,7 +333,22 @@ const ScanningPage = () => {
         
         // Continue polling - more frequently during analysis phase
         const pollInterval = (uiStatus === 'ready_for_analysis' || uiStatus === 'analyzing') ? 2000 : 3000;
-        setTimeout(checkScanStatus, pollInterval);
+        
+        // Update the polling interval if needed
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = setInterval(() => {
+            setPollingCount(prev => {
+              const newCount = prev + 1;
+              // Check for timeout on each polling increment
+              if (newCount >= MAX_POLLING_COUNT) {
+                checkScanTimeout();
+              }
+              return newCount;
+            });
+            checkScanStatus();
+          }, pollInterval);
+        }
       }
     } catch (error) {
       console.error('Error checking scan status:', error);
