@@ -306,8 +306,8 @@ const AuthCallback = () => {
         }
       }
       
-      // Navigate to home or dashboard
-      navigate('/dashboard');
+      // Navigate to scanning page
+      navigate('/scanning');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Error during post-authentication:', errorMessage);
@@ -386,8 +386,8 @@ const AuthCallback = () => {
             await login(token);
           }
           
-          // Redirect the user to the dashboard
-          navigate('/dashboard');
+          // Redirect the user to the scanning page
+          navigate('/scanning');
         } else {
           setError(`Token verification failed: ${verifyResult.error || 'Unknown error'}`);
           setAuthStatus('error');
@@ -454,7 +454,7 @@ const AuthCallback = () => {
   return (
     <LoadingContainer>
       <h1>Authentication Complete</h1>
-      <p>Redirecting to dashboard...</p>
+      <p>Redirecting to scanning...</p>
       <Spinner />
     </LoadingContainer>
   );
