@@ -235,7 +235,7 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async () => {
     try {
-      const response = await fetch(`${API_URL}/scan-status/${scanId}`, {
+      const response = await fetch(`${API_URL}/api/scan-status/${scanId}`, {
         headers: {
           'Authorization': `Bearer ${getToken()}`
         }
