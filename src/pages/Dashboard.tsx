@@ -153,7 +153,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 lg:ml-64">
       {/* Add Subscription Modal */}
       <AddSubscriptionModal 
         isOpen={showAddModal} 
