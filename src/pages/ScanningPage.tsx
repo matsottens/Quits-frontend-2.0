@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Header from '../components/Header';
 import { API_URL } from '../config';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 // Define the ScanningStatus type
 type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'ready_for_analysis' | 'complete' | 'completed' | 'error';
@@ -38,7 +38,7 @@ interface ScanStatus {
 
 const ScanningPage = () => {
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [scanningStatus, setScanningStatus] = useState<ScanningStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +54,9 @@ const ScanningPage = () => {
   const scanInitiatedRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const maxRetries = 3;
+
+  // Get token from localStorage
+  const getToken = () => localStorage.getItem('token');
 
   const MAX_STATUS_CHECK_FAILURES = 5;
 
@@ -231,7 +234,7 @@ const ScanningPage = () => {
     try {
       const response = await fetch(`${API_URL}/scan-status/${scanId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${getToken()}`
         }
       });
       
@@ -387,7 +390,7 @@ const ScanningPage = () => {
   // Add a debug function
   const checkGmailToken = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       if (!token) {
         setError('No authentication token found. Please log in again.');
         return;
@@ -424,7 +427,7 @@ const ScanningPage = () => {
   const testGmailConnection = async () => {
     try {
       setError('Testing Gmail API connection...');
-      const token = localStorage.getItem('token');
+      const token = getToken();
       if (!token) {
         setError('No authentication token found. Please log in again.');
         return;
@@ -458,7 +461,7 @@ const ScanningPage = () => {
   const diagnoseScan = async () => {
     try {
       setError('Running diagnostic checks...');
-      const token = localStorage.getItem('token');
+      const token = getToken();
       if (!token) {
         setError('No authentication token found. Please log in again.');
         return;
