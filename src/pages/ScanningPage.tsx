@@ -6,7 +6,7 @@ import { API_URL } from '../config';
 import { useAuth } from '../contexts/AuthContext';
 
 // Define the ScanningStatus type
-type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'complete' | 'completed' | 'error';
+type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'ready_for_analysis' | 'complete' | 'completed' | 'error';
 
 interface SubscriptionSuggestion {
   id: string;
