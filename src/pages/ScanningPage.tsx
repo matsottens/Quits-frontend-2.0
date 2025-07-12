@@ -356,15 +356,16 @@ const ScanningPage = () => {
       const initiateScanning = () => {
         console.log('initiateScanning called, current status:', scanningStatus, 'scanId:', scanId, 'scanInitiated:', scanInitiatedRef.current);
         
-        // If we have a scanId from localStorage but no active scanning
-        if (scanId && !scanInitiatedRef.current) {
-          console.log(`Found existing scan ID ${scanId} in localStorage, resuming polling`);
-          setScanningStatus('scanning');
-          scanInitiatedRef.current = true;
-          pollScanStatus(scanId);
-        } 
-        // Otherwise start a new scan after a short delay
-        else if (!scanInitiatedRef.current) {
+        // Clear any old scan ID from localStorage to force a new scan
+        const oldScanId = localStorage.getItem('current_scan_id');
+        if (oldScanId) {
+          console.log(`Clearing old scan ID ${oldScanId} from localStorage to start fresh`);
+          localStorage.removeItem('current_scan_id');
+          setScanId(null);
+        }
+        
+        // Start a new scan after a short delay
+        if (!scanInitiatedRef.current) {
           console.log('Starting new scan automatically after a short delay...');
           setError('Starting scan automatically in 2 seconds...');
           
@@ -377,7 +378,7 @@ const ScanningPage = () => {
       };
       
       initiateScanning();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error in initiate scanning effect:', err);
       setError('Error starting scan: ' + (err instanceof Error ? err.message : String(err)));
       
