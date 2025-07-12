@@ -475,8 +475,7 @@ const apiService = {
     scanEmails: async (options = {}) => {
       try {
         const token = localStorage.getItem('token');
-        const gmailToken = extractGmailToken(token);
-        console.log('Starting email scanning with token');
+        if (!token) throw new Error('No authentication token found');
         // Try /api/email-scan first
         let response = await fetch(`${API_URL}/api/email-scan`, {
           method: 'POST',
@@ -486,6 +485,7 @@ const apiService = {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
+            token, // <-- Always include token in body
             ...options,
             useRealData: true
           })
@@ -501,6 +501,7 @@ const apiService = {
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
+              token, // <-- Always include token in body
               ...options,
               useRealData: true
             })
