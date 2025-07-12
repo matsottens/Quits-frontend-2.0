@@ -85,6 +85,9 @@ const ScanningPage = () => {
 
   // Add a new state variable to track polling count
   const [pollingCount, setPollingCount] = useState(0);
+  
+  // Add a flag to prevent multiple Gemini triggers
+  const geminiTriggeredRef = useRef(false);
 
   // Add a new function to check if the scan has timed out
   const checkScanTimeout = useCallback(() => {
@@ -128,6 +131,7 @@ const ScanningPage = () => {
       setError(null);
       setScanningStatus('scanning');
       scanInitiatedRef.current = true;
+      geminiTriggeredRef.current = false; // Reset Gemini trigger flag
       scanStartTimeRef.current = Date.now(); // Record scan start time
       console.log('Starting email scanning process');
       
@@ -266,6 +270,31 @@ const ScanningPage = () => {
       } else if (uiStatus === 'error') {
         setError(data.error || 'An error occurred during scanning');
       } else {
+        // Trigger Gemini analysis when status is 'ready_for_analysis' (only once)
+        if (uiStatus === 'ready_for_analysis' && !geminiTriggeredRef.current) {
+          console.log('Email scan completed, triggering Gemini analysis');
+          geminiTriggeredRef.current = true; // Prevent multiple triggers
+          try {
+            const triggerResponse = await fetch(`${API_URL}/api/trigger-gemini-scan`, { 
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ scan_id: scanId })
+            });
+            
+            if (!triggerResponse.ok) {
+              console.error('Error triggering Gemini analysis:', triggerResponse.status);
+            } else {
+              const triggerData = await triggerResponse.json();
+              console.log('Gemini analysis triggered successfully:', triggerData);
+            }
+          } catch (error) {
+            console.error('Error triggering Gemini analysis:', error);
+          }
+        }
+        
         // Continue polling - more frequently during analysis phase
         const pollInterval = (uiStatus === 'ready_for_analysis' || uiStatus === 'analyzing') ? 2000 : 3000;
         setTimeout(checkScanStatus, pollInterval);
@@ -284,6 +313,7 @@ const ScanningPage = () => {
     setProgress(0);
     setReconnectAttempt(0);
     setStatusCheckFailures(0);
+    geminiTriggeredRef.current = false; // Reset Gemini trigger flag
     // Clear the current scanId from localStorage
     localStorage.removeItem('current_scan_id');
     scanInitiatedRef.current = false;
