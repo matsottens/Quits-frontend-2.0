@@ -122,12 +122,16 @@ const ScanningPage = () => {
 
   // Start email scanning process
   const startScanning = async () => {
+    console.log('SCAN-DEBUG: startScanning called');
+    console.log('SCAN-DEBUG: scanInitiatedRef.current:', scanInitiatedRef.current);
+    
     if (scanInitiatedRef.current) {
       console.log('Scan already initiated, skipping');
       return;
     }
 
     try {
+      console.log('SCAN-DEBUG: Starting email scanning process');
       setError(null);
       setScanningStatus('scanning');
       scanInitiatedRef.current = true;
@@ -135,7 +139,9 @@ const ScanningPage = () => {
       scanStartTimeRef.current = Date.now(); // Record scan start time
       console.log('Starting email scanning process');
       
+      console.log('SCAN-DEBUG: About to call api.email.scanEmails()');
       const response = await api.email.scanEmails();
+      console.log('SCAN-DEBUG: api.email.scanEmails() response:', response);
       
       // Check for mock response (indicating connection issues)
       if (response.mock) {
@@ -235,6 +241,13 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async () => {
     try {
+      console.log('SCAN-DEBUG: Checking scan status for scanId:', scanId);
+      
+      if (!scanId) {
+        console.log('SCAN-DEBUG: No scanId available, cannot check status');
+        return;
+      }
+      
       const response = await fetch(`${API_URL}/api/scan-status/${scanId}`, {
         headers: {
           'Authorization': `Bearer ${getToken()}`
