@@ -356,7 +356,7 @@ const ScanningPage = () => {
         localStorage.removeItem('current_scan_id');
         // Navigate to dashboard after a short delay to show completion
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/dashboard', { state: { justScanned: true } });
         }, 2000);
       } else if (uiStatus === 'error' || uiStatus === 'failed') {
         if (pollingIntervalRef.current) {
@@ -384,7 +384,7 @@ const ScanningPage = () => {
           localStorage.removeItem('current_scan_id');
           // Navigate to dashboard after a short delay to show completion
           setTimeout(() => {
-            navigate('/dashboard');
+            navigate('/dashboard', { state: { justScanned: true } });
           }, 3000);
         } else {
           // No subscriptions found, continue polling for quota reset
@@ -525,7 +525,7 @@ const ScanningPage = () => {
                   localStorage.removeItem('current_scan_id');
                   // Navigate to dashboard immediately
                   setTimeout(() => {
-                    navigate('/dashboard');
+                    navigate('/dashboard', { state: { justScanned: true } });
                   }, 1000);
                   return;
                 } else if (data.status === 'quota_exhausted' && data.stats?.subscriptions_found > 0) {
@@ -536,7 +536,7 @@ const ScanningPage = () => {
                   localStorage.removeItem('current_scan_id');
                   // Navigate to dashboard immediately
                   setTimeout(() => {
-                    navigate('/dashboard');
+                    navigate('/dashboard', { state: { justScanned: true } });
                   }, 1000);
                   return;
                 } else if (data.status === 'in_progress' || data.status === 'ready_for_analysis' || data.status === 'analyzing') {

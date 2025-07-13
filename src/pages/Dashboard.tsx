@@ -34,6 +34,10 @@ const Dashboard = () => {
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('name');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
+
+  const justScanned = location.state && location.state.justScanned;
 
   // Check if coming from a new scan
   useEffect(() => {
@@ -64,28 +68,50 @@ const Dashboard = () => {
     }
   }, [searchParams, setSearchParams]);
 
-  // Fetch subscriptions
+  // Fetch subscriptions (with polling if justScanned)
   useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null;
+    let isMounted = true;
     const fetchSubscriptions = async () => {
       try {
         setLoading(true);
         const response = await api.subscriptions.getAll();
-        
+        if (!isMounted) return;
         if (response && response.subscriptions) {
           setSubscriptions(response.subscriptions);
+          // If polling and we now have subscriptions, stop polling
+          if (polling && response.subscriptions.length > 0) {
+            setPolling(false);
+          }
         } else {
           setSubscriptions([]);
         }
       } catch (err) {
+        if (!isMounted) return;
         console.error('Error fetching subscriptions:', err);
         setError('Failed to load your subscriptions');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchSubscriptions();
-  }, []);
+
+    // If justScanned and no subscriptions, poll for up to 10 seconds
+    if (justScanned && subscriptions.length === 0 && !polling && pollCount < 10) {
+      setPolling(true);
+      pollInterval = setInterval(() => {
+        setPollCount((c) => c + 1);
+        fetchSubscriptions();
+      }, 1000);
+    }
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justScanned, pollCount]);
 
   // Calculate total monthly cost
   const calculateMonthlyTotal = () => {
@@ -369,13 +395,13 @@ const Dashboard = () => {
 
         {/* Subscriptions List */}
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          {loading ? (
+          {(loading || (justScanned && subscriptions.length === 0 && pollCount < 10)) ? (
             <div className="py-20 text-center">
               <svg className="mx-auto h-12 w-12 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <p className="mt-4 text-gray-500">Loading your subscriptions...</p>
+              <p className="mt-4 text-gray-500">{justScanned ? 'Updating your subscriptions...' : 'Loading your subscriptions...'}</p>
             </div>
           ) : error ? (
             <div className="py-20 text-center">
