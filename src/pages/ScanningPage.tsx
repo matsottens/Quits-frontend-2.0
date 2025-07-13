@@ -80,8 +80,8 @@ const ScanningPage = () => {
   const PROGRESS_COMPLETE = 100;
 
   // Add these new constants at the top with other constants
-  const MAX_SCAN_DURATION_MS = 8 * 60 * 1000; // Extended from 5 minutes to 8 minutes to give Edge Function time
-  const MAX_POLLING_COUNT = 60; // Maximum number of times to poll (at 3 second intervals)
+  const MAX_SCAN_DURATION_MS = 10 * 60 * 1000; // Extended to 10 minutes to give Edge Function time
+  const MAX_POLLING_COUNT = 200; // Maximum number of times to poll (at 3 second intervals = 10 minutes)
 
   // Add a new state variable to track polling count
   const [pollingCount, setPollingCount] = useState(0);
