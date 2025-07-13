@@ -252,7 +252,7 @@ const Login: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <img src="/google-icon.svg" alt="Google Logo" className="w-5 h-5" />
+                  <img src={`${import.meta.env.BASE_URL}google-icon.svg`} alt="Google Logo" className="w-5 h-5" />
                   <span>Continue with Google</span>
                 </>
               )}

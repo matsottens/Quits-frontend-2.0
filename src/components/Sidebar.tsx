@@ -9,7 +9,7 @@ const Sidebar = () => {
       <div className="flex min-h-0 flex-1 flex-col bg-[#26457A]">
         <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
           <div className="flex flex-shrink-0 items-center px-4">
-            <img className="h-8 w-auto" src="/logo.svg" alt="Quits" />
+            <img className="h-8 w-auto" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Quits" />
           </div>
           <nav className="mt-5 flex-1 space-y-1 px-2">
             <Link
