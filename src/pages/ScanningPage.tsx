@@ -845,22 +845,6 @@ const ScanningPage = () => {
                   {scanningStatus === 'idle' && 'Initializing scan process...'}
                 </p>
                 <div className="mt-8">
-                  <div className="relative">
-                    <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
-                      <div 
-                        style={{ 
-                          width: `${progress}%`,
-                          backgroundColor: (scanningStatus === 'scanning' || scanningStatus === 'in_progress') ? '#3B82F6' : 
-                                           scanningStatus === 'quota_exhausted' ? '#F59E0B' : '#10B981'
-                        }}
-                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500"
-                      />
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold text-gray-600">{progress}%</span>
-                    </div>
-                  </div>
-                  
                   {/* Phase indicator */}
                   <div className="mt-4 text-sm text-gray-700">
                     {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && (
