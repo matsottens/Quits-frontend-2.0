@@ -368,24 +368,44 @@ const ScanningPage = () => {
         // Clear scan ID from localStorage on error
         localStorage.removeItem('current_scan_id');
       } else if (uiStatus === 'quota_exhausted') {
-        // Handle quota exhaustion gracefully
-        setScanningStatus('analyzing'); // Keep showing progress bar
-        setError('AI analysis quota temporarily exhausted. Analysis will resume automatically when quota resets.');
-        // Continue polling but with longer intervals
-        const pollInterval = 10000; // 10 seconds for quota exhausted scans
+        // Handle quota exhaustion - if subscriptions were found, consider it complete
+        const subscriptionsFound = stats?.subscriptionsFound || 0;
         
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = setInterval(() => {
-            setPollingCount(prev => {
-              const newCount = prev + 1;
-              if (newCount >= MAX_POLLING_COUNT) {
-                checkScanTimeout();
-              }
-              return newCount;
-            });
-            checkScanStatus();
-          }, pollInterval);
+        if (subscriptionsFound > 0) {
+          console.log(`Quota exhausted but ${subscriptionsFound} subscriptions found via pattern matching - treating as complete`);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setScanningStatus('completed');
+          setProgress(100);
+          setError('Scan completed! Found subscriptions using pattern matching. AI analysis was limited due to quota.');
+          // Clear scan ID from localStorage since scan is complete
+          localStorage.removeItem('current_scan_id');
+          // Navigate to dashboard after a short delay to show completion
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 3000);
+        } else {
+          // No subscriptions found, continue polling for quota reset
+          setScanningStatus('analyzing'); // Keep showing progress bar
+          setError('AI analysis quota temporarily exhausted. Analysis will resume automatically when quota resets.');
+          // Continue polling but with longer intervals
+          const pollInterval = 10000; // 10 seconds for quota exhausted scans
+          
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = setInterval(() => {
+              setPollingCount(prev => {
+                const newCount = prev + 1;
+                if (newCount >= MAX_POLLING_COUNT) {
+                  checkScanTimeout();
+                }
+                return newCount;
+              });
+              checkScanStatus();
+            }, pollInterval);
+          }
         }
       } else {
         // Continue scanning - let the cron job handle Gemini analysis triggering
@@ -499,6 +519,17 @@ const ScanningPage = () => {
                 
                 if (data.status === 'completed') {
                   console.log('Found completed scan, redirecting to dashboard instead of starting new scan');
+                  setScanningStatus('completed');
+                  setProgress(100);
+                  // Clear any stored scan ID since we're redirecting
+                  localStorage.removeItem('current_scan_id');
+                  // Navigate to dashboard immediately
+                  setTimeout(() => {
+                    navigate('/dashboard');
+                  }, 1000);
+                  return;
+                } else if (data.status === 'quota_exhausted' && data.stats?.subscriptions_found > 0) {
+                  console.log('Found quota exhausted scan with subscriptions, redirecting to dashboard instead of starting new scan');
                   setScanningStatus('completed');
                   setProgress(100);
                   // Clear any stored scan ID since we're redirecting
