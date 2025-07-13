@@ -340,12 +340,13 @@ const ScanningPage = () => {
       }
       
       // Use the progress from the API (which now handles two-phase calculation)
-      if (progress !== undefined && progress !== null) {
-        // Only update progress if it's a valid number and not 100 (which is handled by step-based effect)
-        if (progress < 100) {
-          setProgress(progress);
-        }
-      }
+      // Remove this block from checkScanStatus:
+      // if (progress !== undefined && progress !== null) {
+      //   // Only update progress if it's a valid number and not 100 (which is handled by step-based effect)
+      //   if (progress < 100) {
+      //     setProgress(progress);
+      //   }
+      // }
       
       // Handle different scan statuses
       if (uiStatus === 'completed') {
