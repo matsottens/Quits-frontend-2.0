@@ -999,61 +999,6 @@ const ScanningPage = () => {
                 </div>
               </div>
             )}
-
-            {scanningStatus === 'completed' && suggestions.length === 0 && (
-              <div className="text-center">
-                <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                  No subscriptions found
-                </h2>
-                <p className="mt-4 text-lg text-gray-600">
-                  We scanned your email but couldn't find any recurring subscriptions. 
-                  We looked through {scanStats?.emailsProcessed} emails for subscription receipts, 
-                  confirmations, and billing notifications.
-                </p>
-                <p className="mt-2 text-base text-gray-600">
-                  You can add subscriptions manually from your dashboard, or try scanning again with a different email account.
-                </p>
-
-                {/* Add scan statistics */}
-                <div className="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
-                  <div className="px-4 py-5 sm:px-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Scan Statistics</h3>
-                    <p className="mt-1 max-w-2xl text-sm text-gray-500">Results from your email scan</p>
-                  </div>
-                  <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
-                    <dl className="sm:divide-y sm:divide-gray-200">
-                      <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Total emails</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.emailsFound || 0}</dd>
-                      </div>
-                      <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Emails processed</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.emailsProcessed || 0} of {scanStats?.emailsToProcess || 0}</dd>
-                      </div>
-                      <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500">Subscriptions detected</dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{scanStats?.subscriptionsFound || 0}</dd>
-                      </div>
-                    </dl>
-                  </div>
-                </div>
-
-                <div className="mt-8 flex justify-center gap-4">
-                  <button
-                    onClick={() => navigate('/dashboard')}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                  >
-                    Go to Dashboard
-                  </button>
-                  <button
-                    onClick={handleRetry}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-base font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                  >
-                    Try Again
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         </div>
       </div>
