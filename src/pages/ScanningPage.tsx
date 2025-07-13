@@ -593,6 +593,17 @@ const ScanningPage = () => {
     console.log('ScanningStatus changed to:', scanningStatus);
   }, [scanningStatus]);
 
+  // Step-based progress bar logic
+  useEffect(() => {
+    if (scanningStatus === 'scanning' || scanningStatus === 'in_progress') {
+      setProgress(30);
+    } else if (scanningStatus === 'ready_for_analysis' || scanningStatus === 'analyzing') {
+      setProgress(70);
+    } else if (scanningStatus === 'completed' || scanningStatus === 'complete') {
+      setProgress(100);
+    }
+  }, [scanningStatus]);
+
   const handleSuggestionAction = async (suggestionId: string, confirmed: boolean) => {
     try {
       setError(null);
