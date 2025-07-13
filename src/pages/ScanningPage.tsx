@@ -341,7 +341,10 @@ const ScanningPage = () => {
       
       // Use the progress from the API (which now handles two-phase calculation)
       if (progress !== undefined && progress !== null) {
-        setProgress(progress);
+        // Only update progress if it's a valid number and not 100 (which is handled by step-based effect)
+        if (progress < 100) {
+          setProgress(progress);
+        }
       }
       
       // Handle different scan statuses
@@ -351,13 +354,10 @@ const ScanningPage = () => {
           pollingIntervalRef.current = null;
         }
         setScanningStatus('completed');
-        setProgress(100);
-        // Clear scan ID from localStorage since scan is complete
-        localStorage.removeItem('current_scan_id');
-        // Navigate to dashboard after a short delay to show completion
+        // Show 100% for 1s before redirecting
         setTimeout(() => {
           navigate('/dashboard', { state: { justScanned: true } });
-        }, 2000);
+        }, 1000);
       } else if (uiStatus === 'error' || uiStatus === 'failed') {
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
@@ -378,14 +378,10 @@ const ScanningPage = () => {
             pollingIntervalRef.current = null;
           }
           setScanningStatus('completed');
-          setProgress(100);
-          setError('Scan completed! Found subscriptions using pattern matching. AI analysis was limited due to quota.');
-          // Clear scan ID from localStorage since scan is complete
-          localStorage.removeItem('current_scan_id');
-          // Navigate to dashboard after a short delay to show completion
+          // Show 100% for 1s before redirecting
           setTimeout(() => {
             navigate('/dashboard', { state: { justScanned: true } });
-          }, 3000);
+          }, 1000);
         } else {
           // No subscriptions found, continue polling for quota reset
           setScanningStatus('analyzing'); // Keep showing progress bar
@@ -518,26 +514,20 @@ const ScanningPage = () => {
                 console.log('Latest scan status:', data.status);
                 
                 if (data.status === 'completed') {
-                  console.log('Found completed scan, redirecting to dashboard instead of starting new scan');
-                  setScanningStatus('completed');
-                  setProgress(100);
-                  // Clear any stored scan ID since we're redirecting
+                  console.log('Found completed scan, starting a new scan for returning user');
                   localStorage.removeItem('current_scan_id');
-                  // Navigate to dashboard immediately
+                  scanInitiatedRef.current = false;
                   setTimeout(() => {
-                    navigate('/dashboard', { state: { justScanned: true } });
-                  }, 1000);
+                    startScanning();
+                  }, 500);
                   return;
                 } else if (data.status === 'quota_exhausted' && data.stats?.subscriptions_found > 0) {
-                  console.log('Found quota exhausted scan with subscriptions, redirecting to dashboard instead of starting new scan');
-                  setScanningStatus('completed');
-                  setProgress(100);
-                  // Clear any stored scan ID since we're redirecting
+                  console.log('Found quota exhausted scan with subscriptions, starting a new scan for returning user');
                   localStorage.removeItem('current_scan_id');
-                  // Navigate to dashboard immediately
+                  scanInitiatedRef.current = false;
                   setTimeout(() => {
-                    navigate('/dashboard', { state: { justScanned: true } });
-                  }, 1000);
+                    startScanning();
+                  }, 500);
                   return;
                 } else if (data.status === 'in_progress' || data.status === 'ready_for_analysis' || data.status === 'analyzing') {
                   console.log('Found active scan in progress, resuming instead of starting new scan');
