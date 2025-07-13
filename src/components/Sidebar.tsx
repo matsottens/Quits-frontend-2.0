@@ -1,15 +1,22 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLogo } from '../hooks/useLogo';
 
 const Sidebar = () => {
   const { logout } = useAuth();
+  const { logoUrl, handleImageError } = useLogo();
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
       <div className="flex min-h-0 flex-1 flex-col bg-[#26457A]">
         <div className="flex flex-1 flex-col overflow-y-auto pt-5 pb-4">
           <div className="flex flex-shrink-0 items-center px-4">
-            <img className="h-8 w-auto" src={`${import.meta.env.BASE_URL}logo.svg`} alt="Quits" />
+            <img 
+              className="h-8 w-auto" 
+              src={logoUrl} 
+              alt="Quits"
+              onError={handleImageError}
+            />
           </div>
           <nav className="mt-5 flex-1 space-y-1 px-2">
             <Link

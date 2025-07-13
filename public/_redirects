@@ -1,0 +1,6 @@
+# Ensure logo files are served correctly
+/logo.svg /logo.svg 200
+/quits-logo.svg /quits-logo.svg 200
+
+# Handle all other routes for SPA
+/* /index.html 200 

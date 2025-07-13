@@ -43,6 +43,9 @@ export default defineConfig(({ command, mode }) => {
           rewrite: (path) => path.replace(/^\/auth\/google\/callback\/direct2/, '/api/auth/google/callback/direct2'),
         },
       },
+      fs: {
+        allow: ['..']
+      },
       headers: {
         'Content-Security-Policy': "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'inline-speculation-rules' chrome-extension: 'sha256-6wRdeNJzEHNIsDAMAdKbdVLWIqu8b6+Bs+xVNZqplQw='; style-src * 'self' 'unsafe-inline'; font-src * data:; connect-src * ws: wss:; img-src * data: blob:; frame-src *; object-src 'none';",
         'Access-Control-Allow-Origin': '*',
@@ -67,5 +70,7 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     base: '/',
+    publicDir: 'public',
+    assetsInclude: ['**/*.svg', '**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.ico'],
   }
 })

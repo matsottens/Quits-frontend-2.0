@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="120" viewBox="0 0 400 120" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <!-- Dot pattern in circular arrangement -->
+    <g fill="#26457A" transform="translate(60, 60)">
+        <!-- Inner circle -->
+        <circle cx="0" cy="0" r="4"/>
+        <!-- Middle ring -->
+        <circle cx="15" cy="0" r="4"/>
+        <circle cx="10.6" cy="10.6" r="4"/>
+        <circle cx="0" cy="15" r="4"/>
+        <circle cx="-10.6" cy="10.6" r="4"/>
+        <circle cx="-15" cy="0" r="4"/>
+        <circle cx="-10.6" cy="-10.6" r="4"/>
+        <circle cx="0" cy="-15" r="4"/>
+        <circle cx="10.6" cy="-10.6" r="4"/>
+        <!-- Outer ring -->
+        <circle cx="25" cy="0" r="4"/>
+        <circle cx="17.7" cy="17.7" r="4"/>
+        <circle cx="0" cy="25" r="4"/>
+        <circle cx="-17.7" cy="17.7" r="4"/>
+        <circle cx="-25" cy="0" r="4"/>
+        <circle cx="-17.7" cy="-17.7" r="4"/>
+        <circle cx="0" cy="-25" r="4"/>
+        <circle cx="17.7" cy="-17.7" r="4"/>
+    </g>
+    <!-- Quits text -->
+    <text x="160" y="72" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#26457A">
+        Quits
+    </text>
+</svg> 

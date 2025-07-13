@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logo Loading Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .logo-test {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success {
+            border-color: #4CAF50;
+            background-color: #f1f8e9;
+        }
+        .error {
+            border-color: #f44336;
+            background-color: #ffebee;
+        }
+        img {
+            max-height: 50px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Logo Loading Test</h1>
+    
+    <div class="test-container">
+        <h2>Testing Logo Loading</h2>
+        
+        <div class="logo-test" id="test1">
+            <h3>Test 1: /logo.svg</h3>
+            <img src="/logo.svg" alt="Logo Test 1" onload="markSuccess(this)" onerror="markError(this)">
+            <span id="status1">Loading...</span>
+        </div>
+        
+        <div class="logo-test" id="test2">
+            <h3>Test 2: /quits-logo.svg</h3>
+            <img src="/quits-logo.svg" alt="Logo Test 2" onload="markSuccess(this)" onerror="markError(this)">
+            <span id="status2">Loading...</span>
+        </div>
+        
+        <div class="logo-test" id="test3">
+            <h3>Test 3: Relative path logo.svg</h3>
+            <img src="logo.svg" alt="Logo Test 3" onload="markSuccess(this)" onerror="markError(this)">
+            <span id="status3">Loading...</span>
+        </div>
+        
+        <div class="logo-test" id="test4">
+            <h3>Test 4: Relative path quits-logo.svg</h3>
+            <img src="quits-logo.svg" alt="Logo Test 4" onload="markSuccess(this)" onerror="markError(this)">
+            <span id="status4">Loading...</span>
+        </div>
+    </div>
+
+    <script>
+        function markSuccess(img) {
+            const container = img.parentElement;
+            container.classList.add('success');
+            container.classList.remove('error');
+            const status = container.querySelector('span');
+            status.textContent = '✅ Success - Logo loaded';
+            status.style.color = '#4CAF50';
+        }
+        
+        function markError(img) {
+            const container = img.parentElement;
+            container.classList.add('error');
+            container.classList.remove('success');
+            const status = container.querySelector('span');
+            status.textContent = '❌ Error - Logo failed to load';
+            status.style.color = '#f44336';
+        }
+        
+        // Test all images after page load
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                const images = document.querySelectorAll('img');
+                images.forEach(img => {
+                    if (!img.complete) {
+                        markError(img);
+                    }
+                });
+            }, 2000);
+        });
+    </script>
+</body>
+</html> 

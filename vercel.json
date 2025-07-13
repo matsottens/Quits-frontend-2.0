@@ -12,6 +12,20 @@
       "destination": "/index.html"
     }
   ],
+  "routes": [
+    {
+      "src": "/logo.svg",
+      "dest": "/logo.svg"
+    },
+    {
+      "src": "/quits-logo.svg",
+      "dest": "/quits-logo.svg"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

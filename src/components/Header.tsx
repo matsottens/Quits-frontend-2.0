@@ -1,15 +1,22 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLogo } from '../hooks/useLogo';
 
 const Header = () => {
   const { isAuthenticated } = useAuth();
+  const { logoUrl, handleImageError } = useLogo();
   
   return (
     <header className="app-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <Link to="/" className="flex items-center">
-            <img src={`${import.meta.env.BASE_URL}quits-logo.svg`} alt="Quits" className="h-12 w-auto" />
+            <img 
+              src={logoUrl} 
+              alt="Quits" 
+              className="h-12 w-auto"
+              onError={handleImageError}
+            />
           </Link>
           {!isAuthenticated && (
             <nav className="flex items-center space-x-4">
