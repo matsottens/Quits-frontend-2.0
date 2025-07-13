@@ -13,7 +13,7 @@ const GetStarted = () => {
       <div className="flex flex-col items-center justify-center px-4 py-20 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto text-center">
           <div className="flex justify-center mb-8">
-            <img src="/quits-logo.svg" alt="Quits" className="h-16 w-16" />
+            <img src={`${import.meta.env.BASE_URL}quits-logo.svg`} alt="Quits" className="h-16 w-16" />
           </div>
           <h1 className="text-4xl font-extrabold text-[#26457A] sm:text-5xl sm:tracking-tight lg:text-6xl">
             Manage all your subscriptions in one place

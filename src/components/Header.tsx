@@ -9,7 +9,7 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <Link to="/" className="flex items-center">
-            <img src="/quits-logo.svg" alt="Quits" className="h-12 w-auto" />
+            <img src={`${import.meta.env.BASE_URL}quits-logo.svg`} alt="Quits" className="h-12 w-auto" />
           </Link>
           {!isAuthenticated && (
             <nav className="flex items-center space-x-4">
