@@ -132,6 +132,13 @@ const ScanningPage = () => {
       return;
     }
 
+    // Additional check: if there's a scan ID in localStorage, don't start a new scan
+    const storedScanId = localStorage.getItem('current_scan_id');
+    if (storedScanId && storedScanId.startsWith('scan_')) {
+      console.log('SCAN-DEBUG: Found existing scan ID in localStorage, not starting new scan');
+      return;
+    }
+
     try {
       console.log('SCAN-DEBUG: Starting email scanning process');
       setError(null);
@@ -381,29 +388,11 @@ const ScanningPage = () => {
           }, pollInterval);
         }
       } else {
-        // Continue scanning - trigger Gemini analysis when status is 'ready_for_analysis' (only once)
-        if (uiStatus === 'ready_for_analysis' && !geminiTriggeredRef.current) {
-          console.log('Email scan completed, triggering Gemini analysis');
-          geminiTriggeredRef.current = true; // Prevent multiple triggers
-          try {
-            const triggerResponse = await fetch(`${API_URL}/api/trigger-gemini-scan`, { 
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${getToken()}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ scan_id: currentScanId })
-            });
-            
-            if (!triggerResponse.ok) {
-              console.error('Error triggering Gemini analysis:', triggerResponse.status);
-            } else {
-              const triggerData = await triggerResponse.json();
-              console.log('Gemini analysis triggered successfully:', triggerData);
-            }
-          } catch (error) {
-            console.error('Error triggering Gemini analysis:', error);
-          }
+        // Continue scanning - let the cron job handle Gemini analysis triggering
+        // The cron job runs every minute and will automatically trigger analysis for scans in 'ready_for_analysis' status
+        if (uiStatus === 'ready_for_analysis') {
+          console.log('Email scan completed, waiting for cron job to trigger Gemini analysis');
+          // Don't trigger manually - let the cron job handle it
         }
         
         // Continue polling - more frequently during analysis phase
@@ -459,7 +448,7 @@ const ScanningPage = () => {
   // Start scanning when component mounts, only once
   useEffect(() => {
     try {
-      const initiateScanning = () => {
+      const initiateScanning = async () => {
         console.log('initiateScanning called, current status:', scanningStatus, 'scanId:', scanId, 'scanInitiated:', scanInitiatedRef.current);
         
         // Check if we have a valid scan ID in localStorage that we should resume
@@ -487,8 +476,54 @@ const ScanningPage = () => {
           localStorage.removeItem('current_scan_id');
         }
         
-        // Start a new scan if no valid scan ID found
+        // Before starting a new scan, check if there's already a completed scan
         if (!scanInitiatedRef.current) {
+          console.log('Checking for existing completed scans before starting new scan...');
+          
+          try {
+            const token = getToken();
+            if (!token) {
+              console.log('No token available, cannot check for completed scans');
+              // Continue with starting new scan
+            } else {
+              // Check for the latest scan status
+              const response = await fetch(`${API_URL}/api/scan-status?scanId=latest`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                console.log('Latest scan status:', data.status);
+                
+                if (data.status === 'completed') {
+                  console.log('Found completed scan, redirecting to dashboard instead of starting new scan');
+                  setScanningStatus('completed');
+                  setProgress(100);
+                  // Clear any stored scan ID since we're redirecting
+                  localStorage.removeItem('current_scan_id');
+                  // Navigate to dashboard immediately
+                  setTimeout(() => {
+                    navigate('/dashboard');
+                  }, 1000);
+                  return;
+                } else if (data.status === 'in_progress' || data.status === 'ready_for_analysis' || data.status === 'analyzing') {
+                  console.log('Found active scan in progress, resuming instead of starting new scan');
+                  setScanId(data.scan_id);
+                  localStorage.setItem('current_scan_id', data.scan_id);
+                  scanInitiatedRef.current = true;
+                  pollScanStatus(data.scan_id);
+                  return;
+                }
+              }
+            }
+          } catch (checkError) {
+            console.log('Error checking for completed scans:', checkError);
+            // Continue with starting new scan if check fails
+          }
+          
+          // Start a new scan if no valid scan ID found and no completed scan exists
           console.log('Starting new scan automatically after a short delay...');
           setError('Starting scan automatically in 2 seconds...');
           
@@ -520,7 +555,7 @@ const ScanningPage = () => {
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, []);
+  }, [navigate]);
 
   // Add a debugging effect to log state changes
   useEffect(() => {

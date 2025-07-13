@@ -49,14 +49,9 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
           setPhase('analyzing');
           setProgress(50 + (data.progress || 0) / 2); // Analysis phase: 50-100%
           
-          // Only trigger Gemini analysis when status is 'ready_for_analysis'
+          // Let the cron job handle Gemini analysis triggering
           if (currentStatus === 'ready_for_analysis') {
-            console.log('Email scan completed, triggering Gemini analysis');
-            try {
-              await fetch('/api/trigger-gemini-scan', { method: 'POST' });
-            } catch (error) {
-              console.error('Error triggering Gemini analysis:', error);
-            }
+            console.log('Email scan completed, waiting for cron job to trigger Gemini analysis');
           }
         } else if (currentStatus === 'completed') {
           setPhase('complete');
