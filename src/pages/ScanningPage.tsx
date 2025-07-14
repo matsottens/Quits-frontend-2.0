@@ -107,6 +107,26 @@ const ScanningPage = () => {
     return false;
   }, [pollingCount, scanningStatus]);
 
+  // Step-based progress mapping
+  const getStepProgress = (status: ScanningStatus): number => {
+    switch (status) {
+      case 'scanning':
+      case 'in_progress':
+        return 30;
+      case 'ready_for_analysis':
+        return 60;
+      case 'analyzing':
+        return 85;
+      case 'completed':
+      case 'complete':
+        return 100;
+      case 'error':
+        return 0;
+      default:
+        return 0;
+    }
+  };
+
   // Clear any active polling when component unmounts
   useEffect(() => {
     // Debug logging for scanId
@@ -273,7 +293,6 @@ const ScanningPage = () => {
       
       // Update scanning status
       setScanningStatus(uiStatus);
-      
       // Update scan stats if available
       if (stats) {
         setScanStats({
@@ -283,9 +302,8 @@ const ScanningPage = () => {
           subscriptionsFound: stats.subscriptions_found || 0
         });
       }
-      
-      // Use the progress from the API (which now handles two-phase calculation)
-      setProgress(progress || 0);
+      // Set progress based on step logic
+      setProgress(getStepProgress(uiStatus));
       
       // If scan is complete, navigate to dashboard
       if (uiStatus === 'completed') {
