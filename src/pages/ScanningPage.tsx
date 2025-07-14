@@ -845,6 +845,19 @@ const ScanningPage = () => {
                   {scanningStatus === 'idle' && 'Initializing scan process...'}
                 </p>
                 <div className="mt-8">
+                  {/* Main Progress Bar */}
+                  <div className="w-full max-w-md mx-auto mb-6">
+                    <div className="bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-primary-600 h-3 rounded-full transition-all duration-500 ease-out" 
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600 text-center">
+                      {progress}% Complete
+                    </div>
+                  </div>
+                  
                   {/* Phase indicator */}
                   <div className="mt-4 text-sm text-gray-700">
                     {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && (
