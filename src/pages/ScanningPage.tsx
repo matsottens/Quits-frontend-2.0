@@ -248,10 +248,13 @@ const ScanningPage = () => {
         return;
       }
       
+      const token = getToken();
+      const headers: Record<string, string> = {};
+      if (token && token.length > 20 && token.split('.').length === 3) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`${API_URL}/api/scan-status/${scanId}`, {
-        headers: {
-          'Authorization': `Bearer ${getToken()}`
-        }
+        headers
       });
       
       if (!response.ok) {
@@ -295,12 +298,15 @@ const ScanningPage = () => {
           console.log('Email scan completed, triggering Gemini analysis');
           geminiTriggeredRef.current = true; // Prevent multiple triggers
           try {
+            const triggerHeaders: Record<string, string> = {
+              'Content-Type': 'application/json'
+            };
+            if (token && token.length > 20 && token.split('.').length === 3) {
+              triggerHeaders['Authorization'] = `Bearer ${token}`;
+            }
             const triggerResponse = await fetch(`${API_URL}/api/trigger-gemini-scan`, { 
               method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${getToken()}`,
-                'Content-Type': 'application/json'
-              },
+              headers: triggerHeaders,
               body: JSON.stringify({ scan_id: scanId })
             });
             
