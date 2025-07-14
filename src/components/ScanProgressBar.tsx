@@ -16,55 +16,50 @@ const statusMessages: Record<string, string> = {
 export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComplete }) => {
   const [status, setStatus] = useState<string | null>(null);
   const [scanId, setScanId] = useState<string | null>(null);
-  const [phase, setPhase] = useState<'reading' | 'analyzing' | 'complete'>('reading');
   const [progress, setProgress] = useState(0);
+  const [showComplete, setShowComplete] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
   const stoppedRef = useRef<boolean>(false);
 
   useEffect(() => {
     stoppedRef.current = false;
-    
+    let completeTimeout: NodeJS.Timeout | null = null;
+
     async function pollScanStatus() {
       try {
-        // Don't trigger the Edge Function immediately - wait for email scan to complete first
-        // The email scan will set the status to 'ready_for_analysis' when it's done
-        
-        // Poll for scan status
         const res = await fetch(`/api/scan-status?user_id=${userId}`);
         if (!res.ok) {
           setStatus('error');
           return;
         }
-        
         const data = await res.json();
         const currentStatus = data.status;
         setStatus(currentStatus);
         setScanId(data.scan_id);
-        
-        // Determine phase based on status
+
+        // Step-based progress logic
         if (currentStatus === 'in_progress') {
-          setPhase('reading');
-          setProgress(Math.min(50, data.progress || 0)); // Reading phase: 0-50%
-        } else if (currentStatus === 'ready_for_analysis' || currentStatus === 'analyzing') {
-          setPhase('analyzing');
-          setProgress(50 + (data.progress || 0) / 2); // Analysis phase: 50-100%
-          
+          setProgress(30);
+        } else if (currentStatus === 'ready_for_analysis') {
+          setProgress(40);
           // Only trigger Gemini analysis when status is 'ready_for_analysis'
-          if (currentStatus === 'ready_for_analysis') {
-            console.log('Email scan completed, triggering Gemini analysis');
-            try {
-              await fetch('/api/trigger-gemini-scan', { method: 'POST' });
-            } catch (error) {
-              console.error('Error triggering Gemini analysis:', error);
-            }
+          try {
+            await fetch('/api/trigger-gemini-scan', { method: 'POST' });
+          } catch (error) {
+            console.error('Error triggering Gemini analysis:', error);
           }
+        } else if (currentStatus === 'analyzing') {
+          setProgress(70);
         } else if (currentStatus === 'completed') {
-          setPhase('complete');
           setProgress(100);
+          setShowComplete(true);
           stoppedRef.current = true;
-          onComplete(data.scan_id);
+          // Show 100% for 1 second before redirecting
+          completeTimeout = setTimeout(() => {
+            setShowComplete(false);
+            onComplete(data.scan_id);
+          }, 1000);
         }
-        
       } catch (error) {
         console.error('Error polling scan status:', error);
         setStatus('error');
@@ -75,28 +70,27 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
       while (!stoppedRef.current) {
         const elapsed = Date.now() - startTimeRef.current;
         await pollScanStatus();
-        
         if (stoppedRef.current) break;
-        
-        // Poll more frequently during analysis phase
-        if (phase === 'analyzing') {
-          await new Promise(r => setTimeout(r, 2000)); // Every 2s during analysis
+        if (status === 'analyzing') {
+          await new Promise(r => setTimeout(r, 2000));
         } else if (elapsed < 30000) {
-          await new Promise(r => setTimeout(r, 3000)); // Every 3s for first 30s
+          await new Promise(r => setTimeout(r, 3000));
         } else {
-          await new Promise(r => setTimeout(r, 60000)); // Every 60s after
+          await new Promise(r => setTimeout(r, 60000));
         }
       }
     };
-    
     loop();
-    return () => { stoppedRef.current = true; };
-  }, [userId, onComplete, phase]);
+    return () => {
+      stoppedRef.current = true;
+      if (completeTimeout) clearTimeout(completeTimeout);
+    };
+  }, [userId, onComplete]);
 
   const getPhaseMessage = () => {
-    if (phase === 'reading') {
+    if (progress < 40) {
       return 'Reading emails from your Gmail account...';
-    } else if (phase === 'analyzing') {
+    } else if (progress < 100) {
       return 'Using AI to analyze subscription details...';
     } else {
       return 'Complete!';
@@ -105,14 +99,14 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
 
   return (
     <div style={{ margin: '2em 0', textAlign: 'center' }}>
-      {status && status !== 'completed' && status !== 'error' && (
+      {status && status !== 'error' && (
         <div>
           <div className="progress-bar">
             <div 
               className="progress-bar-inner" 
               style={{ 
                 width: `${progress}%`,
-                backgroundColor: phase === 'reading' ? '#3B82F6' : '#10B981'
+                backgroundColor: progress < 100 ? '#3B82F6' : '#10B981'
               }} 
             />
           </div>
@@ -124,8 +118,12 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
           </div>
         </div>
       )}
-      {status === 'completed' && <div>Analysis complete!</div>}
       {status === 'error' && <div style={{ color: 'red' }}>{statusMessages.error}</div>}
+      {showComplete && (
+        <div style={{ marginTop: 16, fontWeight: 600, color: '#10B981' }}>
+          Analysis complete! Redirecting to your dashboard...
+        </div>
+      )}
     </div>
   );
 };
