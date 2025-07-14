@@ -182,6 +182,7 @@ const Dashboard = () => {
   };
 
   return (
+    // The lg:ml-64 ensures the main content is not overlapped by the fixed sidebar on large screens
     <div className="min-h-screen bg-gray-50 lg:ml-64">
       {/* Add Subscription Modal */}
       <AddSubscriptionModal 
