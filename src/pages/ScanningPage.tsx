@@ -283,8 +283,8 @@ const ScanningPage = () => {
         return;
       }
       
-      console.log('SCAN-DEBUG: Making request to:', `${API_URL}/api/scan-status/${currentScanId}`);
-      const response = await fetch(`${API_URL}/api/scan-status/${currentScanId}`, {
+      console.log('SCAN-DEBUG: Making request to:', `${API_URL}/api/email/status/${currentScanId}`);
+      const response = await fetch(`${API_URL}/api/email/status/${currentScanId}`, {
         headers: {
           'Authorization': `Bearer ${getToken()}`
         }
@@ -504,7 +504,7 @@ const ScanningPage = () => {
               // Continue with starting new scan
             } else {
               // Check for the latest scan status
-              const response = await fetch(`${API_URL}/api/scan-status?scanId=latest`, {
+              const response = await fetch(`${API_URL}/api/email/status?scanId=latest`, {
                 headers: {
                   'Authorization': `Bearer ${token}`
                 }

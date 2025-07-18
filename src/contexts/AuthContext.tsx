@@ -53,8 +53,10 @@ export const useAuth = () => {
 
 const validateToken = async (token: string) => {
   try {
-    const response = await axios.get('/api/auth/me', {
-      baseURL: AUTH_API_URL,
+    const apiUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? 'http://localhost:3000'
+      : 'https://api.quits.cc';
+    await axios.get(`${apiUrl}/api/auth/me`, {
       headers: {
         Authorization: `Bearer ${token}`
       }

@@ -81,7 +81,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
-    'X-Client-Version': process.env.VITE_APP_VERSION || 'development'
+    'X-Client-Version': import.meta.env.VITE_APP_VERSION || 'development'
   },
 });
 

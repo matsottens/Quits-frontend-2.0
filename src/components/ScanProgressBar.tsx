@@ -30,7 +30,7 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
         // The email scan will set the status to 'ready_for_analysis' when it's done
         
         // Poll for scan status
-        const res = await fetch(`/api/scan-status?user_id=${userId}`);
+        const res = await fetch(`/api/email/status?user_id=${userId}`);
         if (!res.ok) {
           setStatus('error');
           return;

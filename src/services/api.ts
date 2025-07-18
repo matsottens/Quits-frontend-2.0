@@ -479,9 +479,8 @@ const apiService = {
         
         console.log('SCAN-DEBUG: scanEmails called with options:', options);
         
-        // Try /api/email-scan first
-        console.log('SCAN-DEBUG: Trying /api/email-scan endpoint');
-        let response = await fetch(`${API_URL}/api/email-scan`, {
+        // Use production endpoint only
+        const response = await fetch(`${API_URL}/api/email/scan`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -495,27 +494,7 @@ const apiService = {
           })
         });
         
-        console.log('SCAN-DEBUG: /api/email-scan response status:', response.status);
-        
-        if (!response.ok) {
-          // If /api/email-scan fails, try /api/scan
-          console.warn('scanEmails: /api/email-scan failed, trying /api/scan');
-          console.log('SCAN-DEBUG: Trying /api/scan endpoint as fallback');
-          response = await fetch(`${API_URL}/api/scan`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              token, // <-- Always include token in body
-              ...options,
-              useRealData: true
-            })
-          });
-          console.log('SCAN-DEBUG: /api/scan response status:', response.status);
-        }
+        console.log('SCAN-DEBUG: /api/email/scan response status:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -589,7 +568,8 @@ const apiService = {
     getScanStatus: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/scan-status?scanId=${encodeURIComponent(scanId)}`, {
+        // Use production endpoint only
+        const response = await fetch(`${API_URL}/api/email/status`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
