@@ -34,9 +34,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 )
 
-// Conditionally register service worker only in development
+// Conditionally register service worker only in production
 // In production, it should be handled by the hosting platform
-if (import.meta.env.MODE === 'development' && 'serviceWorker' in navigator) {
+if (import.meta.env.MODE === 'production' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(registration => {

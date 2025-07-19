@@ -274,11 +274,10 @@ const ScanningPage = () => {
         return;
       }
       
-      // Validate scan ID format
-      if (!currentScanId.startsWith('scan_')) {
-        console.error('SCAN-DEBUG: Invalid scan ID format:', currentScanId);
-        setError('Invalid scan ID format. Please try again.');
-        // Clear invalid scan ID from localStorage
+      // Accept any non-empty scan ID; backend now uses UUIDs directly
+      if (currentScanId.trim().length === 0) {
+        console.error('SCAN-DEBUG: Empty scan ID');
+        setError('Invalid scan ID. Please try again.');
         localStorage.removeItem('current_scan_id');
         return;
       }

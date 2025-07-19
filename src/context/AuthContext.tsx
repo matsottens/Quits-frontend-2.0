@@ -131,7 +131,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           ? 'http://localhost:3000/api'
           : 'https://api.quits.cc';
           
-        await axios.get(`${apiUrl}/api/auth/me`);
+        await axios.get(`${apiUrl}/auth/me`);
       } catch (error) {
         console.error('Token validation error:', error);
         // Continue anyway since we validated the token structure

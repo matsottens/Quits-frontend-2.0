@@ -364,7 +364,7 @@ const apiService = {
     // Get current user info
     getMe: async () => {
       console.log(`Getting user info`);
-      const response = await authApi.get('/api/auth/me');
+      const response = await authApi.get('/auth/me');
       return response.data;
     },
     
@@ -686,7 +686,7 @@ const apiService = {
       try {
         // Use fetch instead of axios to avoid CORS issues
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscription/`, {
+        const response = await fetch(`${API_URL}/api/subscriptions/`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -711,7 +711,7 @@ const apiService = {
     getById: async (id: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscription/${id}`, {
+        const response = await fetch(`${API_URL}/api/subscriptions/${id}`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -734,7 +734,7 @@ const apiService = {
     create: async (data: any) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscription`, {
+        const response = await fetch(`${API_URL}/api/subscriptions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -759,7 +759,7 @@ const apiService = {
     update: async (id: string, data: any) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscription/${id}`, {
+        const response = await fetch(`${API_URL}/api/subscriptions/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -784,7 +784,7 @@ const apiService = {
     delete: async (id: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscription/${id}`, {
+        const response = await fetch(`${API_URL}/api/subscriptions/${id}`, {
           method: 'DELETE',
           headers: {
             'Accept': 'application/json',
