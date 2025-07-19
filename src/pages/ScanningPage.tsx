@@ -282,8 +282,11 @@ const ScanningPage = () => {
         return;
       }
       
-      console.log('SCAN-DEBUG: Making request to:', `${API_URL}/api/email/status/${currentScanId}`);
-      const response = await fetch(`${API_URL}/api/email/status/${currentScanId}`, {
+      // Ensure we don't end up with duplicated '/api/api' in production where API_URL may already include '/api'
+      const apiBase = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
+      const statusUrl = `${apiBase}/email/status/${currentScanId}`;
+      console.log('SCAN-DEBUG: Making request to:', statusUrl);
+      const response = await fetch(statusUrl, {
         headers: {
           'Authorization': `Bearer ${getToken()}`
         }
