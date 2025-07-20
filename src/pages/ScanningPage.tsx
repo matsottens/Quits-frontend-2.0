@@ -151,6 +151,16 @@ const ScanningPage = () => {
       
       console.log('SCAN-DEBUG: About to call api.email.scanEmails()');
       const response = await api.email.scanEmails();
+      
+      if (!response || !response.scanId) {
+        console.error('SCAN-DEBUG: Scan initiation failed, no scanId received.');
+        setError('Failed to start the email scan. The server did not return a valid scan ID. Please try again.');
+        setScanningStatus('error');
+        localStorage.removeItem('current_scan_id');
+        scanInitiatedRef.current = false;
+        return;
+      }
+      
       console.log('SCAN-DEBUG: api.email.scanEmails() response:', response);
       
       // Check for mock response (indicating connection issues)
