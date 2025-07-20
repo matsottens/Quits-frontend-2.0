@@ -46,15 +46,15 @@ const ScanningPage = () => {
   const [isRetrying, setIsRetrying] = useState(false);
   const [statusCheckFailures, setStatusCheckFailures] = useState(0);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  const [scanId, setScanId] = useState<string | null>(() => {
-    // Try to get scanId from localStorage on initial load
-    return localStorage.getItem('current_scan_id');
-  });
-  const scanInitiatedRef = useRef(false);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const maxRetries = 3;
+  const [scanId, setScanId] = useState<string | null>(null);
+  const { user } = useAuth(); // Get user from AuthContext
 
-  // Get token from localStorage
+  // Helper to get user-specific localStorage key for the scan ID
+  const getScanIdKey = () => {
+    if (!user || !user.id) return null;
+    return `current_scan_id_${user.id}`;
+  };
+
   const getToken = () => localStorage.getItem('token');
 
   const MAX_STATUS_CHECK_FAILURES = 5;
@@ -102,6 +102,10 @@ const ScanningPage = () => {
       }
       setScanningStatus('error');
       setError('The scan is taking longer than expected. This may be due to Gmail API limitations or server issues. Please try again later.');
+      const scanIdKey = getScanIdKey();
+      if (scanIdKey) {
+        localStorage.removeItem(scanIdKey);
+      }
       return true;
     }
     return false;
@@ -111,7 +115,7 @@ const ScanningPage = () => {
   useEffect(() => {
     // Debug logging for scanId
     console.log('Initial scanId state:', scanId);
-    console.log('Initial localStorage scanId:', localStorage.getItem('current_scan_id'));
+    console.log('Initial localStorage scanId:', localStorage.getItem(getScanIdKey()));
     
     return () => {
       if (pollingIntervalRef.current) {
@@ -122,10 +126,15 @@ const ScanningPage = () => {
 
   // Start email scanning process
   const startScanning = async () => {
+    const scanIdKey = getScanIdKey();
+    if (!scanIdKey) {
+      setError("Cannot start scan: user is not authenticated.");
+      return;
+    }
     console.log('SCAN-DEBUG: startScanning called');
     console.log('SCAN-DEBUG: scanInitiatedRef.current:', scanInitiatedRef.current);
     console.log('SCAN-DEBUG: Current scanId state:', scanId);
-    console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem('current_scan_id'));
+    console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey));
     
     if (scanInitiatedRef.current) {
       console.log('SCAN-DEBUG: Scan already initiated, skipping');
@@ -133,7 +142,7 @@ const ScanningPage = () => {
     }
 
     // Additional check: if there's a scan ID in localStorage, don't start a new scan
-    const storedScanId = localStorage.getItem('current_scan_id');
+    const storedScanId = localStorage.getItem(scanIdKey);
     if (storedScanId && storedScanId.startsWith('scan_')) {
       console.log('SCAN-DEBUG: Found existing scan ID in localStorage, not starting new scan');
       return;
@@ -156,7 +165,7 @@ const ScanningPage = () => {
         console.error('SCAN-DEBUG: Scan initiation failed, no scanId received.');
         setError('Failed to start the email scan. The server did not return a valid scan ID. Please try again.');
         setScanningStatus('error');
-        localStorage.removeItem('current_scan_id');
+        localStorage.removeItem(scanIdKey);
         scanInitiatedRef.current = false;
         return;
       }
@@ -181,13 +190,13 @@ const ScanningPage = () => {
         const newScanId = response.scanId;
         console.log('SCAN-DEBUG: Received scanId from API:', newScanId);
         console.log('SCAN-DEBUG: Previous scanId state:', scanId);
-        console.log('SCAN-DEBUG: Previous localStorage scanId:', localStorage.getItem('current_scan_id'));
+        console.log('SCAN-DEBUG: Previous localStorage scanId:', localStorage.getItem(scanIdKey));
         
         setScanId(newScanId);
         // Save scanId to localStorage
-        localStorage.setItem('current_scan_id', newScanId);
+        localStorage.setItem(scanIdKey, newScanId);
         console.log('SCAN-DEBUG: Updated scanId state to:', newScanId);
-        console.log('SCAN-DEBUG: Updated localStorage to:', localStorage.getItem('current_scan_id'));
+        console.log('SCAN-DEBUG: Updated localStorage to:', localStorage.getItem(scanIdKey));
         console.log('Scan started with ID:', newScanId);
         
         // Start polling for status updates with the new ID
@@ -245,7 +254,7 @@ const ScanningPage = () => {
     setPollingCount(0); // Reset polling count
     
     // Use the provided scan ID or fall back to localStorage only if no state
-    const scanIdToUse = currentScanId || localStorage.getItem('current_scan_id');
+    const scanIdToUse = currentScanId || localStorage.getItem(getScanIdKey());
     
     // Set initial poll immediately with the current scan ID
     if (scanIdToUse) {
@@ -272,17 +281,22 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async (providedScanId?: string) => {
     try {
+      const scanIdKey = getScanIdKey();
+      if (!scanIdKey) {
+        console.warn("Scan status check skipped: no user ID found.");
+        return;
+      }
       // Determine which scan ID to query.
       // Priority:
       //   1) Explicit function argument
       //   2) Value stored in localStorage (authoritative, written right after the scan starts)
       //   3) React state (may be stale inside closures)
-      const currentScanId = providedScanId || localStorage.getItem('current_scan_id') || scanId;
+      const currentScanId = providedScanId || localStorage.getItem(scanIdKey) || scanId;
       
       console.log('SCAN-DEBUG: Checking scan status for scanId:', currentScanId);
       console.log('SCAN-DEBUG: Provided scanId:', providedScanId);
       console.log('SCAN-DEBUG: Current scanId state:', scanId);
-      console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem('current_scan_id'));
+      console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey));
       
       if (!currentScanId) {
         console.log('SCAN-DEBUG: No scanId available, cannot check status');
@@ -293,7 +307,7 @@ const ScanningPage = () => {
       if (currentScanId.trim().length === 0) {
         console.error('SCAN-DEBUG: Empty scan ID');
         setError('Invalid scan ID. Please try again.');
-        localStorage.removeItem('current_scan_id');
+        localStorage.removeItem(scanIdKey);
         return;
       }
       
@@ -325,7 +339,10 @@ const ScanningPage = () => {
       if (returnedScanId && returnedScanId !== currentScanId) {
         console.log('SCAN-DEBUG: API returned different scan ID:', returnedScanId, 'updating from:', currentScanId);
         setScanId(returnedScanId);
-        localStorage.setItem('current_scan_id', returnedScanId);
+        const scanIdKey = getScanIdKey();
+        if (scanIdKey) {
+          localStorage.setItem(scanIdKey, returnedScanId);
+        }
         
         // Show a brief message to the user about the scan ID change
         if (warning) {
@@ -414,7 +431,10 @@ const ScanningPage = () => {
         setScanningStatus('error');
         setError(data.error || 'An error occurred during scanning');
         // Clear scan ID from localStorage on error
-        localStorage.removeItem('current_scan_id');
+        const scanIdKey = getScanIdKey();
+        if (scanIdKey) {
+          localStorage.removeItem(scanIdKey);
+        }
       } else if (uiStatus === 'quota_exhausted') {
         // Handle quota exhaustion - if subscriptions were found, consider it complete
         const subscriptionsFound = stats?.subscriptionsFound || 0;
@@ -503,7 +523,10 @@ const ScanningPage = () => {
     setStatusCheckFailures(0);
     geminiTriggeredRef.current = false; // Reset Gemini trigger flag
     // Clear the current scanId from localStorage
-    localStorage.removeItem('current_scan_id');
+    const scanIdKey = getScanIdKey();
+    if (scanIdKey) {
+      localStorage.removeItem(scanIdKey);
+    }
     scanInitiatedRef.current = false;
     
     // Stop any existing polling
@@ -524,8 +547,14 @@ const ScanningPage = () => {
       const initiateScanning = async () => {
         console.log('initiateScanning called, current status:', scanningStatus, 'scanId:', scanId, 'scanInitiated:', scanInitiatedRef.current);
         
+        const scanIdKey = getScanIdKey();
+        if (!scanIdKey) {
+          console.log("Waiting for user context to be available...");
+          return;
+        }
+
         // Check if we have a valid scan ID in localStorage that we should resume
-        const storedScanId = localStorage.getItem('current_scan_id');
+        const storedScanId = localStorage.getItem(scanIdKey);
         if (storedScanId && storedScanId.startsWith('scan_')) {
           console.log(`Found valid scan ID in localStorage: ${storedScanId}, attempting to resume`);
           setScanId(storedScanId);
@@ -546,7 +575,7 @@ const ScanningPage = () => {
         } else if (storedScanId) {
           // Clear invalid scan ID from localStorage
           console.log(`Clearing invalid scan ID ${storedScanId} from localStorage`);
-          localStorage.removeItem('current_scan_id');
+          localStorage.removeItem(scanIdKey);
         }
         
         // Before starting a new scan, check if there's already a completed scan
@@ -572,7 +601,7 @@ const ScanningPage = () => {
                 
                 if (data.status === 'completed') {
                   console.log('Found completed scan, starting a new scan for returning user');
-                  localStorage.removeItem('current_scan_id');
+                  localStorage.removeItem(scanIdKey);
                   scanInitiatedRef.current = false;
                   setTimeout(() => {
                     startScanning();
@@ -580,7 +609,7 @@ const ScanningPage = () => {
                   return;
                 } else if (data.status === 'quota_exhausted' && data.stats?.subscriptions_found > 0) {
                   console.log('Found quota exhausted scan with subscriptions, starting a new scan for returning user');
-                  localStorage.removeItem('current_scan_id');
+                  localStorage.removeItem(scanIdKey);
                   scanInitiatedRef.current = false;
                   setTimeout(() => {
                     startScanning();
@@ -589,7 +618,7 @@ const ScanningPage = () => {
                 } else if (data.status === 'in_progress' || data.status === 'ready_for_analysis' || data.status === 'analyzing') {
                   console.log('Found active scan in progress, resuming instead of starting new scan');
                   setScanId(data.scan_id);
-                  localStorage.setItem('current_scan_id', data.scan_id);
+                  localStorage.setItem(scanIdKey, data.scan_id);
                   scanInitiatedRef.current = true;
                   pollScanStatus(data.scan_id);
                   return;
@@ -633,7 +662,7 @@ const ScanningPage = () => {
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, [navigate]);
+  }, [user]); // Rerun when user context becomes available
 
   // Add a debugging effect to log state changes
   useEffect(() => {
@@ -763,7 +792,7 @@ const ScanningPage = () => {
         return;
       }
 
-      const currentScanId = scanId || localStorage.getItem('current_scan_id');
+      const currentScanId = scanId || localStorage.getItem(getScanIdKey());
       if (!currentScanId) {
         setError('No scan ID available for diagnostics.');
         return;

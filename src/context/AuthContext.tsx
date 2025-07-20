@@ -110,13 +110,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Store token in localStorage
       localStorage.setItem('token', token);
       
-      // Set user and auth state
+      // Decode the token to get user info
       const userData: User = {
         id: decoded.id,
         email: decoded.email,
         name: decoded.name,
         picture: decoded.picture
       };
+
+      // Store user ID separately for namespacing local storage
+      localStorage.setItem('user_id', userData.id);
       
       setUser(userData);
       setIsAuthenticated(true);
@@ -148,6 +151,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user_id');
     setUser(null);
     setIsAuthenticated(false);
     delete axios.defaults.headers.common['Authorization'];
