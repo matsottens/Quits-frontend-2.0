@@ -262,8 +262,12 @@ const ScanningPage = () => {
   // Check the scanning status
   const checkScanStatus = async (providedScanId?: string) => {
     try {
-      // Use provided scan ID first, then current state, then localStorage as fallback
-      const currentScanId = providedScanId || scanId || localStorage.getItem('current_scan_id');
+      // Determine which scan ID to query.
+      // Priority:
+      //   1) Explicit function argument
+      //   2) Value stored in localStorage (authoritative, written right after the scan starts)
+      //   3) React state (may be stale inside closures)
+      const currentScanId = providedScanId || localStorage.getItem('current_scan_id') || scanId;
       
       console.log('SCAN-DEBUG: Checking scan status for scanId:', currentScanId);
       console.log('SCAN-DEBUG: Provided scanId:', providedScanId);
@@ -359,7 +363,9 @@ const ScanningPage = () => {
         // that the Edge Function had time to write results into the subscriptions table and that
         // the dashboard will show meaningful data straight away.
 
-        const subsFound = stats?.subscriptionsFound || 0;
+        // API returns stats with snake_case (subscriptions_found). The component's mapping later converts
+        // to camelCase, but here we are still dealing with the raw `stats` object coming from the API.
+        const subsFound = (stats as any)?.subscriptions_found ?? (stats as any)?.subscriptionsFound ?? 0;
 
         if (subsFound > 0) {
           if (pollingIntervalRef.current) {
