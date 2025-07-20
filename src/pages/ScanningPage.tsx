@@ -47,7 +47,7 @@ const ScanningPage = () => {
   const [statusCheckFailures, setStatusCheckFailures] = useState(0);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [scanId, setScanId] = useState<string | null>(null);
-  const { user } = useAuth(); // Single declaration of user
+  // user already destructured above; remove duplicate
 
   // Refs to manage polling and scan state
   const scanInitiatedRef = useRef(false);
@@ -120,7 +120,8 @@ const ScanningPage = () => {
   useEffect(() => {
     // Debug logging for scanId
     console.log('Initial scanId state:', scanId);
-    console.log('Initial localStorage scanId:', localStorage.getItem(getScanIdKey()));
+    const key = getScanIdKey();
+    console.log('Initial localStorage scanId:', key ? localStorage.getItem(key) : null);
     
     return () => {
       if (pollingIntervalRef.current) {
@@ -139,7 +140,7 @@ const ScanningPage = () => {
     console.log('SCAN-DEBUG: startScanning called');
     console.log('SCAN-DEBUG: scanInitiatedRef.current:', scanInitiatedRef.current);
     console.log('SCAN-DEBUG: Current scanId state:', scanId);
-    console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey));
+    console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey!));
     
     if (scanInitiatedRef.current) {
       console.log('SCAN-DEBUG: Scan already initiated, skipping');
@@ -195,13 +196,13 @@ const ScanningPage = () => {
         const newScanId = response.scanId;
         console.log('SCAN-DEBUG: Received scanId from API:', newScanId);
         console.log('SCAN-DEBUG: Previous scanId state:', scanId);
-        console.log('SCAN-DEBUG: Previous localStorage scanId:', localStorage.getItem(scanIdKey));
+        console.log('SCAN-DEBUG: Previous localStorage scanId:', localStorage.getItem(scanIdKey!));
         
         setScanId(newScanId);
         // Save scanId to localStorage
         localStorage.setItem(scanIdKey, newScanId);
         console.log('SCAN-DEBUG: Updated scanId state to:', newScanId);
-        console.log('SCAN-DEBUG: Updated localStorage to:', localStorage.getItem(scanIdKey));
+        console.log('SCAN-DEBUG: Updated localStorage to:', localStorage.getItem(scanIdKey!));
         console.log('Scan started with ID:', newScanId);
         
         // Start polling for status updates with the new ID
@@ -299,12 +300,12 @@ const ScanningPage = () => {
       //   1) Explicit function argument
       //   2) Value stored in localStorage (authoritative, written right after the scan starts)
       //   3) React state (may be stale inside closures)
-      const currentScanId = providedScanId || localStorage.getItem(scanIdKey) || scanId;
+      const currentScanId = providedScanId || localStorage.getItem(scanIdKey!) || scanId;
       
       console.log('SCAN-DEBUG: Checking scan status for scanId:', currentScanId);
       console.log('SCAN-DEBUG: Provided scanId:', providedScanId);
       console.log('SCAN-DEBUG: Current scanId state:', scanId);
-      console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey));
+      console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey!));
       
       if (!currentScanId) {
         console.log('SCAN-DEBUG: No scanId available, cannot check status');
