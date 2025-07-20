@@ -240,7 +240,7 @@ const ScanningPage = () => {
     // Set initial poll immediately with the current scan ID
     if (scanIdToUse) {
       console.log(`SCAN-DEBUG: Starting polling for scan ID: ${scanIdToUse}`);
-      checkScanStatus();
+      checkScanStatus(scanIdToUse);
       
       // Then poll every 3 seconds
       pollingIntervalRef.current = setInterval(() => {
@@ -252,7 +252,7 @@ const ScanningPage = () => {
           }
           return newCount;
         });
-        checkScanStatus();
+        checkScanStatus(scanIdToUse);
       }, 3000);
     } else {
       console.warn('Cannot start polling: No scan ID available');
@@ -260,12 +260,13 @@ const ScanningPage = () => {
   };
 
   // Check the scanning status
-  const checkScanStatus = async () => {
+  const checkScanStatus = async (providedScanId?: string) => {
     try {
-      // Use the current scanId state, with localStorage as fallback only for page refreshes
-      const currentScanId = scanId || localStorage.getItem('current_scan_id');
+      // Use provided scan ID first, then current state, then localStorage as fallback
+      const currentScanId = providedScanId || scanId || localStorage.getItem('current_scan_id');
       
       console.log('SCAN-DEBUG: Checking scan status for scanId:', currentScanId);
+      console.log('SCAN-DEBUG: Provided scanId:', providedScanId);
       console.log('SCAN-DEBUG: Current scanId state:', scanId);
       console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem('current_scan_id'));
       
