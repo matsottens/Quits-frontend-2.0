@@ -355,15 +355,39 @@ const ScanningPage = () => {
       
       // Handle different scan statuses
       if (uiStatus === 'completed') {
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
+        // Only redirect when at least one subscription has been discovered. This guarantees
+        // that the Edge Function had time to write results into the subscriptions table and that
+        // the dashboard will show meaningful data straight away.
+
+        const subsFound = stats?.subscriptionsFound || 0;
+
+        if (subsFound > 0) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setScanningStatus('completed');
+          // Show 100% for 1 s before redirecting so users see the progress bar finish.
+          setTimeout(() => {
+            navigate('/dashboard', { state: { justScanned: true } });
+          }, 1000);
+        } else {
+          console.log('SCAN-DEBUG: Scan marked completed but subscriptions_found = 0 – waiting…');
+          // Force an extra poll every 2 s until subscriptions appear or we hit the max polling count.
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+          }
+          pollingIntervalRef.current = setInterval(() => {
+            setPollingCount(prev => {
+              const newCount = prev + 1;
+              if (newCount >= MAX_POLLING_COUNT) {
+                checkScanTimeout();
+              }
+              return newCount;
+            });
+            checkScanStatus();
+          }, 2000);
         }
-        setScanningStatus('completed');
-        // Show 100% for 1s before redirecting
-        setTimeout(() => {
-          navigate('/dashboard', { state: { justScanned: true } });
-        }, 1000);
       } else if (uiStatus === 'error' || uiStatus === 'failed') {
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
