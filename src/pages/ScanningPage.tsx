@@ -284,7 +284,9 @@ const ScanningPage = () => {
       
       // Ensure we don't end up with duplicated '/api/api' in production where API_URL may already include '/api'
       const apiBase = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
-      const statusUrl = `${apiBase}/email/status/${currentScanId}`;
+      const statusUrl = currentScanId.startsWith('scan_')
+        ? `${apiBase}/email/status?scanId=${currentScanId}`
+        : `${apiBase}/email/status/${currentScanId}`;
       console.log('SCAN-DEBUG: Making request to:', statusUrl);
       const response = await fetch(statusUrl, {
         headers: {
