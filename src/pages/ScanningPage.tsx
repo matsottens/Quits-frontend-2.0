@@ -49,6 +49,10 @@ const ScanningPage = () => {
   const [scanId, setScanId] = useState<string | null>(null);
   const { user } = useAuth(); // Get user from AuthContext
 
+  // Refs to manage polling and scan state
+  const scanInitiatedRef = useRef(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Helper to get user-specific localStorage key for the scan ID
   const getScanIdKey = () => {
     if (!user || !user.id) return null;
@@ -245,7 +249,7 @@ const ScanningPage = () => {
   };
 
   // Poll for scan status
-  const pollScanStatus = (currentScanId = scanId) => {
+  const pollScanStatus = (currentScanId: string) => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -254,14 +258,13 @@ const ScanningPage = () => {
     setPollingCount(0); // Reset polling count
     
     // Use the provided scan ID or fall back to localStorage only if no state
-    const scanIdToUse = currentScanId || localStorage.getItem(getScanIdKey());
+    const scanIdToUse = currentScanId || (getScanIdKey() ? localStorage.getItem(getScanIdKey()!) : null);
     
-    // Set initial poll immediately with the current scan ID
     if (scanIdToUse) {
-      console.log(`SCAN-DEBUG: Starting polling for scan ID: ${scanIdToUse}`);
+      // Set initial poll immediately with the current scan ID
       checkScanStatus(scanIdToUse);
       
-      // Then poll every 3 seconds
+      // Set up the polling interval
       pollingIntervalRef.current = setInterval(() => {
         setPollingCount(prev => {
           const newCount = prev + 1;
