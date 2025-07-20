@@ -47,7 +47,7 @@ const ScanningPage = () => {
   const [statusCheckFailures, setStatusCheckFailures] = useState(0);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [scanId, setScanId] = useState<string | null>(null);
-  const { user } = useAuth(); // Get user from AuthContext
+  const { user } = useAuth(); // Single declaration of user
 
   // Refs to manage polling and scan state
   const scanInitiatedRef = useRef(false);
@@ -263,7 +263,7 @@ const ScanningPage = () => {
     setPollingCount(0); // Reset polling count
     
     // Use the provided scan ID or fall back to localStorage only if no state
-    const scanIdToUse = currentScanId || (getScanIdKey() ? localStorage.getItem(getScanIdKey()!) : null);
+    const scanIdToUse = currentScanId; // It's guaranteed to be a string here
     
     if (scanIdToUse) {
       // Set initial poll immediately with the current scan ID
