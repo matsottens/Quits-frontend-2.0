@@ -801,7 +801,8 @@ const ScanningPage = () => {
         return;
       }
 
-      const currentScanId = scanId || localStorage.getItem(getScanIdKey());
+      const key = getScanIdKey();
+      const currentScanId = scanId || (key ? localStorage.getItem(key) : null);
       if (!currentScanId) {
         setError('No scan ID available for diagnostics.');
         return;
