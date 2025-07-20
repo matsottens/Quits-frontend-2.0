@@ -52,6 +52,7 @@ const ScanningPage = () => {
   // Refs to manage polling and scan state
   const scanInitiatedRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const maxRetries = 3;
 
   // Helper to get user-specific localStorage key for the scan ID
   const getScanIdKey = () => {
@@ -249,7 +250,11 @@ const ScanningPage = () => {
   };
 
   // Poll for scan status
-  const pollScanStatus = (currentScanId: string) => {
+  const pollScanStatus = (currentScanId: string | null) => {
+    if (!currentScanId) {
+      console.warn('Cannot start polling: No scan ID provided');
+      return;
+    }
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
