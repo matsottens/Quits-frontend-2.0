@@ -304,7 +304,7 @@ const ScanningPage = () => {
       }
       
       const data = await response.json();
-      const { status: uiStatus, progress, stats, scan_id: returnedScanId, warning } = data;
+      const { status: uiStatus, progress, stats, scan_id: returnedScanId, warning, completed_count } = data;
       
       // Log warning if present
       if (warning) {
@@ -366,8 +366,10 @@ const ScanningPage = () => {
         // API returns stats with snake_case (subscriptions_found). The component's mapping later converts
         // to camelCase, but here we are still dealing with the raw `stats` object coming from the API.
         const subsFound = (stats as any)?.subscriptions_found ?? (stats as any)?.subscriptionsFound ?? 0;
+        const analysisCompleted = completed_count ?? 0;
+        const totalDetected = subsFound + analysisCompleted;
 
-        if (subsFound > 0) {
+        if (totalDetected > 0) {
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current);
             pollingIntervalRef.current = null;
@@ -441,10 +443,19 @@ const ScanningPage = () => {
         }
       } else {
         // Continue scanning - let the cron job handle Gemini analysis triggering
-        // The cron job runs every minute and will automatically trigger analysis for scans in 'ready_for_analysis' status
-        if (uiStatus === 'ready_for_analysis') {
-          console.log('Email scan completed, waiting for cron job to trigger Gemini analysis');
-          // Don't trigger manually - let the cron job handle it
+        // The cron job runs every minute; as fallback, if analysis is already detecting results we can redirect early
+        if (uiStatus === 'analyzing') {
+          const subsFound = (stats as any)?.subscriptions_found ?? (stats as any)?.subscriptionsFound ?? 0;
+          const analysisCompleted = completed_count ?? 0;
+          if ((subsFound + analysisCompleted) > 0) {
+            console.log('SCAN-DEBUG: Subscriptions detected during analyzing – redirecting');
+            if (pollingIntervalRef.current) {
+              clearInterval(pollingIntervalRef.current);
+              pollingIntervalRef.current = null;
+            }
+            setTimeout(() => navigate('/dashboard', { state: { justScanned: true } }), 500);
+            return;
+          }
         }
         
         // Continue polling - more frequently during analysis phase
