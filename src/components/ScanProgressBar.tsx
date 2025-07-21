@@ -90,9 +90,9 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
 
   const getPhaseMessage = () => {
     if (phase === 'reading') {
-      return 'Reading emails from your Gmail account...';
+      return 'Fetching emails...';
     } else if (phase === 'analyzing') {
-      return 'Using AI to analyze subscription details...';
+      return 'Analyzing subscriptions...';
     } else {
       return 'Complete!';
     }
