@@ -30,16 +30,30 @@ const SubscriptionDetails = () => {
         const response = await api.subscriptions.getById(id);
         
         if (response && response.subscription) {
-          setSubscription(response.subscription);
+          const sub = response.subscription;
+          setSubscription(sub);
           setFormData({
-            name: response.subscription.name || '',
-            price: response.subscription.price?.toString() || '',
-            currency: response.subscription.currency || 'USD',
-            billing_cycle: response.subscription.billing_cycle || 'monthly',
-            next_billing_date: response.subscription.next_billing_date || '',
-            provider: response.subscription.provider || '',
-            category: response.subscription.category || '',
-            notes: response.subscription.notes || ''
+            name: sub.name || '',
+            price: sub.price?.toString() || '',
+            currency: sub.currency || 'USD',
+            billing_cycle: sub.billing_cycle || 'monthly',
+            next_billing_date: sub.next_billing_date || '',
+            provider: sub.provider || '',
+            category: sub.category || '',
+            notes: sub.notes || ''
+          });
+        } else if (response && response.id) {
+          const sub = response;
+          setSubscription(sub);
+          setFormData({
+            name: sub.name || '',
+            price: sub.price?.toString() || '',
+            currency: sub.currency || 'USD',
+            billing_cycle: sub.billing_cycle || 'monthly',
+            next_billing_date: sub.next_billing_date || '',
+            provider: sub.provider || '',
+            category: sub.category || '',
+            notes: sub.notes || ''
           });
         } else {
           setError('Subscription not found');
