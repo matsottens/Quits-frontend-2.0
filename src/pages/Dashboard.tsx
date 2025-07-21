@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useLogo } from '../hooks/useLogo';
 import AddSubscriptionModal from '../components/AddSubscriptionModal';
 
 interface Subscription {
@@ -166,6 +167,8 @@ const Dashboard = () => {
     }).format(amount);
   };
 
+  const { logoUrl, handleImageError } = useLogo();
+
   // Handle scan button
   const handleScan = () => {
     navigate('/scanning');
@@ -192,10 +195,20 @@ const Dashboard = () => {
       />
 
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-white shadow relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Quits</h1>
-          <div className="flex items-center space-x-4">
+          {/* Invisible placeholder to keep spacing when sidebar is collapsed on mobile */}
+          <div className="w-6" />
+
+          {/* Centered logo */}
+          <img
+            src={logoUrl}
+            alt="Quits"
+            className="h-8 w-auto absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2"
+            onError={handleImageError}
+          />
+
+          <div className="flex items-center space-x-4 ml-auto">
             <Link to="/settings" className="text-gray-500 hover:text-gray-700">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
