@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import GoogleLogo from '../components/GoogleLogo';
 import authService from '../services/authService';
 import api from '../services/api';
 
@@ -252,7 +253,7 @@ const Login: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <img src={`${import.meta.env.BASE_URL}google-icon.svg`} alt="Google Logo" className="w-5 h-5" />
+                  <GoogleLogo className="w-5 h-5" />
                   <span>Continue with Google</span>
                 </>
               )}
