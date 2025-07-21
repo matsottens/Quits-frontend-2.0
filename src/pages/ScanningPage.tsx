@@ -860,15 +860,15 @@ const ScanningPage = () => {
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   {scanningStatus === 'initial' && 'Preparing to scan your emails'}
-                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Reading emails from Gmail'}
-                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Analyzing subscriptions with AI'}
+                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Fetching emails'}
+                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Analyzing subscriptions'}
                   {scanningStatus === 'quota_exhausted' && 'AI Analysis Paused'}
                   {scanningStatus === 'idle' && 'Starting scan...'}
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
                   {scanningStatus === 'initial' && 'Getting ready to find your subscriptions...'}
-                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Searching for subscription confirmation emails...'}
-                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Using AI to extract subscription details...'}
+                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Please wait while we fetch your emails...'}
+                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Extracting subscription details...'}
                   {scanningStatus === 'quota_exhausted' && 'AI quota temporarily exhausted. Analysis will resume automatically...'}
                   {scanningStatus === 'idle' && 'Initializing scan process...'}
                 </p>
@@ -897,7 +897,7 @@ const ScanningPage = () => {
                     {(scanningStatus === 'ready_for_analysis' || scanningStatus === 'analyzing') && (
                       <div className="bg-green-50 p-3 rounded">
                         <p className="font-medium text-green-800">Phase 2: AI Analysis</p>
-                        <p className="text-green-600">Using AI to extract subscription details...</p>
+                       
                       </div>
                     )}
                     {scanningStatus === 'quota_exhausted' && (
