@@ -118,16 +118,46 @@ const Dashboard = () => {
   const calculateMonthlyTotal = () => {
     return subscriptions.reduce((total, sub) => {
       let amount = sub.price;
-      
-      // Convert to monthly value based on billing cycle
-      if (sub.billing_cycle === 'yearly') {
-        amount = amount / 12;
-      } else if (sub.billing_cycle === 'weekly') {
-        amount = amount * 4.33; // Average weeks in a month
-      } else if (sub.billing_cycle === 'daily') {
-        amount = amount * 30; // Approximate days in a month
+      const cycle = (sub.billing_cycle || '').toLowerCase();
+
+      // Helper to safely parse a float
+      const safeNumber = (val: any) => {
+        const num = parseFloat(val);
+        return isNaN(num) ? 0 : num;
+      };
+
+      // 1. Explicit mappings for common cycles
+      switch (cycle) {
+        case 'monthly':
+          // no change
+          break;
+        case 'weekly':
+          amount = safeNumber(amount) * 4.33; // avg weeks per month
+          break;
+        case 'daily':
+          amount = safeNumber(amount) * 30; // approx days per month
+          break;
+        case 'quarterly': // every 3 months
+          amount = safeNumber(amount) / 3;
+          break;
+        case 'biannually':
+        case 'semiannually':
+        case 'semi-annually':
+          amount = safeNumber(amount) / 6;
+          break;
+        case 'yearly':
+        case 'annual':
+        case 'annually':
+          amount = safeNumber(amount) / 12;
+          break;
+        default: {
+          // Unknown or custom cycle – assume the stored price is already monthly
+          // This avoids accidentally dividing prices for multi-year terms that are
+          // still billed monthly (e.g., a 3-year contract paid monthly).
+          amount = safeNumber(amount);
+        }
       }
-      
+
       return total + amount;
     }, 0);
   };
