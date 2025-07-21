@@ -6,9 +6,9 @@ interface ScanProgressBarProps {
 }
 
 const statusMessages: Record<string, string> = {
-  in_progress: 'Reading emails from Gmail...',
-  ready_for_analysis: 'Emails read! Analyzing subscriptions with AI...',
-  analyzing: 'Analyzing subscriptions with AI...',
+  in_progress: 'Fetching subscriptions from your Gmail account...',
+  ready_for_analysis:' Analyzing subscriptions...',
+  analyzing: 'Analyzing subscriptions...',
   completed: 'Analysis complete! Fetching subscriptions...',
   error: 'An error occurred during analysis.'
 };
