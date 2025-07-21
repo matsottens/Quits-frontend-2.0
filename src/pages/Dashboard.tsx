@@ -151,10 +151,27 @@ const Dashboard = () => {
           amount = safeNumber(amount) / 12;
           break;
         default: {
-          // Unknown or custom cycle – assume the stored price is already monthly
-          // This avoids accidentally dividing prices for multi-year terms that are
-          // still billed monthly (e.g., a 3-year contract paid monthly).
-          amount = safeNumber(amount);
+          // Unknown or custom cycle – attempt to parse formats like "3 months", "2 years".
+          // We guard against dividing when the stored price already appears monthly (e.g., 9.99 with cycle "3 years").
+          const monthMatch = cycle.match(/(\d+)\s*month/);
+          const yearMatch  = cycle.match(/(\d+)\s*year/);
+
+          if (monthMatch) {
+            const n = parseInt(monthMatch[1], 10);
+            if (n > 1) {
+              const candidate = safeNumber(amount) / n;
+              // Guard: if candidate is very small (<1) and original amount is modest (<n*5), assume price already monthly.
+              amount = candidate < 1 && safeNumber(amount) < n * 5 ? safeNumber(amount) : candidate;
+            }
+          } else if (yearMatch) {
+            const n = parseInt(yearMatch[1], 10);
+            if (n > 1) {
+              const divisor = n * 12;
+              const candidate = safeNumber(amount) / divisor;
+              amount = candidate < 1 && safeNumber(amount) < divisor * 5 ? safeNumber(amount) : candidate;
+            }
+          }
+          // If no matches or guards triggered, keep amount as-is (assumed monthly)
         }
       }
 
