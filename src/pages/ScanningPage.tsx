@@ -394,7 +394,7 @@ const ScanningPage = () => {
       // }
       
       // Handle different scan statuses
-      if (uiStatus === 'completed') {
+      if (uiStatus === 'completed' || uiStatus === 'complete') {
         // Only redirect when at least one subscription has been discovered. This guarantees
         // that the Edge Function had time to write results into the subscriptions table and that
         // the dashboard will show meaningful data straight away.
@@ -593,6 +593,14 @@ const ScanningPage = () => {
   useEffect(() => {
     console.log('ScanningStatus changed to:', scanningStatus);
   }, [scanningStatus]);
+
+  // Add redirect when status completes (additional safety)
+  useEffect(() => {
+    if (scanningStatus === 'completed' || scanningStatus === 'complete') {
+      const timer = setTimeout(() => navigate('/dashboard', { state: { justScanned: true } }), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [scanningStatus, navigate]);
 
   // --- STEP-BASED PROGRESS CONFIGURATION -------------------------------------
   // Map every status that can appear in the scan_history table to a percentage
