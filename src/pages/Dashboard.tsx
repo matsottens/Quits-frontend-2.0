@@ -116,68 +116,64 @@ const Dashboard = () => {
 
   // Calculate total monthly cost
   const calculateMonthlyTotal = () => {
-    return subscriptions.reduce((total, sub) => {
-      let amount = sub.price;
-      const cycle = (sub.billing_cycle || '').toLowerCase();
+    return subscriptions.reduce((total, sub) => total + getMonthlyPrice(sub), 0);
+  };
 
-      // Helper to safely parse a float
-      const safeNumber = (val: any) => {
-        const num = parseFloat(val);
-        return isNaN(num) ? 0 : num;
-      };
+  // Helper to convert any subscription to its monthly-equivalent price
+  const getMonthlyPrice = (sub: Subscription) => {
+    let amount = sub.price;
+    const cycle = (sub.billing_cycle || '').toLowerCase();
+    const safeNumber = (val: any) => {
+      const num = parseFloat(val);
+      return isNaN(num) ? 0 : num;
+    };
 
-      // 1. Explicit mappings for common cycles
-      switch (cycle) {
-        case 'monthly':
-          // no change
-          break;
-        case 'weekly':
-          amount = safeNumber(amount) * 4.33; // avg weeks per month
-          break;
-        case 'daily':
-          amount = safeNumber(amount) * 30; // approx days per month
-          break;
-        case 'quarterly': // every 3 months
-          amount = safeNumber(amount) / 3;
-          break;
-        case 'biannually':
-        case 'semiannually':
-        case 'semi-annually':
-          amount = safeNumber(amount) / 6;
-          break;
-        case 'yearly':
-        case 'annual':
-        case 'annually':
-          amount = safeNumber(amount) / 12;
-          break;
-        default: {
-          // Unknown or custom cycle – attempt to parse formats like "3 months", "2 years".
-          // We guard against dividing when the stored price already appears monthly (e.g., 9.99 with cycle "3 years").
-          const monthMatch = cycle.match(/(\d+)\s*month/);
-          const yearMatch  = cycle.match(/(\d+)\s*year/);
-
-          if (monthMatch) {
-            const n = parseInt(monthMatch[1], 10);
-            if (n > 1) {
-              const candidate = safeNumber(amount) / n;
-              // Guard: if candidate is very small (<1) and original amount is modest (<n*5), assume price already monthly.
-              amount = candidate < 1 && safeNumber(amount) < n * 5 ? safeNumber(amount) : candidate;
-            }
-          } else if (yearMatch) {
-            const n = parseInt(yearMatch[1], 10);
-            if (n > 1) {
-              const divisor = n * 12;
-              const candidate = safeNumber(amount) / divisor;
-              amount = candidate < 1 && safeNumber(amount) < divisor * 5 ? safeNumber(amount) : candidate;
-            }
+    switch (cycle) {
+      case 'monthly':
+        break;
+      case 'weekly':
+        amount = safeNumber(amount) * 4.33;
+        break;
+      case 'daily':
+        amount = safeNumber(amount) * 30;
+        break;
+      case 'quarterly':
+        amount = safeNumber(amount) / 3;
+        break;
+      case 'biannually':
+      case 'semiannually':
+      case 'semi-annually':
+        amount = safeNumber(amount) / 6;
+        break;
+      case 'yearly':
+      case 'annual':
+      case 'annually':
+        amount = safeNumber(amount) / 12;
+        break;
+      default: {
+        const monthMatch = cycle.match(/(\d+)\s*month/);
+        const yearMatch  = cycle.match(/(\d+)\s*year/);
+        if (monthMatch) {
+          const n = parseInt(monthMatch[1], 10);
+          if (n > 1) {
+            const candidate = safeNumber(amount) / n;
+            amount = candidate < 1 && safeNumber(amount) < n * 5 ? safeNumber(amount) : candidate;
           }
-          // If no matches or guards triggered, keep amount as-is (assumed monthly)
+        } else if (yearMatch) {
+          const n = parseInt(yearMatch[1], 10);
+          if (n > 1) {
+            const divisor = n * 12;
+            const candidate = safeNumber(amount) / divisor;
+            amount = candidate < 1 && safeNumber(amount) < divisor * 5 ? safeNumber(amount) : candidate;
+          }
         }
       }
-
-      return total + amount;
-    }, 0);
+    }
+    return amount;
   };
+
+  // State to control which cost to display
+  const [costView, setCostView] = useState<'monthly' | 'total'>('monthly');
 
   // Filter subscriptions
   const filteredSubscriptions = () => {
@@ -344,11 +340,11 @@ const Dashboard = () => {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">
-                      Monthly Cost
+                      {costView === 'monthly' ? 'Monthly Cost' : 'Total Cost'}
                     </dt>
                     <dd>
                       <div className="text-lg font-medium text-gray-900">
-                        {formatCurrency(calculateMonthlyTotal())}
+                        {formatCurrency(costView === 'monthly' ? calculateMonthlyTotal() : subscriptions.reduce((t,s)=>t+s.price,0))}
                       </div>
                     </dd>
                   </dl>
@@ -452,6 +448,22 @@ const Dashboard = () => {
               <option value="date">Next Billing Date</option>
             </select>
           </div>
+
+          {/* Cost View Toggle */}
+          <div className="sm:w-1/2">
+            <label htmlFor="costView" className="block text-sm font-medium text-gray-700 mb-1">
+              Display prices as
+            </label>
+            <select
+              id="costView"
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+              value={costView}
+              onChange={(e) => setCostView(e.target.value as 'monthly' | 'total')}
+            >
+              <option value="monthly">Monthly Equivalent</option>
+              <option value="total">Full Billing Amount</option>
+            </select>
+          </div>
         </div>
 
         {/* Subscriptions List */}
@@ -532,7 +544,7 @@ const Dashboard = () => {
                         </div>
                         <div className="ml-2 flex-shrink-0 flex">
                           <p className="px-2 inline-flex text-sm leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            {formatCurrency(subscription.price, subscription.currency)}
+                            {formatCurrency(costView === 'monthly' ? getMonthlyPrice(subscription) : subscription.price, subscription.currency)}
                           </p>
                         </div>
                       </div>
