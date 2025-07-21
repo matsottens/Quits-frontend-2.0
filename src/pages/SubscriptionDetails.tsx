@@ -86,6 +86,39 @@ const SubscriptionDetails = () => {
     return amount;
   };
 
+  // Calculate monthly cost
+  const getMonthlyPrice = () => {
+    if (!subscription) return 0;
+    let amount = parseFloat(subscription.price);
+    const cycle = (subscription.billing_cycle || '').toLowerCase();
+    const safe = (v: any) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v));
+    switch (cycle) {
+      case 'weekly':
+        amount = safe(amount) * 4.33; break;
+      case 'daily':
+        amount = safe(amount) * 30; break;
+      case 'quarterly':
+        amount = safe(amount) / 3; break;
+      case 'biannually':
+      case 'semiannually':
+      case 'semi-annually':
+        amount = safe(amount) / 6; break;
+      case 'yearly':
+      case 'annual':
+      case 'annually':
+        amount = safe(amount) / 12; break;
+      default:
+        const m = cycle.match(/(\d+)\s*month/);
+        const y = cycle.match(/(\d+)\s*year/);
+        if (m) {
+          const n = parseInt(m[1],10); if(n>1) amount = safe(amount)/n;
+        } else if(y){
+          const n=parseInt(y[1],10); if(n>1) amount = safe(amount)/(n*12);
+        }
+    }
+    return amount;
+  };
+
   // Handle form changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -417,6 +450,18 @@ const SubscriptionDetails = () => {
                     <dt className="text-sm font-medium text-gray-500">Added on</dt>
                     <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                       {formatDate(subscription.created_at)}
+                    </dd>
+                  </div>
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Monthly cost (equiv.)</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      {formatCurrency(getMonthlyPrice(), subscription.currency)}
+                    </dd>
+                  </div>
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-gray-500">Start date</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      {formatDate(subscription.created_at || subscription.start_date)}
                     </dd>
                   </div>
                   {subscription.notes && (
