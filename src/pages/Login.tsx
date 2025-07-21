@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { useLogo } from '../hooks/useLogo';
 import GoogleLogo from '../components/GoogleLogo';
 import authService from '../services/authService';
 import api from '../services/api';
@@ -12,6 +13,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { logoUrl, handleImageError } = useLogo();
 
   useEffect(() => {
     // Check for error parameters in URL
@@ -211,11 +213,16 @@ const Login: React.FC = () => {
       </Helmet>
       
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="text-4xl font-bold text-primary-600">Quits</div>
+        <div className="flex justify-center py-4">
+          <img
+            src={logoUrl}
+            alt="Quits"
+            className="h-16 w-auto"
+            onError={handleImageError}
+          />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to Quits
+          Sign in
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           Manage your subscriptions with ease
