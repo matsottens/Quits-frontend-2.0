@@ -42,19 +42,6 @@ const SubscriptionDetails = () => {
             category: sub.category || '',
             notes: sub.notes || ''
           });
-        } else if (response && response.id) {
-          const sub = response;
-          setSubscription(sub);
-          setFormData({
-            name: sub.name || '',
-            price: sub.price?.toString() || '',
-            currency: sub.currency || 'USD',
-            billing_cycle: sub.billing_cycle || 'monthly',
-            next_billing_date: sub.next_billing_date || '',
-            provider: sub.provider || '',
-            category: sub.category || '',
-            notes: sub.notes || ''
-          });
         } else {
           setError('Subscription not found');
         }
