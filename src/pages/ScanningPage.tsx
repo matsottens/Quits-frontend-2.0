@@ -558,128 +558,36 @@ const ScanningPage = () => {
     }, 500);
   };
 
-  // Start scanning when component mounts, only once
+  // --- SIMPLIFIED INITIAL SCAN FLOW --------------------------------------
+  // Always trigger a brand-new scan once the user context is available.
+  // This guarantees a fresh row in `scan_history` even for existing users
+  // and avoids the complex resume/skip logic that sometimes prevented a
+  // new scan from ever starting.
   useEffect(() => {
-    try {
-      const initiateScanning = async () => {
-        console.log('initiateScanning called, current status:', scanningStatus, 'scanId:', scanId, 'scanInitiated:', scanInitiatedRef.current);
-        
-        const scanIdKey = getScanIdKey();
-        if (!scanIdKey) {
-          console.log("Waiting for user context to be available...");
-          return;
-        }
+    if (!user) return; // Wait until AuthContext provides user details
 
-        // Check if we have a valid scan ID in localStorage that we should resume
-        const storedScanId = localStorage.getItem(scanIdKey);
-        if (storedScanId && storedScanId.startsWith('scan_')) {
-          console.log(`Found valid scan ID in localStorage: ${storedScanId}, attempting to resume`);
-          setScanId(storedScanId);
-          
-          // Try to resume the existing scan instead of starting a new one
-          if (!scanInitiatedRef.current) {
-            console.log('Resuming existing scan...');
-            setError('Resuming previous scan...');
-            
-            setTimeout(() => {
-              console.log('Resuming scan now');
-              setError(null);
-              scanInitiatedRef.current = true;
-              pollScanStatus(storedScanId);
-            }, 1000);
-            return;
-          }
-        } else if (storedScanId) {
-          // Clear invalid scan ID from localStorage
-          console.log(`Clearing invalid scan ID ${storedScanId} from localStorage`);
-          localStorage.removeItem(scanIdKey);
-        }
-        
-        // Before starting a new scan, check if there's already a completed scan
-        if (!scanInitiatedRef.current) {
-          console.log('Checking for existing completed scans before starting new scan...');
-          
-          try {
-            const token = getToken();
-            if (!token) {
-              console.log('No token available, cannot check for completed scans');
-              // Continue with starting new scan
-            } else {
-              // Check for the latest scan status
-              const response = await fetch(`${API_URL}/api/email/status?scanId=latest`, {
-                headers: {
-                  'Authorization': `Bearer ${token}`
-                }
-              });
-              
-              if (response.ok) {
-                const data = await response.json();
-                console.log('Latest scan status:', data.status);
-                
-                if (data.status === 'completed') {
-                  console.log('Found completed scan, starting a new scan for returning user');
-                  localStorage.removeItem(scanIdKey);
-                  scanInitiatedRef.current = false;
-                  setTimeout(() => {
-                    startScanning();
-                  }, 500);
-                  return;
-                } else if (data.status === 'quota_exhausted' && data.stats?.subscriptions_found > 0) {
-                  console.log('Found quota exhausted scan with subscriptions, starting a new scan for returning user');
-                  localStorage.removeItem(scanIdKey);
-                  scanInitiatedRef.current = false;
-                  setTimeout(() => {
-                    startScanning();
-                  }, 500);
-                  return;
-                } else if (data.status === 'in_progress' || data.status === 'ready_for_analysis' || data.status === 'analyzing') {
-                  console.log('Found active scan in progress, resuming instead of starting new scan');
-                  setScanId(data.scan_id);
-                  localStorage.setItem(scanIdKey, data.scan_id);
-                  scanInitiatedRef.current = true;
-                  pollScanStatus(data.scan_id);
-                  return;
-                }
-              }
-            }
-          } catch (checkError) {
-            console.log('Error checking for completed scans:', checkError);
-            // Continue with starting new scan if check fails
-          }
-          
-          // Start a new scan if no valid scan ID found and no completed scan exists
-          console.log('Starting new scan automatically after a short delay...');
-          setError('Starting scan automatically in 2 seconds...');
-          
-          setTimeout(() => {
-            console.log('Auto-starting scan now');
-            setError(null);
-            startScanning();
-          }, 2000);
-        }
-      };
-      
-      initiateScanning();
-    } catch (err: any) {
-      console.error('Error in initiate scanning effect:', err);
-      setError('Error starting scan: ' + (err instanceof Error ? err.message : String(err)));
-      
-      // Auto-retry if there's an error starting the scan
-      setTimeout(() => {
-        console.log('Auto-retrying after error');
-        setError('Retrying scan automatically...');
-        scanInitiatedRef.current = false;
-        startScanning();
-      }, 3000);
+    const scanIdKey = getScanIdKey();
+    if (scanIdKey) {
+      // Remove any stale scan reference so the backend will create a new row
+      localStorage.removeItem(scanIdKey);
     }
-    
-    // Cleanup on unmount
+
+    // Ensure we start from a clean state
+    scanInitiatedRef.current = false;
+    setScanId(null);
+    setScanningStatus('idle');
+    setProgress(0);
+
+    // Kick off the scan immediately
+    startScanning();
+
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, [user]); // Rerun when user context becomes available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   // Add a debugging effect to log state changes
   useEffect(() => {
