@@ -411,7 +411,15 @@ const ScanningPage = () => {
             pollingIntervalRef.current = null;
           }
           setScanningStatus('completed');
-          // Show 100% for 1 s before redirecting so users see the progress bar finish.
+
+          // Ensure future scans are not blocked by a stale scan_id from this run.
+          const scanIdKeyForRemoval = getScanIdKey();
+          if (scanIdKeyForRemoval) {
+            localStorage.removeItem(scanIdKeyForRemoval);
+          }
+
+          // Show 100 % for a brief moment so users perceive completion, then
+          // take them to their updated dashboard.
           setTimeout(() => {
             navigate('/dashboard', { state: { justScanned: true } });
           }, 1000);
@@ -678,16 +686,33 @@ const ScanningPage = () => {
     console.log('ScanningStatus changed to:', scanningStatus);
   }, [scanningStatus]);
 
-  // Step-based progress bar logic
+  // --- STEP-BASED PROGRESS CONFIGURATION -------------------------------------
+  // Map every status that can appear in the scan_history table to a percentage
+  // shown on the progress bar.  This keeps the UI in sync with backend state and
+  // works for both new and returning users.
+  const STATUS_PROGRESS_MAP: Record<ScanningStatus, number> = {
+    idle: 0,
+    initial: 0,
+    scanning: 10,
+    in_progress: 30,
+    ready_for_analysis: 60,
+    analyzing: 80,
+    complete: 100,     // some legacy flows use "complete"
+    completed: 100,
+    error: 0,          // keep at 0 – the error banner will be shown instead
+    quota_exhausted: 90
+  };
+
+  // Step-based progress bar logic – whenever the status coming from the backend
+  // changes, look up the corresponding percentage and apply it.  This gives a
+  // deterministic "jump" between clearly defined steps rather than a smooth
+  // incremental bar.  The mapping is defined in STATUS_PROGRESS_MAP above.
   useEffect(() => {
-    if (scanningStatus === 'scanning' || scanningStatus === 'in_progress') {
-      setProgress(30);
-    } else if (scanningStatus === 'ready_for_analysis' || scanningStatus === 'analyzing') {
-      setProgress(70);
-    } else if (scanningStatus === 'completed' || scanningStatus === 'complete') {
-      setProgress(100);
+    const mapped = STATUS_PROGRESS_MAP[scanningStatus];
+    if (mapped !== undefined && mapped !== progress) {
+      setProgress(mapped);
     }
-  }, [scanningStatus]);
+  }, [scanningStatus, progress]);
 
   const handleSuggestionAction = async (suggestionId: string, confirmed: boolean) => {
     try {
