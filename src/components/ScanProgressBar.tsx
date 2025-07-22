@@ -53,8 +53,8 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
             break;
           case 'analyzing':
             setPhase('analyzing');
-            // Use the server-reported progress (fallback to 60 if missing)
-            setProgress(Math.max(60, data.progress ?? 60));
+            // Use the server-reported progress (fallback to 30 if missing)
+            setProgress(Math.max(30, data.progress ?? 30));
             break;
           case 'completed':
             setPhase('complete');
