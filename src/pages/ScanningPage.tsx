@@ -384,14 +384,13 @@ const ScanningPage = () => {
         });
       }
       
-      // Use the progress from the API (which now handles two-phase calculation)
-      // Remove this block from checkScanStatus:
-      // if (progress !== undefined && progress !== null) {
-      //   // Only update progress if it's a valid number and not 100 (which is handled by step-based effect)
-      //   if (progress < 100) {
-      //     setProgress(progress);
-      //   }
-      // }
+      // Use the progress from the API
+      if (progress !== undefined && progress !== null) {
+        // Don't override the final 100% animation handled elsewhere
+        if (progress < 100) {
+          setProgress(progress);
+        }
+      }
       
       // Handle different scan statuses
       if (uiStatus === 'completed' || uiStatus === 'complete') {
@@ -612,8 +611,9 @@ const ScanningPage = () => {
     scanning: 10,
     in_progress: 10,
     ready_for_analysis: 30,
-    analyzing: 60,
-    complete: 100,     // some legacy flows use "complete"
+    // For analyzing we rely on the numeric progress coming from the backend
+    // analyzing: handled dynamically,
+    complete: 100,
     completed: 100,
     error: 0,          // keep at 0 – the error banner will be shown instead
     quota_exhausted: 60
