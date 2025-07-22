@@ -15,6 +15,8 @@ import Calendar from './pages/Calendar';
 import SubscriptionDetails from './pages/SubscriptionDetails';
 import Navigation from './components/Navigation';
 import AddPhoneNumber from './pages/AddPhoneNumber';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import { useEffect, useState } from 'react';
 
 interface ProtectedRouteProps {
@@ -77,6 +79,8 @@ const App = () => {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route
             path="/add-phone"
             element={
