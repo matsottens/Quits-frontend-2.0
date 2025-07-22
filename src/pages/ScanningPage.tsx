@@ -610,13 +610,13 @@ const ScanningPage = () => {
     idle: 0,
     initial: 0,
     scanning: 10,
-    in_progress: 30,
-    ready_for_analysis: 60,
-    analyzing: 80,
+    in_progress: 10,
+    ready_for_analysis: 30,
+    analyzing: 60,
     complete: 100,     // some legacy flows use "complete"
     completed: 100,
     error: 0,          // keep at 0 – the error banner will be shown instead
-    quota_exhausted: 90
+    quota_exhausted: 60
   };
 
   // Step-based progress bar logic – whenever the status coming from the backend
