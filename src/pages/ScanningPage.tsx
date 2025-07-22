@@ -605,14 +605,14 @@ const ScanningPage = () => {
   // Map every status that can appear in the scan_history table to a percentage
   // shown on the progress bar.  This keeps the UI in sync with backend state and
   // works for both new and returning users.
-  const STATUS_PROGRESS_MAP: Record<ScanningStatus, number> = {
+  const STATUS_PROGRESS_MAP: Partial<Record<ScanningStatus, number>> = {
     idle: 0,
     initial: 0,
     scanning: 10,
     in_progress: 10,
     ready_for_analysis: 30,
-    // For analyzing we rely on the numeric progress coming from the backend
-    // analyzing: handled dynamically,
+    // analyzing is handled dynamically via API progress
+    analyzing: undefined as any,
     complete: 100,
     completed: 100,
     error: 0,          // keep at 0 – the error banner will be shown instead
