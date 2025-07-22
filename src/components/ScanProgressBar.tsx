@@ -41,23 +41,33 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
         setStatus(currentStatus);
         setScanId(data.scan_id);
         
-        // Determine phase based on status
-        if (currentStatus === 'in_progress') {
-          setPhase('reading');
-          setProgress(Math.min(50, data.progress || 0)); // Reading phase: 0-50%
-        } else if (currentStatus === 'ready_for_analysis' || currentStatus === 'analyzing') {
-          setPhase('analyzing');
-          setProgress(50 + (data.progress || 0) / 2); // Analysis phase: 50-100%
-          
-          // Let the cron job handle Gemini analysis triggering
-          if (currentStatus === 'ready_for_analysis') {
-            console.log('Email scan completed, waiting for cron job to trigger Gemini analysis');
-          }
-        } else if (currentStatus === 'completed') {
-          setPhase('complete');
-          setProgress(100);
-          stoppedRef.current = true;
-          onComplete(data.scan_id);
+        // Map statuses to stepped progress values for smoother UX
+        switch (currentStatus) {
+          case 'in_progress':
+            setPhase('reading');
+            setProgress(10);
+            break;
+          case 'ready_for_analysis':
+            setPhase('analyzing');
+            setProgress(30);
+            break;
+          case 'analyzing':
+            setPhase('analyzing');
+            setProgress(60);
+            break;
+          case 'completed':
+            setPhase('complete');
+            setProgress(100);
+            // Allow the progress bar to show 100% for 1s before redirect
+            setTimeout(() => {
+              if (!stoppedRef.current) {
+                stoppedRef.current = true;
+                onComplete(data.scan_id);
+              }
+            }, 1000);
+            break;
+          default:
+            break;
         }
         
       } catch (error) {
