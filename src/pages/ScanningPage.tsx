@@ -489,20 +489,8 @@ const ScanningPage = () => {
         }
       } else {
         // Continue scanning - let the cron job handle Gemini analysis triggering
-        // The cron job runs every minute; as fallback, if analysis is already detecting results we can redirect early
-        if (uiStatus === 'analyzing') {
-          const subsFound = (stats as any)?.subscriptions_found ?? (stats as any)?.subscriptionsFound ?? 0;
-          const analysisCompleted = completed_count ?? 0;
-          if ((subsFound + analysisCompleted) > 0) {
-            console.log('SCAN-DEBUG: Subscriptions detected during analyzing – redirecting');
-            if (pollingIntervalRef.current) {
-              clearInterval(pollingIntervalRef.current);
-              pollingIntervalRef.current = null;
-            }
-            setTimeout(() => navigate('/dashboard', { state: { justScanned: true } }), 500);
-            return;
-          }
-        }
+        // Redirect only when backend marks scan completed (handled in earlier branch)
+        // or when progress reaches 100% – no premature redirect during analyzing.
         
         // Continue polling - more frequently during analysis phase
         const pollInterval = (uiStatus === 'ready_for_analysis' || uiStatus === 'analyzing') ? 2000 : 3000;
