@@ -2,9 +2,6 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": {
-    "api/**": { "runtime": "vercel-ignored" }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
