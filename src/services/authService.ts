@@ -13,9 +13,11 @@ export interface User {
 }
 
 export interface AuthResponse {
-  success: boolean;
-  token: string;
-  user: User;
+  token?: string;
+  user?: User;
+  success?: boolean;
+  error?: string;
+  message?: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
