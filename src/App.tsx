@@ -16,6 +16,8 @@ import SubscriptionDetails from './pages/SubscriptionDetails';
 import Navigation from './components/Navigation';
 import AddPhoneNumber from './pages/AddPhoneNumber';
 import { useEffect, useState } from 'react';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -77,6 +79,8 @@ const App = () => {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route
             path="/add-phone"
             element={
