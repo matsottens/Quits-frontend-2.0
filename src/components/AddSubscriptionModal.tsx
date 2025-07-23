@@ -41,13 +41,19 @@ const AddSubscriptionModal = ({ isOpen, onClose, onSuccess }: AddSubscriptionMod
         return;
       }
       
-      // Convert price to number
-      const data = {
-        ...formData,
+      // Build payload with camelCase keys for widest backend compatibility
+      const payload = {
+        name: formData.name,
         price: parseFloat(formData.price),
+        currency: formData.currency,
+        billingCycle: formData.billing_cycle, // camelCase for legacy API
+        nextBillingDate: formData.next_billing_date || undefined,
+        provider: formData.provider || undefined,
+        category: formData.category || undefined,
+        notes: formData.notes || undefined,
       };
       
-      const response = await api.subscriptions.create(data);
+      const response = await api.subscriptions.create(payload);
       
       if (response && response.subscription) {
         onSuccess(response.subscription);
