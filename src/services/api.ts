@@ -732,22 +732,41 @@ const apiService = {
     
     // Create a new subscription
     create: async (data: any) => {
+      // Prepare payload compatible with both new Express API (snake_case) and legacy Vercel API (camelCase)
+      const payload = {
+        ...data,
+        billingCycle: data.billing_cycle ?? data.billingCycle,
+        nextBillingDate: data.next_billing_date ?? data.nextBillingDate,
+      };
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscriptions`, {
+        // Try modern plural endpoint first
+        let response = await fetch(`${API_URL}/api/subscriptions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify(data)
+          body: JSON.stringify(payload)
         });
+        // Fallback to legacy singular endpoint if 404 or 405
+        if (!response.ok && (response.status === 404 || response.status === 405)) {
+          response = await fetch(`${API_URL}/api/subscription`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+        }
         
         if (!response.ok) {
           throw new Error(`Failed to create subscription: ${response.status}`);
         }
-        
+
         return await response.json();
       } catch (error) {
         console.error('Error creating subscription:', error);
