@@ -132,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Make a request to verify the token
         const apiUrl = window.location.hostname === 'localhost' 
           ? 'http://localhost:3000/api'
-          : 'https://api.quits.cc';
+          : 'https://api.quits.cc/api';
           
         await axios.get(`${apiUrl}/auth/me`);
       } catch (error) {

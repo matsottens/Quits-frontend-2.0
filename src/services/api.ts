@@ -16,7 +16,7 @@ const API_URL = isProd
 
 // Auth-specific API URL (always use production)
 const AUTH_API_URL = isProd
-  ? 'https://api.quits.cc'
+  ? 'https://api.quits.cc/api'
   : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
 
 console.log(`Using API URL: ${API_URL} in ${isProd ? 'production' : 'development'} mode`);
