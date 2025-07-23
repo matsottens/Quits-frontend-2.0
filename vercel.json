@@ -4,6 +4,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://api-quits-2-0.vercel.app/api/$1"
+    },
+    {
       "source": "/auth/callback",
       "destination": "/index.html"
     },
