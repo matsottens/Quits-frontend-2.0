@@ -178,6 +178,40 @@ const authService = {
       }
     );
     console.log('Axios interceptors setup complete');
+  },
+
+  // ----------------------
+  // Email / Password Flow
+  // ----------------------
+
+  signup: async (email: string, password: string, name?: string): Promise<AuthResponse> => {
+    const payload = { email, password, name };
+    const response = await axios.post(`${API_URL}/api/auth/signup`, payload, { withCredentials: true });
+    if (response.data?.token) {
+      authService.setToken(response.data.token);
+    }
+    return response.data;
+  },
+
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    const response = await axios.post(`${API_URL}/api/auth/login`, { email, password }, { withCredentials: true });
+    if (response.data?.token) {
+      authService.setToken(response.data.token);
+    }
+    return response.data;
+  },
+
+  forgotPassword: async (email: string): Promise<{ success: boolean }> => {
+    const response = await axios.post(`${API_URL}/api/auth/forgot-password`, { email }, { withCredentials: true });
+    return response.data;
+  },
+
+  resetPassword: async (token: string, password: string): Promise<AuthResponse> => {
+    const response = await axios.post(`${API_URL}/api/auth/reset-password`, { token, password }, { withCredentials: true });
+    if (response.data?.token) {
+      authService.setToken(response.data.token);
+    }
+    return response.data;
   }
 };
 

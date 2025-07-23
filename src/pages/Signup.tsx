@@ -1,12 +1,11 @@
 import { useState, FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import GoogleLogo from '../components/GoogleLogo';
-import api from '../services/api';
+import authService from '../services/authService';
 
 const SignUp = () => {
-  const { login } = useAuth();
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,20 +25,12 @@ const SignUp = () => {
       setSuccess(null);
       setIsLoading(true);
       
-      // Check if user exists with Google OAuth
-      const { data: { user }, error: signUpError } = await api.auth.signUpWithEmail(email, password);
-      
-      if (signUpError) {
-        if (signUpError.message.includes('already exists')) {
-          setError('An account with this email already exists. Please sign in instead.');
-          return;
-        }
-        throw signUpError;
-      }
-
-      if (user) {
-        // Redirect to phone number screen
-        window.location.href = '/add-phone';
+      const resp = await authService.signup(email, password);
+      if (resp.token) {
+        setSuccess('Account created!');
+        navigate('/dashboard');
+      } else if (resp.error) {
+        setError(resp.error);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to create account. Please try again.');

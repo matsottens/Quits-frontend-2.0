@@ -13,6 +13,8 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const { logoUrl, handleImageError } = useLogo();
 
   useEffect(() => {
@@ -115,6 +117,26 @@ const Login: React.FC = () => {
       console.error('Direct login error:', err);
       setError('Failed to start Google login process. Please try again.');
       setLoading(false);
+    }
+  };
+
+  // New email/password login handler
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const resp = await authService.login(email, password);
+      if (resp.token) {
+        navigate('/dashboard');
+      } else {
+        setError(resp.error || 'Login failed');
+      }
+    } catch (err: any) {
+      console.error('Email login error', err);
+      setError(err.response?.data?.error || err.message || 'Login failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -247,6 +269,28 @@ const Login: React.FC = () => {
           )}
           
           <div className="space-y-6">
+            {/* Email/Password Form */}
+            <form className="space-y-4" onSubmit={handleEmailLogin}>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                <input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
+                <input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+              </div>
+              <div>
+                <button type="submit" disabled={isLoading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  {isLoading ? 'Signing in…' : 'Sign in'}
+                </button>
+              </div>
+            </form>
+
+            <div className="flex justify-between text-sm">
+              <a href="/forgot-password" className="text-primary-600 hover:text-primary-500">Forgot password?</a>
+              <a href="/signup" className="text-primary-600 hover:text-primary-500">Create account</a>
+            </div>
+
             <button
               type="button"
               onClick={handleGoogleLogin}
