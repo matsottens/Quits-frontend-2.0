@@ -28,7 +28,7 @@ const SignUp = () => {
       const resp = await authService.signup(email, password);
       if (resp.token) {
         setSuccess('Account created!');
-        navigate('/dashboard');
+        navigate('/welcome');
       } else if (resp.error) {
         setError(resp.error);
       }
