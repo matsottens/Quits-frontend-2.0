@@ -292,11 +292,13 @@ const apiService = {
         
         try {
           // First try with standard fetch - no explicit OPTIONS request
+          const authToken = localStorage.getItem('token');
           const response = await fetch(proxyUrl, {
             method: 'GET',
             headers: {
               'Accept': 'application/json, text/html, */*',
               'Cache-Control': 'no-cache'
+              ,...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
             },
             credentials: 'include' // Include credentials for cross-domain requests
           });

@@ -78,8 +78,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Decode the token to verify its structure
       const decoded: any = jwtDecode(token);
       
-      // Check if token has the required fields
-      if (!decoded || !decoded.id || !decoded.email) {
+      // Check if token has the required fields (support legacy `userId`)
+      if (!decoded || (!(decoded.id || decoded.userId)) || !decoded.email) {
         console.error('Token missing required fields');
         return false;
       }
@@ -112,7 +112,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       // Decode the token to get user info
       const userData: User = {
-        id: decoded.id,
+        id: decoded.id || decoded.userId,
         email: decoded.email,
         name: decoded.name,
         picture: decoded.picture
