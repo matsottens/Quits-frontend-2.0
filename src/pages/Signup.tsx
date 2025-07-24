@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import GoogleLogo from '../components/GoogleLogo';
 import authService from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,6 +30,8 @@ const SignUp = () => {
       const resp = await authService.signup(email, password);
       if (resp.token) {
         setSuccess('Account created!');
+        // Update auth context so ProtectedRoute recognises user
+        await login(resp.token);
         navigate('/welcome');
       } else if (resp.error) {
         setError(resp.error);
