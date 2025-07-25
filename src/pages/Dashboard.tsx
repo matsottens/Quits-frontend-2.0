@@ -202,12 +202,26 @@ const Dashboard = () => {
     return filtered;
   };
 
-  // Format currency
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
+  // Format currency safely. If an invalid or missing currency code is supplied, fall back to USD to
+  // avoid runtime "RangeError: invalid currency code" which would otherwise crash the dashboard.
+  const formatCurrency = (amount: number, currency?: string) => {
+    // Accept only 3-letter currency codes; anything else defaults to USD
+    const safeCurrency = currency && /^[A-Za-z]{3}$/.test(currency)
+      ? currency.toUpperCase()
+      : 'USD';
+
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: safeCurrency,
+      }).format(amount);
+    } catch (_err) {
+      // As an extra safeguard, fall back to USD if Intl.NumberFormat still rejects the code
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(amount);
+    }
   };
 
   const { logoUrl, handleImageError } = useLogo();
