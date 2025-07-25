@@ -686,21 +686,34 @@ const apiService = {
     // Get all subscriptions
     getAll: async () => {
       try {
-        // Use fetch instead of axios to avoid CORS issues
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscriptions/`, {
+
+        // 1️⃣  Try the user-scoped singular endpoint first – this explicitly filters by the
+        //     authenticated user on the server side.
+        let response = await fetch(`${API_URL}/api/subscription`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           }
         });
-        
+
+        // If the endpoint is missing (404) or not allowed (405) fall back to the plural version
+        if (!response.ok && (response.status === 404 || response.status === 405)) {
+          response = await fetch(`${API_URL}/api/subscriptions`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        }
+
         if (!response.ok) {
           console.error(`Subscription fetch failed with status: ${response.status}`);
           return { error: `Failed to fetch subscriptions: ${response.status}`, subscriptions: [] };
         }
-        
+
         const data = await response.json();
         return data;
       } catch (error) {
