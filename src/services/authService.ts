@@ -22,6 +22,17 @@ export interface AuthResponse {
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
 
+// Helper to avoid double /api/ segments when building URLs
+const buildAuthUrl = (endpoint: string): string => {
+  // If API_URL already contains "/api" at the end (e.g. http://localhost:3000/api)
+  // then we should NOT prepend another "/api".
+  const needsApiPrefix = !API_URL.endsWith('/api');
+  const prefix = needsApiPrefix ? '/api' : '';
+  // Ensure the endpoint starts with a single leading slash
+  const ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_URL}${prefix}${ep}`;
+};
+
 // Service for handling authentication
 const authService = {
   // Get the Google Auth URL for initiating login
@@ -198,7 +209,7 @@ const authService = {
 
   signup: async (email: string, password: string, name?: string): Promise<AuthResponse> => {
     const payload = { email, password, name };
-    const response = await axios.post(`${API_URL}/api/auth/signup`, payload, { withCredentials: true });
+    const response = await axios.post(buildAuthUrl('/auth/signup'), payload, { withCredentials: true });
     if (response.data?.token) {
       authService.setToken(response.data.token);
     }
@@ -206,7 +217,7 @@ const authService = {
   },
 
   login: async (email: string, password: string): Promise<AuthResponse> => {
-    const response = await axios.post(`${API_URL}/api/auth/login`, { email, password }, { withCredentials: true });
+    const response = await axios.post(buildAuthUrl('/auth/login'), { email, password }, { withCredentials: true });
     if (response.data?.token) {
       authService.setToken(response.data.token);
     }
@@ -214,12 +225,12 @@ const authService = {
   },
 
   forgotPassword: async (email: string): Promise<{ success: boolean }> => {
-    const response = await axios.post(`${API_URL}/api/auth/forgot-password`, { email }, { withCredentials: true });
+    const response = await axios.post(buildAuthUrl('/auth/forgot-password'), { email }, { withCredentials: true });
     return response.data;
   },
 
   resetPassword: async (token: string, password: string): Promise<AuthResponse> => {
-    const response = await axios.post(`${API_URL}/api/auth/reset-password`, { token, password }, { withCredentials: true });
+    const response = await axios.post(buildAuthUrl('/auth/reset-password'), { token, password }, { withCredentials: true });
     if (response.data?.token) {
       authService.setToken(response.data.token);
     }
