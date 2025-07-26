@@ -4,6 +4,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/auth/:action(signup|login|forgot-password|reset-password)",
+      "destination": "https://api-quits-2-0.vercel.app/api/auth/:action"
+    },
+    {
       "source": "/auth/callback",
       "destination": "/index.html"
     },

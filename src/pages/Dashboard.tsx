@@ -79,9 +79,20 @@ const Dashboard = () => {
         const response = await api.subscriptions.getAll();
         if (!isMounted) return;
         if (response && response.subscriptions) {
-          setSubscriptions(response.subscriptions);
-          // If polling and we now have subscriptions, stop polling
-          if (polling && response.subscriptions.length > 0) {
+          // Only keep subscriptions that are fully processed. We exclude any items that
+          // (a) have analysis_status and it is NOT "completed", OR
+          // (b) have is_pending === true.
+          // Manual subscriptions (no analysis_status) are always included.
+          const completedSubs = response.subscriptions.filter((sub: Subscription) => {
+            const notCompletedStatus = sub.analysis_status && sub.analysis_status !== 'completed';
+            const stillPending = !!sub.is_pending;
+            return !notCompletedStatus && !stillPending;
+          });
+
+          setSubscriptions(completedSubs);
+
+          // Stop polling once we actually have completed subscriptions
+          if (polling && completedSubs.length > 0) {
             setPolling(false);
           }
         } else {
@@ -202,12 +213,26 @@ const Dashboard = () => {
     return filtered;
   };
 
-  // Format currency
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
+  // Format currency safely. If an invalid or missing currency code is supplied, fall back to USD to
+  // avoid runtime "RangeError: invalid currency code" which would otherwise crash the dashboard.
+  const formatCurrency = (amount: number, currency?: string) => {
+    // Accept only 3-letter currency codes; anything else defaults to USD
+    const safeCurrency = currency && /^[A-Za-z]{3}$/.test(currency)
+      ? currency.toUpperCase()
+      : 'USD';
+
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: safeCurrency,
+      }).format(amount);
+    } catch (_err) {
+      // As an extra safeguard, fall back to USD if Intl.NumberFormat still rejects the code
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(amount);
+    }
   };
 
   const { logoUrl, handleImageError } = useLogo();

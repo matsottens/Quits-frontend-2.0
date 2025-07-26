@@ -13,9 +13,11 @@ export interface User {
 }
 
 export interface AuthResponse {
-  success: boolean;
-  token: string;
-  user: User;
+  token?: string;
+  user?: User;
+  success?: boolean;
+  error?: string;
+  message?: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
@@ -26,10 +28,20 @@ const authService = {
   getGoogleAuthUrl: async (): Promise<string> => {
     try {
       console.log(`Requesting Google auth URL from ${API_URL}/api/google-auth-url`);
+
+      // If the user is already authenticated we attach their UUID in the state
+      // parameter so the backend can reliably link the Google account even when
+      // the e-mail address returned by OAuth is different from the sign-up e-mail.
+      const currentUser = authService.getCurrentUser();
+      const stateParam = currentUser ? `uid:${currentUser.id}` : Date.now().toString();
+
+      // Persist state for later CSRF check in AuthCallback
+      localStorage.setItem('oauth_state', stateParam);
+
       const response = await axios.get(`${API_URL}/api/google-auth-url`, {
         params: {
           redirect_uri: window.location.origin + '/auth/callback',
-          state: Date.now().toString(), // Add state parameter to prevent CSRF
+          state: stateParam, // Include explicit link to current account when available
         }
       });
       
@@ -178,6 +190,40 @@ const authService = {
       }
     );
     console.log('Axios interceptors setup complete');
+  },
+
+  // ----------------------
+  // Email / Password Flow
+  // ----------------------
+
+  signup: async (email: string, password: string, name?: string): Promise<AuthResponse> => {
+    const payload = { email, password, name };
+    const response = await axios.post(`${API_URL}/api/auth/signup`, payload, { withCredentials: true });
+    if (response.data?.token) {
+      authService.setToken(response.data.token);
+    }
+    return response.data;
+  },
+
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    const response = await axios.post(`${API_URL}/api/auth/login`, { email, password }, { withCredentials: true });
+    if (response.data?.token) {
+      authService.setToken(response.data.token);
+    }
+    return response.data;
+  },
+
+  forgotPassword: async (email: string): Promise<{ success: boolean }> => {
+    const response = await axios.post(`${API_URL}/api/auth/forgot-password`, { email }, { withCredentials: true });
+    return response.data;
+  },
+
+  resetPassword: async (token: string, password: string): Promise<AuthResponse> => {
+    const response = await axios.post(`${API_URL}/api/auth/reset-password`, { token, password }, { withCredentials: true });
+    if (response.data?.token) {
+      authService.setToken(response.data.token);
+    }
+    return response.data;
   }
 };
 

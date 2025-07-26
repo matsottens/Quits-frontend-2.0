@@ -69,7 +69,8 @@ const AuthCallback = () => {
           // Update progress
           if (isMounted) setProgress(50);
           
-          const response = await handleGoogleCallback(code);
+          const state = urlParams.get('state');
+          const response = await handleGoogleCallback(code, state);
           
           // Process successful authentication
           if (isMounted) setProgress(75);

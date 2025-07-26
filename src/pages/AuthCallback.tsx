@@ -351,7 +351,7 @@ const AuthCallback = () => {
         componentAddDebugInfo(`Extracted token: ${code.substring(0, 10)}...`);
         
         // Process the authorization code only once
-        const response = await api.auth.handleGoogleCallback(code);
+        const response = await api.auth.handleGoogleCallback(code, state);
         
         if (!response.success) {
           setError(`Error during authentication: ${response.message || 'Unknown error'}`);

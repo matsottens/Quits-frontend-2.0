@@ -287,7 +287,7 @@ export default api;
  * Exchange a Google OAuth code for a token
  * This uses a simplified approach to avoid CORS preflight requests
  */
-export const handleGoogleCallback = async (code: string): Promise<AuthResponse> => {
+export const handleGoogleCallback = async (code: string, state?: string | null): Promise<AuthResponse> => {
   console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
   
   // Create a URL with the code as a query parameter - simpler approach to avoid CORS issues
@@ -324,7 +324,7 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
   try {
     console.log('Attempting to use direct callback endpoint');
     const timestamp = Date.now();
-    const directUrl = `${authApiUrl}/auth/google/callback?code=${encodeURIComponent(code)}&_t=${timestamp}`;
+    const directUrl = `${authApiUrl}/auth/google/callback?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&_t=${timestamp}`;
     console.log('Using direct URL:', directUrl);
     
     try {
@@ -362,9 +362,9 @@ export const handleGoogleCallback = async (code: string): Promise<AuthResponse> 
     
     // Try multiple URL formats
     const urlsToTry = [
-      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
-      `${authApiUrl}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
-      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`
+      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
+      `${authApiUrl}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
+      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`
     ];
     
     let lastError: any = null;

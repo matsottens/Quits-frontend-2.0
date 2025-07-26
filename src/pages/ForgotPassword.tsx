@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
+import authService from '../services/authService';
 
 const ForgotPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -13,8 +14,8 @@ const ForgotPassword = () => {
     setError(null);
 
     try {
-      // In a real app, you would call your API here
-      // await api.auth.forgotPassword(email);
+      const emailInput = (e.target as HTMLFormElement).email?.value;
+      await authService.forgotPassword(emailInput);
       setEmailSent(true);
     } catch (err) {
       setError('Failed to send password reset email. Please try again.');

@@ -267,8 +267,9 @@ const apiService = {
       return finalUrl;
     },
     
-    // Handle Google callback
-    handleGoogleCallback: async (code: string) => {
+    // Handle Google callback – supports optional `state` so the backend can
+    // link this OAuth flow to an existing user account (uid:<uuid> pattern).
+    handleGoogleCallback: async (code: string, state?: string | null) => {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
       
       // Prevent multiple simultaneous exchanges of the same code
@@ -286,17 +287,19 @@ const apiService = {
       try {
         // Always use GET for Google proxy to avoid CORS issues
         const timestamp = Date.now();
-        const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
+        const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
         
         console.log('Trying proxy URL:', proxyUrl);
         
         try {
           // First try with standard fetch - no explicit OPTIONS request
+          const authToken = localStorage.getItem('token');
           const response = await fetch(proxyUrl, {
             method: 'GET',
             headers: {
               'Accept': 'application/json, text/html, */*',
               'Cache-Control': 'no-cache'
+              ,...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
             },
             credentials: 'include' // Include credentials for cross-domain requests
           });
@@ -684,21 +687,34 @@ const apiService = {
     // Get all subscriptions
     getAll: async () => {
       try {
-        // Use fetch instead of axios to avoid CORS issues
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/subscriptions/`, {
+
+        // 1️⃣  Try the user-scoped singular endpoint first – this explicitly filters by the
+        //     authenticated user on the server side.
+        let response = await fetch(`${API_URL}/api/subscription`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           }
         });
-        
+
+        // If the endpoint is missing (404) or not allowed (405) fall back to the plural version
+        if (!response.ok && (response.status === 404 || response.status === 405)) {
+          response = await fetch(`${API_URL}/api/subscriptions`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        }
+
         if (!response.ok) {
           console.error(`Subscription fetch failed with status: ${response.status}`);
           return { error: `Failed to fetch subscriptions: ${response.status}`, subscriptions: [] };
         }
-        
+
         const data = await response.json();
         return data;
       } catch (error) {

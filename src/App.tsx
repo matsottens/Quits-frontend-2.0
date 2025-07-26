@@ -18,6 +18,7 @@ import AddPhoneNumber from './pages/AddPhoneNumber';
 import { useEffect, useState } from 'react';
 import TermsOfService from './pages/TermsOfService';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import Welcome from './pages/Welcome';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -134,6 +135,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <SubscriptionDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/welcome"
+            element={
+              <ProtectedRoute>
+                <Welcome />
               </ProtectedRoute>
             }
           />
