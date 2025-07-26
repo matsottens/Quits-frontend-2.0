@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import GoogleLogo from '../components/GoogleLogo';
@@ -10,7 +11,25 @@ const Welcome = () => {
   const handleGoogleConnect = async () => {
     try {
       setIsLoading(true);
-      // Build Google OAuth URL (same logic as Signup / Login pages)
+      // Build Google OAuth URL with state=uid:<user-id> so backend links
+      // Gmail account to the currently logged-in user row.
+
+      const token = localStorage.getItem('token');
+      let linkState = Date.now().toString();
+      if (token) {
+        try {
+          const decoded: any = jwtDecode(token);
+          if (decoded && decoded.id) {
+            linkState = `uid:${decoded.id}`;
+          }
+        } catch (err) {
+          console.warn('Failed to decode token for state param:', err);
+        }
+      }
+
+      // Persist for CSRF validation in callback
+      localStorage.setItem('oauth_state', linkState);
+
       const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
       const isProd = window.location.hostname !== 'localhost';
       const REDIRECT_URI = isProd
@@ -23,7 +42,8 @@ const Welcome = () => {
         scope: 'email profile https://www.googleapis.com/auth/gmail.readonly openid',
         response_type: 'code',
         access_type: 'offline',
-        prompt: 'consent'
+        prompt: 'consent',
+        state: linkState
       });
 
       const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
