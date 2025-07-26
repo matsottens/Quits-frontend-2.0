@@ -24,13 +24,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
 
 // Helper to avoid double /api/ segments when building URLs
 const buildAuthUrl = (endpoint: string): string => {
-  // If API_URL already contains "/api" at the end (e.g. http://localhost:3000/api)
-  // then we should NOT prepend another "/api".
-  const needsApiPrefix = !API_URL.endsWith('/api');
-  const prefix = needsApiPrefix ? '/api' : '';
-  // Ensure the endpoint starts with a single leading slash
+  // Ensure the endpoint starts with a single leading slash, but do NOT automatically
+  // insert an extra "/api" segment – our backend already handles correct routing.
   const ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${API_URL}${prefix}${ep}`;
+  return `${API_URL}${ep}`;
 };
 
 // Service for handling authentication
