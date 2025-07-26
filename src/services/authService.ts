@@ -28,10 +28,20 @@ const authService = {
   getGoogleAuthUrl: async (): Promise<string> => {
     try {
       console.log(`Requesting Google auth URL from ${API_URL}/api/google-auth-url`);
+
+      // If the user is already authenticated we attach their UUID in the state
+      // parameter so the backend can reliably link the Google account even when
+      // the e-mail address returned by OAuth is different from the sign-up e-mail.
+      const currentUser = authService.getCurrentUser();
+      const stateParam = currentUser ? `uid:${currentUser.id}` : Date.now().toString();
+
+      // Persist state for later CSRF check in AuthCallback
+      localStorage.setItem('oauth_state', stateParam);
+
       const response = await axios.get(`${API_URL}/api/google-auth-url`, {
         params: {
           redirect_uri: window.location.origin + '/auth/callback',
-          state: Date.now().toString(), // Add state parameter to prevent CSRF
+          state: stateParam, // Include explicit link to current account when available
         }
       });
       
