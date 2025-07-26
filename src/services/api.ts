@@ -267,8 +267,9 @@ const apiService = {
       return finalUrl;
     },
     
-    // Handle Google callback
-    handleGoogleCallback: async (code: string) => {
+    // Handle Google callback – supports optional `state` so the backend can
+    // link this OAuth flow to an existing user account (uid:<uuid> pattern).
+    handleGoogleCallback: async (code: string, state?: string | null) => {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
       
       // Prevent multiple simultaneous exchanges of the same code
@@ -286,7 +287,7 @@ const apiService = {
       try {
         // Always use GET for Google proxy to avoid CORS issues
         const timestamp = Date.now();
-        const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
+        const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
         
         console.log('Trying proxy URL:', proxyUrl);
         
