@@ -147,12 +147,10 @@ const ScanningPage = () => {
       return;
     }
 
-    // Additional check: if there's a scan ID in localStorage, don't start a new scan
-    const storedScanId = localStorage.getItem(scanIdKey);
-    if (storedScanId && storedScanId.startsWith('scan_')) {
-      console.log('SCAN-DEBUG: Found existing scan ID in localStorage, not starting new scan');
-      return;
-    }
+    // Always clear any existing scan ID to ensure we start fresh
+    // This ensures dashboard scans work the same as initial scans
+    localStorage.removeItem(scanIdKey);
+    console.log('SCAN-DEBUG: Cleared existing scan ID from localStorage to ensure fresh scan');
 
     try {
       console.log('SCAN-DEBUG: Starting email scanning process');
