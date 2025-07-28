@@ -173,6 +173,12 @@ setInterval(checkApiDomains, HEALTH_CHECK_INTERVAL_MS);
 // Request interceptor
 api.interceptors.request.use(
   async (config) => {
+    // Attach the JWT token to the Authorization header
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     // Check for cached response
     if (isCacheable(config)) {
       const cacheKey = getCacheKey(config);
