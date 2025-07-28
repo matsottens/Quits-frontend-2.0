@@ -14,6 +14,10 @@ const EmailAccountsSettings = () => {
   const { settings, update, loading } = useSettings();
 
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
+
+  // Store list of connected email addresses
+  const [accounts, setAccounts] = useState<string[]>([]);
+
   const [permissions, setPermissions] = useState<Record<string, boolean>>({
     subscriptions: true,
     newsletters: false,
@@ -28,6 +32,7 @@ const EmailAccountsSettings = () => {
       const e = settings.email;
       setSelectedFrequency(e.scanFrequency || 'daily');
       setPermissions({ ...permissions, ...e.permissions });
+      setAccounts(e.accounts || []);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
@@ -42,19 +47,36 @@ const EmailAccountsSettings = () => {
     push({ permissions: newPerm });
   };
 
+  const disconnectAccount = (email: string) => {
+    const filtered = accounts.filter((a) => a !== email);
+    setAccounts(filtered);
+    update({ email: { ...(settings?.email || {}), accounts: filtered } });
+  };
+
   return (
     <div className="max-w-3xl space-y-8">
       {/* Connected accounts */}
       <section>
         <h2 className="text-xl font-semibold mb-4">Connected Accounts</h2>
         <div className="border rounded-md p-4 space-y-2 bg-white">
-          {/* Placeholder list */}
-          <div className="flex justify-between items-center py-2">
-            <span className="text-gray-700">example@gmail.com</span>
-            <button className="text-sm text-red-600 hover:underline" title="Remove account">
-              Disconnect
-            </button>
-          </div>
+          {accounts.length === 0 && <p className="text-sm text-gray-500">No accounts connected yet.</p>}
+
+          {accounts.map((email) => (
+            <div
+              key={email}
+              className="flex justify-between items-center py-2 hover:bg-gray-50 px-2 rounded"
+            >
+              <span className="text-gray-700 break-all">{email}</span>
+              <button
+                onClick={() => disconnectAccount(email)}
+                className="text-sm text-red-600 hover:underline"
+                title="Remove account"
+              >
+                Disconnect
+              </button>
+            </div>
+          ))}
+
           {/* Add new */}
           <div className="pt-2">
             <Link
