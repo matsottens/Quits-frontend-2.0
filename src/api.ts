@@ -290,145 +290,42 @@ export default api;
 export const handleGoogleCallback = async (code: string, state?: string | null): Promise<AuthResponse> => {
   console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
   
-  // Create a URL with the code as a query parameter - simpler approach to avoid CORS issues
-  const useSimplifiedApproach = true;
-  
-  if (useSimplifiedApproach) {
-    try {
-      console.log('Using simplified approach without preflight requests');
-      
-      // Direct redirect to Google - this will work cross-origin without preflight
-      const redirectUrl = `https://accounts.google.com/o/oauth2/auth?client_id=82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com&redirect_uri=${encodeURIComponent('https://www.quits.cc/auth/callback')}&response_type=code&scope=${encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid')}&state=auth&prompt=select_account+consent&access_type=offline`;
-      
-      // Open in a new window
-      window.open(redirectUrl, '_blank');
-      
-      return {
-        success: true,
-        token: '',
-        message: 'Redirecting to Google for authentication',
-        redirecting: true
-      };
-    } catch (error) {
-      console.error('Error with simplified OAuth approach:', error);
-      return {
-        success: false,
-        token: '',
-        error: 'auth_failed',
-        message: 'Failed to authenticate with Google. Please try again.'
-      };
-    }
-  }
-  
-  // If simplified approach is disabled, try the multiple approaches below
   try {
-    console.log('Attempting to use direct callback endpoint');
     const timestamp = Date.now();
     const directUrl = `${authApiUrl}/auth/google/callback?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&_t=${timestamp}`;
-    console.log('Using direct URL:', directUrl);
     
-    try {
-      // First try with credentials: 'same-origin' to avoid preflight request
-      const directResponse = await fetch(directUrl, {
-        method: 'GET',
-        credentials: 'same-origin',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (directResponse.ok) {
-        const data = await directResponse.json();
-        return {
-          success: true,
-          token: data.token,
-          user: data.user
-        };
-      }
-    } catch (directError) {
-      console.log('Direct callback failed, attempting to exchange code via Google proxy API');
-      // Continue to next approach
-    }
-    
-    // If direct approach fails, try the proxy endpoint
-    console.log('Using proxy endpoint:', `${authApiUrl}/google-proxy`);
-    const fetchOptions = {
+    const response = await fetch(directUrl, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
-      }
-    };
-    console.log('Fetch options:', fetchOptions);
+        'Accept': 'application/json',
+      },
+      credentials: 'omit', // Explicitly omit credentials to prevent preflight issues
+    });
     
-    // Try multiple URL formats
-    const urlsToTry = [
-      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
-      `${authApiUrl}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`,
-      `${authApiUrl}/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`
-    ];
-    
-    let lastError: any = null;
-    
-    for (const url of urlsToTry) {
-      try {
-        console.log('Trying URL:', url);
-        const response = await fetch(url, {
-          ...fetchOptions,
-          credentials: 'same-origin' // This helps avoid preflight requests
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.token) {
-            return {
-              success: true,
-              token: data.token,
-              user: data.user
-            };
-          } else if (data.redirectUrl) {
-            // Handle redirection if needed
-            window.location.href = data.redirectUrl;
-            return {
-              success: true,
-              token: '',
-              redirecting: true
-            };
-          } else if (data.pending) {
-            // Handle pending background operation
-            return {
-              success: true,
-              token: '',
-              pending: true
-            };
-          }
-        }
-        
-        // If we got a response but it wasn't ok, try to parse error
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          lastError = errorData;
-        }
-      } catch (error) {
-        console.error('Error with URL', url, error);
-        lastError = error;
-        // Continue to next URL
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Callback request failed:', response.status, errorText);
+      throw new Error(`Server returned ${response.status}: ${errorText}`);
     }
     
-    // If we've tried all approaches and nothing worked
-    return {
-      success: false,
-      token: '',
-      error: lastError?.error || 'auth_failed',
-      message: lastError?.message || 'Failed to authenticate with Google. Please try again.'
-    };
+    const data = await response.json();
+    
+    if (data.token) {
+      return {
+        success: true,
+        token: data.token,
+        user: data.user,
+      };
+    } else {
+      throw new Error('Token not found in response');
+    }
   } catch (error) {
+    console.error('Error in handleGoogleCallback:', error);
     return {
       success: false,
       token: '',
       error: 'auth_failed',
-      message: 'Failed to authenticate with Google. Please try again.'
+      message: 'Failed to authenticate with Google. Please try again.',
     };
   }
 }; 
