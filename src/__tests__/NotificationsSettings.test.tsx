@@ -7,10 +7,10 @@ import NotificationsSettings from '../components/settings/NotificationsSettings'
 
 // Mock the settings service
 vi.mock('../services/settingsService', () => ({
-  default: {
+    default: {
     getSettings: vi.fn(),
     updateSettings: vi.fn(),
-  },
+    },
 }));
 
 // Get the mocked service

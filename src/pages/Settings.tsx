@@ -28,7 +28,7 @@ const Settings = () => {
 
   return (
     <SettingsProvider>
-    <div className="min-h-screen bg-gray-50 lg:ml-64 flex flex-col">
+    <div className="min-h-screen bg-gray-50 lg:ml-64 flex flex-col lg:flex-row">
       {/* Mobile header */}
       <div className="lg:hidden bg-[#26457A] text-white shadow-sm">
         <div className="px-4 py-3 flex items-center">
@@ -86,14 +86,10 @@ const Settings = () => {
               </Link>
             ))}
           </div>
-        ) : (
-          <ActiveComponent />
-        )}
+        ) : null}
 
-        {/* Desktop always shows component */}
-        <div className="hidden lg:block">
-          <ActiveComponent />
-        </div>
+        {/* Show the active component when a section is selected OR always on desktop */}
+        {(section || window.innerWidth >= 1024) && <ActiveComponent />}
       </main>
     </div>
     </SettingsProvider>

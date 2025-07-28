@@ -15,7 +15,7 @@ const NotificationsSettings = () => {
   const [upcomingChargesEnabled, setUpcomingChargesEnabled] = useState(false);
   const [includeCalendarSync, setIncludeCalendarSync] = useState(false);
 
-  const [invoiceDigest, setInvoiceDigest] = useState<'daily' | 'weekly' | 'none'>('weekly');
+  const [invoiceDigest, setInvoiceDigest] = useState<'daily' | 'weekly' | 'none'>('none');
 
   const [customRule, setCustomRule] = useState('');
 
@@ -29,7 +29,7 @@ const NotificationsSettings = () => {
       setTrialReminderDays(n.trialReminderDays ?? 3);
       setUpcomingChargesEnabled(!!n.upcomingChargesEnabled);
       setIncludeCalendarSync(!!n.includeCalendarSync);
-      setInvoiceDigest((n.invoiceDigest as any) ?? 'weekly');
+      setInvoiceDigest((n.invoiceDigest as any) ?? 'none');
       setCustomRule(n.customRule ?? '');
     }
   }, [loading, settings]);
