@@ -31,13 +31,24 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Load settings from backend, falling back to cached localStorage on failure
   const fetchSettings = async () => {
     try {
       setLoading(true);
       const data = await settingsService.getSettings();
-      setSettings(data || {});
+      if (data) {
+        setSettings(data);
+        localStorage.setItem('quits-settings', JSON.stringify(data));
+      } else {
+        // If backend returns null, try local cache
+        const cached = localStorage.getItem('quits-settings');
+        setSettings(cached ? JSON.parse(cached) : {});
+      }
     } catch (err) {
       console.error('[SettingsContext] Failed to load settings', err);
+      // Fallback to cached copy
+      const cached = localStorage.getItem('quits-settings');
+      setSettings(cached ? JSON.parse(cached) : {});
     } finally {
       setLoading(false);
     }
@@ -51,6 +62,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const updated = await settingsService.updateSettings(patch);
       setSettings(updated);
+      localStorage.setItem('quits-settings', JSON.stringify(updated));
     } catch (err) {
       console.error('[SettingsContext] Failed to update settings', err);
     }
