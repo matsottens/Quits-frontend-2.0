@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { SettingsProvider } from '../context/SettingsContext';
 import AccountSettings from '../components/settings/AccountSettings';
@@ -25,74 +24,76 @@ const Settings = () => {
   const { section } = useParams();
   const navigate = useNavigate();
 
-  const [active, setActive] = useState<string>(section as string || 'account');
-
-  // Keep state in sync with URL changes
-  useEffect(() => {
-    if (section && sections.find(s => s.key === section)) {
-      setActive(section);
-    }
-  }, [section]);
-
-  const ActiveComponent = sections.find((s) => s.key === active)?.component || AccountSettings;
+  const ActiveComponent = sections.find((s) => s.key === section)?.component || AccountSettings;
 
   return (
     <SettingsProvider>
     <div className="min-h-screen bg-gray-50 lg:ml-64 flex flex-col">
-      {/* Mobile settings navigation */}
-      <div className="lg:hidden bg-white border-b border-gray-200">
+      {/* Mobile header */}
+      <div className="lg:hidden bg-[#26457A] text-white shadow-sm">
         <div className="px-4 py-3 flex items-center">
-          <Link
-            to="/dashboard"
-            className="mr-3 p-1 rounded-md hover:bg-gray-100"
-          >
-            <svg className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <h1 className="text-lg font-semibold text-gray-900">Settings</h1>
-        </div>
-        <div className="px-4 pb-3">
-          <select
-            value={active}
-            onChange={(e) => {
-              const newSection = e.target.value;
-              setActive(newSection);
-              navigate(`/settings/${newSection}`);
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#26457A] focus:border-[#26457A]"
-          >
-            {sections.map((section) => (
-              <option key={section.key} value={section.key}>
-                {section.label}
-              </option>
-            ))}
-          </select>
+          {section ? (
+            <Link
+              to="/settings"
+              className="mr-3 p-1 rounded-md hover:bg-white/10"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+          ) : (
+            <Link
+              to="/dashboard"
+              className="mr-3 p-1 rounded-md hover:bg-white/10"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+          )}
+          <h1 className="text-lg font-semibold">Settings</h1>
         </div>
       </div>
 
       {/* Desktop settings sidebar */}
       <aside className="hidden lg:block w-56 border-r bg-white">
         <nav className="py-6 space-y-1">
-          {sections.map((section) => (
+          {sections.map((s) => (
             <button
-              key={section.key}
-              onClick={() => {
-                navigate(`/settings/${section.key}`);
-                setActive(section.key);
-              }}
+              key={s.key}
+              onClick={() => navigate(`/settings/${s.key}`)}
               className={`w-full text-left px-6 py-2 text-sm font-medium rounded-r-full transition-colors
-                ${active === section.key ? 'bg-gray-100 text-[#26457A]' : 'text-gray-600 hover:bg-gray-50'}`}
+                ${section === s.key ? 'bg-gray-100 text-[#26457A]' : 'text-gray-600 hover:bg-gray-50'}`}
             >
-              {section.label}
+              {s.label}
             </button>
           ))}
         </nav>
       </aside>
 
-      {/* Main settings content */}
+      {/* Main content */}
       <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
-        <ActiveComponent />
+        {/* Mobile list or component */}
+        {!section ? (
+          <div className="lg:hidden space-y-3">
+            {sections.map((s) => (
+              <Link
+                key={s.key}
+                to={`/settings/${s.key}`}
+                className="block bg-white border rounded-lg shadow-sm px-4 py-3 text-gray-700 hover:bg-gray-50"
+              >
+                {s.label}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <ActiveComponent />
+        )}
+
+        {/* Desktop always shows component */}
+        <div className="hidden lg:block">
+          <ActiveComponent />
+        </div>
       </main>
     </div>
     </SettingsProvider>

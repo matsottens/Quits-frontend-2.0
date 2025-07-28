@@ -76,7 +76,7 @@ const EmailAccountsSettings = () => {
       {/* Connected accounts */}
       <section>
         <h2 className="text-xl font-semibold mb-4">Connected Accounts</h2>
-        <div className="border rounded-md p-4 space-y-2 bg-white">
+        <div className="border rounded-lg p-4 space-y-2 bg-white shadow-sm">
           {accounts.length === 0 && <p className="text-sm text-gray-500">No accounts connected yet.</p>}
 
           {accounts.map((email) => {

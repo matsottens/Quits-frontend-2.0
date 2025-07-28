@@ -44,7 +44,7 @@ const NotificationsSettings = () => {
       <h2 className="text-xl font-semibold">Notifications & Alerts</h2>
 
       {/* Price Increase Alerts */}
-      <section className="space-y-4">
+      <section className="space-y-4 bg-white border rounded-lg shadow-sm p-4">
         <h3 className="font-semibold">Price Increase Alerts</h3>
         <label className="flex items-center gap-3">
           <Toggle
@@ -76,7 +76,7 @@ const NotificationsSettings = () => {
       </section>
 
       {/* Trial Ending Reminders */}
-      <section className="space-y-4">
+      <section className="space-y-4 bg-white border rounded-lg shadow-sm p-4">
         <h3 className="font-semibold">Trial Ending Reminders</h3>
         <label className="flex items-center gap-3">
           <Toggle
@@ -108,7 +108,7 @@ const NotificationsSettings = () => {
       </section>
 
       {/* Upcoming Charges */}
-      <section className="space-y-4">
+      <section className="space-y-4 bg-white border rounded-lg shadow-sm p-4">
         <h3 className="font-semibold">Upcoming Charges</h3>
         <label className="flex items-center gap-3">
           <Toggle
@@ -135,7 +135,7 @@ const NotificationsSettings = () => {
       </section>
 
       {/* Invoice Summary Digest */}
-      <section className="space-y-4">
+      <section className="space-y-4 bg-white border rounded-lg shadow-sm p-4">
         <h3 className="font-semibold">Invoice Summary Digest</h3>
         <div className="flex gap-4">
           {['daily', 'weekly', 'none'].map((opt) => (
@@ -157,7 +157,7 @@ const NotificationsSettings = () => {
       </section>
 
       {/* Custom Rules */}
-      <section className="space-y-4">
+      <section className="space-y-4 bg-white border rounded-lg shadow-sm p-4">
         <h3 className="font-semibold">Custom Rules</h3>
         <textarea
           className="w-full border rounded p-2"

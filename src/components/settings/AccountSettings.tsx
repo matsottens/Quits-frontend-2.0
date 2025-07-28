@@ -21,14 +21,14 @@ const AccountSettings = () => {
       <div className="space-y-4">
         <button
           onClick={logout}
-          className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors"
+          className="w-full bg-[#26457A] text-white px-5 py-3 rounded-lg shadow hover:bg-[#1B3359] transition-colors"
         >
           Sign Out
         </button>
 
         <button
           onClick={() => setShowDelete(true)}
-          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+          className="w-full bg-red-600 text-white px-5 py-3 rounded-lg shadow hover:bg-red-700 transition-colors"
         >
           Delete Account
         </button>
