@@ -84,10 +84,11 @@ const AuthCallback = () => {
             // Update progress
             if (isMounted) setProgress(100);
             
-            // Redirect to scanning page on success
+            // Redirect depending on flow
             if (isMounted) {
+              const target = state && state.startsWith('uid:') ? '/settings/email' : '/scanning';
               // Short delay to show completion
-              setTimeout(() => navigate('/scanning'), 500);
+              setTimeout(() => navigate(target), 500);
             }
           } else {
             throw new Error('No token received from authentication server');

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import Toggle from '../ui/Toggle';
+import authService from '../../services/authService';
 
 const scanFrequencies = [
   { id: 'realtime', label: 'Real-time' },
@@ -12,7 +13,7 @@ const scanFrequencies = [
 ] as const;
 
 const EmailAccountsSettings = () => {
-  const { settings, update, loading } = useSettings();
+  const { settings, update, loading, refresh } = useSettings();
   const { user } = useAuth();
 
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
@@ -28,6 +29,11 @@ const EmailAccountsSettings = () => {
     expenses: false,
     donations: false,
   });
+
+  // Fetch latest settings whenever component mounts or user changes
+  useEffect(() => {
+    refresh();
+  }, [user]);
 
   useEffect(() => {
     if (!loading && settings?.email) {
@@ -110,16 +116,14 @@ const EmailAccountsSettings = () => {
           {/* Add new */}
           <div className="pt-2">
             <button
-              onClick={() => {
-                // Redirect to Google OAuth to add another Gmail account
-                const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
-                const redirectUri = encodeURIComponent(window.location.origin + '/auth/callback');
-                const scope = encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid');
-                const state = Date.now().toString();
-                
-                const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account+consent&state=${state}`;
-                
-                window.location.href = authUrl;
+              onClick={async () => {
+                try {
+                  const url = await authService.getGoogleAuthUrl();
+                  window.location.href = url;
+                } catch (err) {
+                  console.error('Failed to initiate Google OAuth', err);
+                  alert('Failed to start account linking. Please try again.');
+                }
               }}
               className="text-blue-600 hover:underline text-sm"
             >
