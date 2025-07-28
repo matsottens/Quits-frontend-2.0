@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 import Toggle from '../ui/Toggle';
 
 const scanFrequencies = [
@@ -12,6 +13,7 @@ const scanFrequencies = [
 
 const EmailAccountsSettings = () => {
   const { settings, update, loading } = useSettings();
+  const { user } = useAuth();
 
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
 
@@ -32,10 +34,20 @@ const EmailAccountsSettings = () => {
       const e = settings.email;
       setSelectedFrequency(e.scanFrequency || 'daily');
       setPermissions({ ...permissions, ...e.permissions });
-      setAccounts(e.accounts || []);
+      
+      // Get connected accounts from settings or use authenticated user's email
+      const savedAccounts = e.accounts || [];
+      const userEmail = user?.email;
+      
+      // If user is authenticated and has an email, include it in connected accounts
+      if (userEmail && !savedAccounts.includes(userEmail)) {
+        setAccounts([userEmail, ...savedAccounts]);
+      } else {
+        setAccounts(savedAccounts);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [loading, user]);
 
   const push = (patch: Partial<Record<string, any>>) => {
     update({ email: { ...(settings?.email || {}), ...patch } });
@@ -48,6 +60,12 @@ const EmailAccountsSettings = () => {
   };
 
   const disconnectAccount = (email: string) => {
+    // Don't allow disconnecting the primary authenticated user's email
+    if (email === user?.email) {
+      alert('You cannot disconnect your primary account email. This is the email you used to sign in.');
+      return;
+    }
+    
     const filtered = accounts.filter((a) => a !== email);
     setAccounts(filtered);
     update({ email: { ...(settings?.email || {}), accounts: filtered } });
@@ -61,30 +79,52 @@ const EmailAccountsSettings = () => {
         <div className="border rounded-md p-4 space-y-2 bg-white">
           {accounts.length === 0 && <p className="text-sm text-gray-500">No accounts connected yet.</p>}
 
-          {accounts.map((email) => (
-            <div
-              key={email}
-              className="flex justify-between items-center py-2 hover:bg-gray-50 px-2 rounded"
-            >
-              <span className="text-gray-700 break-all">{email}</span>
-              <button
-                onClick={() => disconnectAccount(email)}
-                className="text-sm text-red-600 hover:underline"
-                title="Remove account"
+          {accounts.map((email) => {
+            const isPrimaryAccount = email === user?.email;
+            return (
+              <div
+                key={email}
+                className="flex justify-between items-center py-2 hover:bg-gray-50 px-2 rounded"
               >
-                Disconnect
-              </button>
-            </div>
-          ))}
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-700 break-all">{email}</span>
+                  {isPrimaryAccount && (
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      Primary
+                    </span>
+                  )}
+                </div>
+                {!isPrimaryAccount && (
+                  <button
+                    onClick={() => disconnectAccount(email)}
+                    className="text-sm text-red-600 hover:underline"
+                    title="Remove account"
+                  >
+                    Disconnect
+                  </button>
+                )}
+              </div>
+            );
+          })}
 
           {/* Add new */}
           <div className="pt-2">
-            <Link
-              to="/settings/connect-account" /* placeholder route */
+            <button
+              onClick={() => {
+                // Redirect to Google OAuth to add another Gmail account
+                const clientId = '82730443897-ji64k4jhk02lonkps5vu54e1q5opoq3g.apps.googleusercontent.com';
+                const redirectUri = encodeURIComponent(window.location.origin + '/auth/callback');
+                const scope = encodeURIComponent('email profile https://www.googleapis.com/auth/gmail.readonly openid');
+                const state = Date.now().toString();
+                
+                const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account+consent&state=${state}`;
+                
+                window.location.href = authUrl;
+              }}
               className="text-blue-600 hover:underline text-sm"
             >
-              + Add new account
-            </Link>
+              + Add new Gmail account
+            </button>
           </div>
         </div>
       </section>

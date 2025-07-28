@@ -73,7 +73,7 @@ const App = () => {
   return (
     <div className="flex h-screen bg-gray-100">
       {isAuthenticated && <Sidebar />}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto pb-16 md:pb-0">
         <Routes>
           <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
           <Route path="/signup" element={<Signup />} />

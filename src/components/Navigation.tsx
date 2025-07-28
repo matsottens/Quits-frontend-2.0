@@ -1,9 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useState } from 'react';
 
 const Navigation = () => {
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
+  const [showMenu, setShowMenu] = useState(false);
   
   // Don't show navigation on these pages
   const hideNavPages = ['/', '/login', '/signup', '/auth/callback', '/scanning'];
@@ -117,9 +119,50 @@ const Navigation = () => {
               </svg>
               <span className="mt-1">Settings</span>
             </Link>
+
+            {/* Menu/More Button */}
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="flex flex-col items-center py-2 px-4 text-sm text-gray-500 hover:text-[#26457A]"
+            >
+              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+              <span className="mt-1">More</span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {showMenu && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden">
+          <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200">
+            <div className="p-4 space-y-2">
+              <button
+                onClick={logout}
+                className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-md flex items-center"
+              >
+                <svg className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                Sign Out
+              </button>
+            </div>
+          </div>
+          <div className="absolute inset-0" onClick={() => setShowMenu(false)} />
+        </div>
+      )}
     </nav>
   );
 };

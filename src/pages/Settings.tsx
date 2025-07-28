@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { SettingsProvider } from '../context/SettingsContext';
 import AccountSettings from '../components/settings/AccountSettings';
 import PersonalizationSettings from '../components/settings/PersonalizationSettings';
@@ -38,8 +38,40 @@ const Settings = () => {
 
   return (
     <SettingsProvider>
-    <div className="min-h-screen bg-gray-50 lg:ml-64 flex">
-      {/* Internal settings sidebar */}
+    <div className="min-h-screen bg-gray-50 lg:ml-64 flex flex-col">
+      {/* Mobile settings navigation */}
+      <div className="lg:hidden bg-white border-b border-gray-200">
+        <div className="px-4 py-3 flex items-center">
+          <Link
+            to="/dashboard"
+            className="mr-3 p-1 rounded-md hover:bg-gray-100"
+          >
+            <svg className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <h1 className="text-lg font-semibold text-gray-900">Settings</h1>
+        </div>
+        <div className="px-4 pb-3">
+          <select
+            value={active}
+            onChange={(e) => {
+              const newSection = e.target.value;
+              setActive(newSection);
+              navigate(`/settings/${newSection}`);
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#26457A] focus:border-[#26457A]"
+          >
+            {sections.map((section) => (
+              <option key={section.key} value={section.key}>
+                {section.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Desktop settings sidebar */}
       <aside className="hidden lg:block w-56 border-r bg-white">
         <nav className="py-6 space-y-1">
           {sections.map((section) => (
@@ -57,8 +89,9 @@ const Settings = () => {
           ))}
         </nav>
       </aside>
+
       {/* Main settings content */}
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
         <ActiveComponent />
       </main>
     </div>
