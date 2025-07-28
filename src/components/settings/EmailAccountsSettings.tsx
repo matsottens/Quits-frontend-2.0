@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../../context/SettingsContext';
+import Toggle from '../ui/Toggle';
 
 const scanFrequencies = [
   { id: 'realtime', label: 'Real-time' },
@@ -94,12 +95,7 @@ const EmailAccountsSettings = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {Object.entries(permissions).map(([key, value]) => (
             <label key={key} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="form-checkbox"
-                checked={value}
-                onChange={() => togglePermission(key)}
-              />
+              <Toggle checked={value} onChange={() => togglePermission(key)} />
               {key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
             </label>
           ))}

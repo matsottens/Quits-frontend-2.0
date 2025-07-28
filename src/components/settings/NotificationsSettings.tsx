@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import Toggle from '../ui/Toggle';
 
 const NotificationsSettings = () => {
   const { settings, update, loading } = useSettings();
@@ -46,12 +47,9 @@ const NotificationsSettings = () => {
       <section className="space-y-4">
         <h3 className="font-semibold">Price Increase Alerts</h3>
         <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            className="form-checkbox"
+          <Toggle
             checked={priceAlertsEnabled}
-            onChange={() => {
-              const val = !priceAlertsEnabled;
+            onChange={(val) => {
               setPriceAlertsEnabled(val);
               pushUpdates({ priceAlertsEnabled: val });
             }}
@@ -81,12 +79,9 @@ const NotificationsSettings = () => {
       <section className="space-y-4">
         <h3 className="font-semibold">Trial Ending Reminders</h3>
         <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            className="form-checkbox"
+          <Toggle
             checked={trialRemindersEnabled}
-            onChange={() => {
-              const val = !trialRemindersEnabled;
+            onChange={(val) => {
               setTrialRemindersEnabled(val);
               pushUpdates({ trialRemindersEnabled: val });
             }}
@@ -116,12 +111,9 @@ const NotificationsSettings = () => {
       <section className="space-y-4">
         <h3 className="font-semibold">Upcoming Charges</h3>
         <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            className="form-checkbox"
+          <Toggle
             checked={upcomingChargesEnabled}
-            onChange={() => {
-              const val = !upcomingChargesEnabled;
+            onChange={(val) => {
               setUpcomingChargesEnabled(val);
               pushUpdates({ upcomingChargesEnabled: val });
             }}
@@ -130,12 +122,9 @@ const NotificationsSettings = () => {
         </label>
         {upcomingChargesEnabled && (
           <label className="flex items-center gap-3 ml-6">
-            <input
-              type="checkbox"
-              className="form-checkbox"
+            <Toggle
               checked={includeCalendarSync}
-              onChange={() => {
-                const val = !includeCalendarSync;
+              onChange={(val) => {
                 setIncludeCalendarSync(val);
                 pushUpdates({ includeCalendarSync: val });
               }}
