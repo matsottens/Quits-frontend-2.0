@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import Toggle from '../ui/Toggle';
 
 const options = [
   { id: 'googleCalendar', label: 'Google Calendar Sync' },
@@ -38,12 +39,7 @@ const IntegrationsSettings = () => {
       {options.map((opt) => (
         <div key={opt.id} className="flex items-center justify-between border rounded p-4 bg-white">
           <span>{opt.label}</span>
-          <input
-            type="checkbox"
-            className="form-checkbox h-5 w-5 text-[#26457A]"
-            checked={!!enabled[opt.id]}
-            onChange={() => toggle(opt.id)}
-          />
+          <Toggle checked={!!enabled[opt.id]} onChange={() => toggle(opt.id)} />
         </div>
       ))}
     </div>

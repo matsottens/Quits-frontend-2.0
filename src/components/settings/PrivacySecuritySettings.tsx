@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import Toggle from '../ui/Toggle';
 
 const PrivacySecuritySettings = () => {
   const { settings, update, loading } = useSettings();
@@ -32,12 +33,9 @@ const PrivacySecuritySettings = () => {
           <p className="font-medium">Two-Factor Authentication</p>
           <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
         </div>
-        <input
-          type="checkbox"
-          className="form-checkbox h-5 w-5 text-[#26457A]"
+        <Toggle
           checked={twoFactorEnabled}
-          onChange={() => {
-            const val = !twoFactorEnabled;
+          onChange={(val) => {
             setTwoFactorEnabled(val);
             push({ twoFactorEnabled: val });
           }}
@@ -50,12 +48,9 @@ const PrivacySecuritySettings = () => {
           <p className="font-medium">Opt-out of Usage Analytics</p>
           <p className="text-sm text-gray-500">Stop sending anonymised usage data</p>
         </div>
-        <input
-          type="checkbox"
-          className="form-checkbox h-5 w-5 text-[#26457A]"
+        <Toggle
           checked={analyticsOptOut}
-          onChange={() => {
-            const val = !analyticsOptOut;
+          onChange={(val) => {
             setAnalyticsOptOut(val);
             push({ analyticsOptOut: val });
           }}
