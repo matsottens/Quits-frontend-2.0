@@ -5,20 +5,25 @@ import { vi } from 'vitest';
 import { SettingsProvider } from '../context/SettingsContext';
 import NotificationsSettings from '../components/settings/NotificationsSettings';
 
-const updateMock = vi.fn(async (patch: any) => patch);
+// Mock the settings service
+vi.mock('../services/settingsService', () => ({
+  default: {
+    getSettings: vi.fn(),
+    updateSettings: vi.fn(),
+  },
+}));
 
-vi.mock('../services/settingsService', () => {
-  return {
-    default: {
-      getSettings: vi.fn().mockResolvedValue({ notifications: { priceAlertsEnabled: false } }),
-      updateSettings: updateMock,
-    },
-  };
-});
+// Get the mocked service
+const mockSettingsService = vi.mocked(await import('../services/settingsService')).default;
 
 describe('NotificationsSettings interactions', () => {
   beforeEach(() => {
-    updateMock.mockClear();
+    // Reset mocks and set default implementations
+    vi.clearAllMocks();
+    mockSettingsService.getSettings.mockResolvedValue({ 
+      notifications: { priceAlertsEnabled: false } 
+    });
+    mockSettingsService.updateSettings.mockImplementation(async (patch) => patch);
   });
 
   it('enables price alerts and triggers update', async () => {
@@ -33,10 +38,10 @@ describe('NotificationsSettings interactions', () => {
 
     // Click first switch (price alerts)
     const switches = screen.getAllByRole('switch');
-    userEvent.click(switches[0]);
+    await userEvent.click(switches[0]);
 
     await waitFor(() => {
-      expect(updateMock).toHaveBeenCalledWith(
+      expect(mockSettingsService.updateSettings).toHaveBeenCalledWith(
         expect.objectContaining({ notifications: expect.objectContaining({ priceAlertsEnabled: true }) })
       );
     });
