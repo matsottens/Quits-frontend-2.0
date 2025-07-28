@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useSettings } from '../../context/SettingsContext';
 
 const scanFrequencies = [
   { id: 'realtime', label: 'Real-time' },
@@ -9,6 +10,8 @@ const scanFrequencies = [
 ] as const;
 
 const EmailAccountsSettings = () => {
+  const { settings, update, loading } = useSettings();
+
   const [selectedFrequency, setSelectedFrequency] = useState('daily');
   const [permissions, setPermissions] = useState<Record<string, boolean>>({
     subscriptions: true,
@@ -19,8 +22,23 @@ const EmailAccountsSettings = () => {
     donations: false,
   });
 
+  useEffect(() => {
+    if (!loading && settings?.email) {
+      const e = settings.email;
+      setSelectedFrequency(e.scanFrequency || 'daily');
+      setPermissions({ ...permissions, ...e.permissions });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  const push = (patch: Partial<Record<string, any>>) => {
+    update({ email: { ...(settings?.email || {}), ...patch } });
+  };
+
   const togglePermission = (key: string) => {
-    setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
+    const newPerm = { ...permissions, [key]: !permissions[key] };
+    setPermissions(newPerm);
+    push({ permissions: newPerm });
   };
 
   return (
@@ -59,7 +77,10 @@ const EmailAccountsSettings = () => {
                 name="frequency"
                 className="form-radio"
                 checked={selectedFrequency === f.id}
-                onChange={() => setSelectedFrequency(f.id)}
+                onChange={() => {
+                  setSelectedFrequency(f.id);
+                  push({ scanFrequency: f.id });
+                }}
               />
               {f.label}
             </label>
