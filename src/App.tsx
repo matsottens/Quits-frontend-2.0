@@ -114,8 +114,9 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          {/* Settings page with optional section parameter */}
           <Route
-            path="/settings"
+            path="/settings/:section?"
             element={
               <ProtectedRoute>
                 <Settings />

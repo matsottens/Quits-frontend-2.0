@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { SettingsProvider } from '../context/SettingsContext';
 import AccountSettings from '../components/settings/AccountSettings';
 import PersonalizationSettings from '../components/settings/PersonalizationSettings';
@@ -21,7 +22,17 @@ const sections = [
 ] as const;
 
 const Settings = () => {
-  const [active, setActive] = useState<string>('account');
+  const { section } = useParams();
+  const navigate = useNavigate();
+
+  const [active, setActive] = useState<string>(section as string || 'account');
+
+  // Keep state in sync with URL changes
+  useEffect(() => {
+    if (section && sections.find(s => s.key === section)) {
+      setActive(section);
+    }
+  }, [section]);
 
   const ActiveComponent = sections.find((s) => s.key === active)?.component || AccountSettings;
 
@@ -34,7 +45,10 @@ const Settings = () => {
           {sections.map((section) => (
             <button
               key={section.key}
-              onClick={() => setActive(section.key)}
+              onClick={() => {
+                navigate(`/settings/${section.key}`);
+                setActive(section.key);
+              }}
               className={`w-full text-left px-6 py-2 text-sm font-medium rounded-r-full transition-colors
                 ${active === section.key ? 'bg-gray-100 text-[#26457A]' : 'text-gray-600 hover:bg-gray-50'}`}
             >

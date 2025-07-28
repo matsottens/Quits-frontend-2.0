@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSettings } from '../../context/SettingsContext';
 
 const NotificationsSettings = () => {
+  const { settings, update, loading } = useSettings();
+
+  // Local state mirrors context for unsaved edits; will auto-save on change for demo
   const [priceAlertsEnabled, setPriceAlertsEnabled] = useState(false);
   const [priceAlertDays, setPriceAlertDays] = useState(3);
 
@@ -14,6 +18,26 @@ const NotificationsSettings = () => {
 
   const [customRule, setCustomRule] = useState('');
 
+  // Load settings when context ready
+  useEffect(() => {
+    if (!loading && settings?.notifications) {
+      const n = settings.notifications;
+      setPriceAlertsEnabled(!!n.priceAlertsEnabled);
+      setPriceAlertDays(n.priceAlertDays ?? 3);
+      setTrialRemindersEnabled(!!n.trialRemindersEnabled);
+      setTrialReminderDays(n.trialReminderDays ?? 3);
+      setUpcomingChargesEnabled(!!n.upcomingChargesEnabled);
+      setIncludeCalendarSync(!!n.includeCalendarSync);
+      setInvoiceDigest((n.invoiceDigest as any) ?? 'weekly');
+      setCustomRule(n.customRule ?? '');
+    }
+  }, [loading, settings]);
+
+  // helper to push changes
+  const pushUpdates = (patch: Partial<Record<string, any>>) => {
+    update({ notifications: { ...(settings?.notifications || {}), ...patch } });
+  };
+
   return (
     <div className="max-w-3xl space-y-8">
       <h2 className="text-xl font-semibold">Notifications & Alerts</h2>
@@ -26,7 +50,11 @@ const NotificationsSettings = () => {
             type="checkbox"
             className="form-checkbox"
             checked={priceAlertsEnabled}
-            onChange={() => setPriceAlertsEnabled(!priceAlertsEnabled)}
+            onChange={() => {
+              const val = !priceAlertsEnabled;
+              setPriceAlertsEnabled(val);
+              pushUpdates({ priceAlertsEnabled: val });
+            }}
           />
           Enable notifications
         </label>
@@ -38,7 +66,11 @@ const NotificationsSettings = () => {
               min={1}
               className="w-20 border rounded px-2 py-1"
               value={priceAlertDays}
-              onChange={(e) => setPriceAlertDays(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setPriceAlertDays(v);
+                pushUpdates({ priceAlertDays: v });
+              }}
             />
             <span>days before change</span>
           </div>
@@ -53,7 +85,11 @@ const NotificationsSettings = () => {
             type="checkbox"
             className="form-checkbox"
             checked={trialRemindersEnabled}
-            onChange={() => setTrialRemindersEnabled(!trialRemindersEnabled)}
+            onChange={() => {
+              const val = !trialRemindersEnabled;
+              setTrialRemindersEnabled(val);
+              pushUpdates({ trialRemindersEnabled: val });
+            }}
           />
           Enable reminders
         </label>
@@ -65,7 +101,11 @@ const NotificationsSettings = () => {
               min={1}
               className="w-20 border rounded px-2 py-1"
               value={trialReminderDays}
-              onChange={(e) => setTrialReminderDays(Number(e.target.value))}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setTrialReminderDays(v);
+                pushUpdates({ trialReminderDays: v });
+              }}
             />
             <span>days before trial ends</span>
           </div>
@@ -80,7 +120,11 @@ const NotificationsSettings = () => {
             type="checkbox"
             className="form-checkbox"
             checked={upcomingChargesEnabled}
-            onChange={() => setUpcomingChargesEnabled(!upcomingChargesEnabled)}
+            onChange={() => {
+              const val = !upcomingChargesEnabled;
+              setUpcomingChargesEnabled(val);
+              pushUpdates({ upcomingChargesEnabled: val });
+            }}
           />
           Enable weekly summary
         </label>
@@ -90,7 +134,11 @@ const NotificationsSettings = () => {
               type="checkbox"
               className="form-checkbox"
               checked={includeCalendarSync}
-              onChange={() => setIncludeCalendarSync(!includeCalendarSync)}
+              onChange={() => {
+                const val = !includeCalendarSync;
+                setIncludeCalendarSync(val);
+                pushUpdates({ includeCalendarSync: val });
+              }}
             />
             Include calendar sync
           </label>
@@ -108,7 +156,10 @@ const NotificationsSettings = () => {
                 name="invoiceDigest"
                 className="form-radio"
                 checked={invoiceDigest === opt}
-                onChange={() => setInvoiceDigest(opt as 'daily' | 'weekly' | 'none')}
+                onChange={() => {
+                  setInvoiceDigest(opt as 'daily' | 'weekly' | 'none');
+                  pushUpdates({ invoiceDigest: opt });
+                }}
               />
               {opt}
             </label>
@@ -123,7 +174,11 @@ const NotificationsSettings = () => {
           className="w-full border rounded p-2"
           placeholder="e.g. Notify me if anything over $50 appears"
           value={customRule}
-          onChange={(e) => setCustomRule(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setCustomRule(val);
+            pushUpdates({ customRule: val });
+          }}
         />
       </section>
     </div>
