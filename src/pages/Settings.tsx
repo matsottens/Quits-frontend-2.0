@@ -1,25 +1,54 @@
-import { useAuth } from '../context/AuthContext';
+import { useState } from 'react';
+import { SettingsProvider } from '../context/SettingsContext';
+import AccountSettings from '../components/settings/AccountSettings';
+import PersonalizationSettings from '../components/settings/PersonalizationSettings';
+import NotificationsSettings from '../components/settings/NotificationsSettings';
+import PrivacySecuritySettings from '../components/settings/PrivacySecuritySettings';
+import IntegrationsSettings from '../components/settings/IntegrationsSettings';
+import EmailAccountsSettings from '../components/settings/EmailAccountsSettings';
+import DataExportSettings from '../components/settings/DataExportSettings';
+import HelpFeedbackSettings from '../components/settings/HelpFeedbackSettings';
+
+const sections = [
+  { key: 'account', label: 'Account', component: AccountSettings },
+  { key: 'personalization', label: 'Personalization', component: PersonalizationSettings },
+  { key: 'notifications', label: 'Notifications', component: NotificationsSettings },
+  { key: 'privacy', label: 'Privacy & Security', component: PrivacySecuritySettings },
+  { key: 'integrations', label: 'Integrations', component: IntegrationsSettings },
+  { key: 'email', label: 'Email Accounts', component: EmailAccountsSettings },
+  { key: 'data', label: 'Data & Export', component: DataExportSettings },
+  { key: 'help', label: 'Help & Feedback', component: HelpFeedbackSettings },
+] as const;
 
 const Settings = () => {
-  const { logout } = useAuth();
+  const [active, setActive] = useState<string>('account');
+
+  const ActiveComponent = sections.find((s) => s.key === active)?.component || AccountSettings;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
-      
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Account</h2>
-        
-        <div className="space-y-4">
-          <button
-            onClick={logout}
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
+    <SettingsProvider>
+    <div className="min-h-screen bg-gray-50 lg:ml-64 flex">
+      {/* Internal settings sidebar */}
+      <aside className="hidden lg:block w-56 border-r bg-white">
+        <nav className="py-6 space-y-1">
+          {sections.map((section) => (
+            <button
+              key={section.key}
+              onClick={() => setActive(section.key)}
+              className={`w-full text-left px-6 py-2 text-sm font-medium rounded-r-full transition-colors
+                ${active === section.key ? 'bg-gray-100 text-[#26457A]' : 'text-gray-600 hover:bg-gray-50'}`}
+            >
+              {section.label}
+            </button>
+          ))}
+        </nav>
+      </aside>
+      {/* Main settings content */}
+      <main className="flex-1 p-6 overflow-y-auto">
+        <ActiveComponent />
+      </main>
     </div>
+    </SettingsProvider>
   );
 };
 
