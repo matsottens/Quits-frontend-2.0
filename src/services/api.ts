@@ -270,7 +270,7 @@ const apiService = {
     // link this OAuth flow to an existing user account (uid:<uuid> pattern).
     handleGoogleCallback: async (code: string, state?: string | null) => {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
-      
+
       // Prevent multiple simultaneous exchanges of the same code
       if (oauthCodeProcessing) {
         console.log('OAuth code already being processed, waiting for completion');
@@ -280,86 +280,70 @@ const apiService = {
           message: 'Authentication is already in progress. Please wait.'
         };
       }
-      
+
       oauthCodeProcessing = true;
-      
+      console.log('OAuth code processing flag set to true.');
+
       try {
         // Always use GET for Google proxy to avoid CORS issues
         const timestamp = Date.now();
         const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
-        
+
         console.log('Trying proxy URL:', proxyUrl);
-        
-        try {
-          // First try with standard fetch - no explicit OPTIONS request
-          const authToken = localStorage.getItem('token');
-          const response = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json, text/html, */*',
-              'Cache-Control': 'no-cache'
-              ,...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-            },
-            credentials: 'include' // Include credentials for cross-domain requests
-          });
-          
-          if (response.ok) {
-            // Try to determine content type
-            const contentType = response.headers.get('content-type');
-            console.log('Response content type:', contentType);
-            
-            if (contentType && contentType.includes('application/json')) {
-              const data = await response.json();
-              console.log('Proxy response (JSON):', data);
-              oauthCodeProcessing = false; // Reset processing flag
-              return data;
-            } else {
-              // Handle HTML response
-              const text = await response.text();
-              console.log('Received HTML/text response, length:', text.length);
-              oauthCodeProcessing = false; // Reset processing flag
-              return {
-                success: false,
-                html_response: true,
-                html_content: text, // Return the full HTML for token extraction
-                message: 'Received HTML response instead of JSON'
-              };
-            }
-          } else {
-            console.log('Proxy response not OK:', response.status);
-            const errorText = await response.text();
-            console.log('Error response:', errorText);
-            
-            // Try to parse the error text as JSON
-            try {
-              oauthCodeProcessing = false; // Reset processing flag
-              return JSON.parse(errorText);
-            } catch {
-              oauthCodeProcessing = false; // Reset processing flag
-              return {
-                success: false,
-                error: 'proxy_error',
-                message: `Server returned ${response.status}: ${errorText}`
-              };
-            }
+
+        // Use standard fetch
+        const authToken = localStorage.getItem('token');
+        const response = await fetch(proxyUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json, text/html, */*',
+            'Cache-Control': 'no-cache',
+            ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+          },
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log(`Proxy response not OK: ${response.status}`, errorText);
+          // Try to parse the error text as JSON, otherwise return the text
+          try {
+            return JSON.parse(errorText);
+          } catch {
+            return {
+              success: false,
+              error: 'proxy_error',
+              message: `Server returned ${response.status}: ${errorText}`
+            };
           }
-        } catch (error: unknown) {
-          console.error('Fetch error:', error);
-          oauthCodeProcessing = false; // Reset processing flag on error
+        }
+
+        // Handle successful response
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          console.log('Proxy response (JSON):', data);
+          return data;
+        } else {
+          const text = await response.text();
+          console.log('Received non-JSON response, length:', text.length);
           return {
             success: false,
-            error: 'fetch_error',
-            message: error instanceof Error ? error.message : 'Network error during authentication'
+            html_response: true,
+            html_content: text,
+            message: 'Received HTML response instead of JSON'
           };
         }
       } catch (error: unknown) {
         console.error('Error in handleGoogleCallback:', error);
-        oauthCodeProcessing = false; // Reset processing flag on error
         return {
           success: false,
-          error: 'auth_failed',
-          message: 'Failed to authenticate with Google. Please try again.'
+          error: 'callback_failed',
+          message: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`
         };
+      } finally {
+        oauthCodeProcessing = false;
+        console.log('OAuth code processing finished, flag reset.');
       }
     },
     
