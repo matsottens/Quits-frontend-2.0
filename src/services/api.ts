@@ -41,10 +41,9 @@ const authApi = axios.create({
 // Add special interceptor to debug all requests
 authApi.interceptors.request.use(config => {
   try {
-    // Remove /api prefix if present - the URL is already correct in AUTH_API_URL
-    if (config.url?.startsWith('/api/')) {
-      config.url = config.url.replace('/api/', '/');
-      console.log(`Corrected API path, now requesting: ${config.baseURL}${config.url}`);
+    // Ensure auth requests include the /api/ prefix so they hit the serverless function route
+    if (config.url && !config.url.startsWith('/api/')) {
+      config.url = `/api${config.url.startsWith('/') ? '' : '/'}${config.url}`;
     }
     
     // Add CORS headers for auth requests
@@ -367,7 +366,7 @@ const apiService = {
     // Get current user info
     getMe: async () => {
       console.log(`Getting user info`);
-      const response = await authApi.get('/auth/me');
+      const response = await authApi.get('/api/auth/me');
       return response.data;
     },
     
