@@ -285,7 +285,6 @@ const apiService = {
       console.log('OAuth code processing flag set to true.');
 
       try {
-        // Always use GET for Google proxy to avoid CORS issues
         const timestamp = Date.now();
         const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
 

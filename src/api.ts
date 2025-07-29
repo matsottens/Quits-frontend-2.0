@@ -298,14 +298,14 @@ export const handleGoogleCallback = async (code: string, state?: string | null):
   
   try {
     const timestamp = Date.now();
-    const directUrl = `${authApiUrl}/auth/google/callback?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&_t=${timestamp}`;
-    
-    const response = await fetch(directUrl, {
+    const proxyUrl = `${authApiUrl}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
+
+    const response = await fetch(proxyUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
       },
-      credentials: 'omit', // Explicitly omit credentials to prevent preflight issues
+      credentials: 'omit',
     });
     
     if (!response.ok) {
