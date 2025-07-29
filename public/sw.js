@@ -18,6 +18,13 @@ self.addEventListener('activate', event => {
 
 // Fetch event - network first strategy
 self.addEventListener('fetch', event => {
-  // Pass through all requests to the network
+  const url = event.request.url;
+  
+  // Never proxy the Google-proxy exchange – let the page handle it once.
+  if (url.includes('/api/google-proxy')) {
+    return; // default browser fetch (no SW)
+  }
+  
+  // Pass through all other requests to the network
   event.respondWith(fetch(event.request));
 }); 
