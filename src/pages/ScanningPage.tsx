@@ -4,6 +4,7 @@ import api from '../services/api';
 import Header from '../components/Header';
 import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 
 // Define the ScanningStatus type
 type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'ready_for_analysis' | 'complete' | 'completed' | 'error' | 'quota_exhausted';
@@ -38,6 +39,7 @@ interface ScanStatus {
 const ScanningPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
+  const { settings } = useSettings();
   const [scanningStatus, setScanningStatus] = useState<ScanningStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -549,11 +551,8 @@ const ScanningPage = () => {
     }, 500);
   };
 
-  // --- SIMPLIFIED INITIAL SCAN FLOW --------------------------------------
-  // Always trigger a brand-new scan once the user context is available.
-  // This guarantees a fresh row in `scan_history` even for existing users
-  // and avoids the complex resume/skip logic that sometimes prevented a
-  // new scan from ever starting.
+  // --- SCAN FREQUENCY AWARE SCAN FLOW --------------------------------------
+  // Check user's scan frequency setting and only start scans when appropriate
   useEffect(() => {
     if (!user) return; // Wait until AuthContext provides user details
 
@@ -569,8 +568,17 @@ const ScanningPage = () => {
     setScanningStatus('idle');
     setProgress(0);
 
-    // Kick off the scan immediately
-    startScanning();
+    // Check scan frequency setting
+    const scanFrequency = settings?.email?.scanFrequency || 'manual';
+    
+    // Only start scan automatically if frequency is not 'manual'
+    if (scanFrequency !== 'manual') {
+      console.log(`Auto-scan enabled with frequency: ${scanFrequency}`);
+      startScanning();
+    } else {
+      console.log('Manual scan mode - waiting for user to initiate scan');
+      setScanningStatus('idle');
+    }
 
     return () => {
       if (pollingIntervalRef.current) {
@@ -578,7 +586,7 @@ const ScanningPage = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, settings]);
 
   // Add a debugging effect to log state changes
   useEffect(() => {
@@ -855,6 +863,24 @@ const ScanningPage = () => {
           )}
 
           <>
+            {/* Manual scan button for manual mode */}
+            {scanningStatus === 'idle' && settings?.email?.scanFrequency === 'manual' && (
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl mb-4">
+                  Manual Scan Mode
+                </h2>
+                <p className="text-lg text-gray-600 mb-6">
+                  Your scan frequency is set to manual. Click the button below to start a new scan.
+                </p>
+                <button
+                  onClick={startScanning}
+                  className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  Start Email Scan
+                </button>
+              </div>
+            )}
+
             {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing' || scanningStatus === 'in_progress' || scanningStatus === 'ready_for_analysis' || scanningStatus === 'quota_exhausted') && (
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
