@@ -169,7 +169,7 @@ const ScanningPage = () => {
         setError('Failed to start the email scan. The server did not return a valid scan ID. Please try again.');
         setScanningStatus('error');
         localStorage.removeItem(scanIdKey);
-        scanInitiatedRef.current = false;
+        scanInitiatedRef.current = false; // Reset the flag
         return;
       }
       
@@ -180,7 +180,7 @@ const ScanningPage = () => {
         console.log('Received mock response, indicating connectivity issues');
         setError('Could not connect to the scanning service. Please check your internet connection and try again.');
         setScanningStatus('error');
-        scanInitiatedRef.current = false;
+        scanInitiatedRef.current = false; // Reset the flag
         return;
       }
       
@@ -211,6 +211,9 @@ const ScanningPage = () => {
     } catch (err: any) {
       console.error('Error starting scan:', err);
       
+      // Always reset the flag on error
+      scanInitiatedRef.current = false;
+      
       // Handle authentication-specific errors
       if (err.message?.includes('Authentication') || 
           err.message?.includes('token') || 
@@ -238,7 +241,6 @@ const ScanningPage = () => {
       // Only allow manual retries after multiple automatic attempts fail
       if (retryCount >= maxRetries) {
         console.log(`Maximum retry attempts (${maxRetries}) reached. Waiting for manual retry.`);
-        scanInitiatedRef.current = false;
         return;
       }
       
@@ -250,7 +252,6 @@ const ScanningPage = () => {
       // Use exponential backoff for retries (2s, 4s, 8s)
       const delay = Math.pow(2, currentRetryCount) * 1000;
       setTimeout(() => {
-        scanInitiatedRef.current = false; // Allow retry
         startScanning();
       }, delay);
     }
@@ -590,18 +591,10 @@ const ScanningPage = () => {
     setScanningStatus('idle');
     setProgress(0);
 
-    // Check scan frequency setting
-    const scanFrequency = settings?.email?.scanFrequency || 'manual';
-    
-    // Only start scan automatically if frequency is not 'manual'
-    // Manual scans from dashboard should always work regardless of frequency setting
-    if (scanFrequency !== 'manual') {
-      console.log(`Auto-scan enabled with frequency: ${scanFrequency}`);
-      startScanning();
-    } else {
-      console.log('Manual scan mode - waiting for user to initiate scan');
-      setScanningStatus('idle');
-    }
+    // Always start the scan automatically when the page loads
+    // This ensures that when users navigate from the dashboard, the scan starts immediately
+    console.log('Starting scan automatically');
+    startScanning();
 
     return () => {
       if (pollingIntervalRef.current) {
@@ -609,7 +602,7 @@ const ScanningPage = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, settings]);
+  }, [user]);
 
   // Add a debugging effect to log state changes
   useEffect(() => {
@@ -899,27 +892,6 @@ const ScanningPage = () => {
           )}
 
           <>
-
-            {/* Manual scan button - always available when in idle state */}
-            {scanningStatus === 'idle' && (
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl mb-4">
-                  {settings?.email?.scanFrequency === 'manual' ? 'Manual Scan Mode' : 'Start New Scan'}
-                </h2>
-                <p className="text-lg text-gray-600 mb-6">
-                  {settings?.email?.scanFrequency === 'manual' 
-                    ? 'Your scan frequency is set to manual. Click the button below to start a new scan.'
-                    : 'Click the button below to start a new scan, regardless of your automatic scan settings.'
-                  }
-                </p>
-                <button
-                  onClick={startScanning}
-                  className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  Start Email Scan
-                </button>
-              </div>
-            )}
 
             {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing' || scanningStatus === 'in_progress' || scanningStatus === 'ready_for_analysis' || scanningStatus === 'quota_exhausted') && (
               <div className="text-center">

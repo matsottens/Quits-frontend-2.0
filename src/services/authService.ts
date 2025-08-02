@@ -189,10 +189,10 @@ const authService = {
     axios.interceptors.response.use(
       (response) => response,
       (error) => {
+        // Don't automatically logout on 401 errors
+        // Let individual components handle authentication errors
         if (error.response && error.response.status === 401) {
-          console.log('Received 401 unauthorized response, logging out');
-          // Auto logout if 401 response returned from API
-          authService.logout();
+          console.log('Received 401 unauthorized response - letting component handle it');
         }
         return Promise.reject(error);
       }
