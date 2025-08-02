@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 
 import api from '../services/api';
+import Header from '../components/Header';
 import { ScanProgressBar } from '../components/ScanProgressBar';
 import SubscriptionList from '../components/SubscriptionList';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -56,10 +58,11 @@ const ScanningPage: React.FC = () => {
   const [isTestScan, setIsTestScan] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
-  const [gmailTokenStatus, setGmailTokenStatus] = useState<'valid' | 'invalid' | 'checking' | 'error'>('checking');
-  const [isInitialScanComplete, setIsInitialScanComplete] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [statusCheckFailures, setStatusCheckFailures] = useState(0);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+
 
   const scanInitiatedRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
