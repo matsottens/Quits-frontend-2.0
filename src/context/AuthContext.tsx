@@ -174,9 +174,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log(`[Logout] Clearing orphaned scan key: ${key}`);
         localStorage.removeItem(key);
       });
+
+    // Unregister service workers to clear caches and prevent stale auth state
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (const registration of registrations) {
+          registration.unregister();
+          console.log('[Logout] Service worker unregistered.');
+        }
+      });
+    }
     
-    // Navigate to login page
-    window.location.href = '/login';
+    // Navigate to login page after a short delay to allow cleanup to complete
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 100);
   };
 
   const value = {
