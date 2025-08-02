@@ -1,29 +1,27 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { vi } from 'vitest';
 import { SettingsProvider } from '../context/SettingsContext';
 import PersonalizationSettings from '../components/settings/PersonalizationSettings';
+import '@testing-library/jest-dom';
+import settingsService from '../services/settingsService';
 
 // Mock the settings service
-vi.mock('../services/settingsService', () => ({
-    default: {
-    getSettings: vi.fn(),
-    updateSettings: vi.fn(),
-    },
+jest.mock('../services/settingsService', () => ({
+  getSettings: jest.fn(),
+  updateSettings: jest.fn(),
 }));
 
-// Get the mocked service
-const mockSettingsService = vi.mocked(await import('../services/settingsService')).default;
+const mockSettingsService = settingsService as jest.Mocked<typeof settingsService>;
 
 describe('PersonalizationSettings interactions', () => {
   beforeEach(() => {
     // Reset mocks and set default implementations
-    vi.clearAllMocks();
-    mockSettingsService.getSettings.mockResolvedValue({ 
-      personalization: { theme: 'auto', currency: 'USD', dateFormat: 'mdy' } 
+    jest.clearAllMocks();
+    mockSettingsService.getSettings.mockResolvedValue({
+      personalization: { theme: 'auto', currency: 'USD', dateFormat: 'mdy' },
     });
-    mockSettingsService.updateSettings.mockImplementation(async (patch) => patch);
+    mockSettingsService.updateSettings.mockImplementation(async (patch: any) => patch);
   });
 
   it('changes theme to Dark and triggers update', async () => {

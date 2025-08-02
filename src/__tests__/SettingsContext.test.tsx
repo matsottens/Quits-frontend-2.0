@@ -1,15 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { vi } from 'vitest';
 import { SettingsProvider, useSettings } from '../context/SettingsContext';
+import '@testing-library/jest-dom';
 
 // Mock settingsService
-vi.mock('../services/settingsService', () => {
+jest.mock('../services/settingsService', () => {
   return {
-    default: {
-      getSettings: vi.fn().mockResolvedValue({ personalization: { theme: 'dark' } }),
-      updateSettings: vi.fn().mockImplementation(async (patch) => ({ personalization: { theme: patch.theme || 'dark' } })),
-    },
+    getSettings: jest.fn().mockResolvedValue({ personalization: { theme: 'dark' } }),
+    updateSettings: jest.fn().mockImplementation(async (patch: any) => ({ personalization: { theme: patch.theme || 'dark' } })),
   };
 });
 
