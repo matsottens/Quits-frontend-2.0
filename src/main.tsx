@@ -8,6 +8,7 @@ import authReducer from './reducers/authSlice'
 import './index.css'
 import App from './App'
 import { AuthProvider } from './context/AuthContext'
+import { SettingsProvider } from './context/SettingsContext'
 import authService from './services/authService'
 
 // Configure the Redux store
@@ -30,7 +31,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <HelmetProvider>
           <AuthProvider>
-            <App />
+            <SettingsProvider>
+              <App />
+            </SettingsProvider>
           </AuthProvider>
         </HelmetProvider>
       </BrowserRouter>
