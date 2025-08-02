@@ -185,28 +185,6 @@ interface SubscriptionSuggestion {
   [key: string]: any; // Allow for additional fields
 }
 
-/**
- * Function to extract Gmail token from JWT
- */
-function extractGmailToken(token: string | null): string | null {
-  if (!token) return null;
-  
-  try {
-    // Split the token to get the payload
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    
-    // Decode the payload (second part)
-    const payload = atob(parts[1]);
-    const parsed = JSON.parse(payload);
-    
-    return parsed.gmail_token || null;
-  } catch (e) {
-    console.error('Error extracting Gmail token:', e);
-    return null;
-  }
-}
-
 // Add a global OAuth code processing lock
 let oauthCodeProcessing = false;
 

@@ -5,17 +5,18 @@ import { useLogo } from '../hooks/useLogo';
 import GoogleLogo from '../components/GoogleLogo';
 import authService from '../services/authService';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Login: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { logoUrl, handleImageError } = useLogo();
+  const { login } = useAuth();
 
   useEffect(() => {
     // Check for error parameters in URL
@@ -100,7 +101,7 @@ const Login: React.FC = () => {
 
   const handleDirectLogin = async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
       
       // Create direct Google auth URL
@@ -116,7 +117,7 @@ const Login: React.FC = () => {
     } catch (err: any) {
       console.error('Direct login error:', err);
       setError('Failed to start Google login process. Please try again.');
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -192,7 +193,7 @@ const Login: React.FC = () => {
   // Add this new function
   const testAuthProxy = async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       setError(null);
       setShowDebug(true);
 
@@ -224,7 +225,7 @@ const Login: React.FC = () => {
       console.error('Proxy test error:', err);
       setError(`Proxy test failed: ${err.message}`);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 

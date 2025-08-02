@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import Header from '../components/Header';
-import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import axios from 'axios';
+
+import api from '../services/api';
+import { ScanProgressBar } from '../components/ScanProgressBar';
+import SubscriptionList from '../components/SubscriptionList';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 // Define the ScanningStatus type
 type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'ready_for_analysis' | 'complete' | 'completed' | 'error' | 'quota_exhausted';
@@ -37,25 +38,36 @@ interface ScanStatus {
   is_test_data?: boolean;
 }
 
-const ScanningPage = () => {
+const ScanningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout } = useAuth();
-  const { settings } = useSettings();
-  const [scanningStatus, setScanningStatus] = useState<ScanningStatus>('idle');
+  const { user, isAuthenticated, logout } = useAuth();
+  const { settings, loading: settingsLoading } = useSettings();
+
+  const [scanId, setScanId] = useState<string | null>(null);
+  const [scanStatus, setScanStatus] = useState<string>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<SubscriptionSuggestion[]>([]);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [analyzedCount, setAnalyzedCount] = useState(0);
+  const [totalEmails, setTotalEmails] = useState(0);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('Initializing scan...');
+  const [isTestScan, setIsTestScan] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [gmailTokenStatus, setGmailTokenStatus] = useState<'valid' | 'invalid' | 'checking' | 'error'>('checking');
+  const [isInitialScanComplete, setIsInitialScanComplete] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [statusCheckFailures, setStatusCheckFailures] = useState(0);
-  const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  const [scanId, setScanId] = useState<string | null>(null);
-  // user already destructured above; remove duplicate
 
-  // Refs to manage polling and scan state
   const scanInitiatedRef = useRef(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const maxRetries = 3;
+
+  const addDebugLog = useCallback((message: string) => {
+    setDebugLog(prev => [`${new Date().toISOString()}: ${message}`, ...prev]);
+  }, []);
 
   // Helper to get user-specific localStorage key for the scan ID
   const getScanIdKey = () => {
@@ -102,13 +114,13 @@ const ScanningPage = () => {
     const hasTimedOut = pollingCount >= MAX_POLLING_COUNT || 
       (scanStartTimeRef.current && (Date.now() - scanStartTimeRef.current > MAX_SCAN_DURATION_MS));
     
-    if (hasTimedOut && scanningStatus !== 'completed' && scanningStatus !== 'error') {
+    if (hasTimedOut && scanStatus !== 'completed' && scanStatus !== 'error') {
       console.log('Scan timed out after too many polling attempts or maximum duration');
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      setScanningStatus('error');
+      setScanStatus('error');
       setError('The scan is taking longer than expected. This may be due to Gmail API limitations or server issues. Please try again later.');
       const scanIdKey = getScanIdKey();
       if (scanIdKey) {
@@ -117,7 +129,7 @@ const ScanningPage = () => {
       return true;
     }
     return false;
-  }, [pollingCount, scanningStatus]);
+  }, [pollingCount, scanStatus]);
 
   // Clear any active polling when component unmounts
   useEffect(() => {
@@ -154,7 +166,7 @@ const ScanningPage = () => {
     try {
       console.log('SCAN-DEBUG: Starting email scanning process');
       setError(null);
-      setScanningStatus('scanning');
+      setScanStatus('scanning');
       scanInitiatedRef.current = true;
       geminiTriggeredRef.current = false; // Reset Gemini trigger flag
       scanStartTimeRef.current = Date.now(); // Record scan start time
@@ -167,7 +179,7 @@ const ScanningPage = () => {
       if (!response || !response.scanId) {
         console.error('SCAN-DEBUG: Scan initiation failed, no scanId received.');
         setError('Failed to start the email scan. The server did not return a valid scan ID. Please try again.');
-        setScanningStatus('error');
+        setScanStatus('error');
         localStorage.removeItem(scanIdKey);
         scanInitiatedRef.current = false; // Reset the flag
         return;
@@ -179,7 +191,7 @@ const ScanningPage = () => {
       if (response.mock) {
         console.log('Received mock response, indicating connectivity issues');
         setError('Could not connect to the scanning service. Please check your internet connection and try again.');
-        setScanningStatus('error');
+        setScanStatus('error');
         scanInitiatedRef.current = false; // Reset the flag
         return;
       }
@@ -221,7 +233,7 @@ const ScanningPage = () => {
           err.response?.status === 401 ||
           err.response?.status === 403) {
         
-        setScanningStatus('error');
+        setScanStatus('error');
         setError('Session expired. Please log in again.');
         
         // Clear any stored scan data
@@ -240,7 +252,7 @@ const ScanningPage = () => {
       
       // For other errors, allow retries
       setError('Failed to start email scanning. Please try again or check if Gmail API access is properly authorized.');
-      setScanningStatus('error');
+      setScanStatus('error');
       
       // Only allow manual retries after multiple automatic attempts fail
       if (retryCount >= maxRetries) {
@@ -338,7 +350,7 @@ const ScanningPage = () => {
       if (data.error === 'scan_not_found') {
         console.log('SCAN-DEBUG: Scan not found, clearing scan ID');
         localStorage.removeItem(scanIdKey);
-        setScanningStatus('error');
+        setScanStatus('error');
         setError('Scan not found. It may have expired or been deleted.');
         return;
       }
@@ -377,7 +389,7 @@ const ScanningPage = () => {
       
       // Update scanning status - ensure we don't lose the scanning state
       if (uiStatus && uiStatus !== 'error') {
-        setScanningStatus(uiStatus);
+        setScanStatus(uiStatus);
       }
       
       // Update scan stats if available
@@ -416,7 +428,7 @@ const ScanningPage = () => {
             clearInterval(pollingIntervalRef.current);
             pollingIntervalRef.current = null;
           }
-          setScanningStatus('completed');
+          setScanStatus('completed');
 
           // Ensure future scans are not blocked by a stale scan_id from this run.
           const scanIdKeyForRemoval = getScanIdKey();
@@ -451,7 +463,7 @@ const ScanningPage = () => {
           clearInterval(pollingIntervalRef.current);
           pollingIntervalRef.current = null;
         }
-        setScanningStatus('error');
+        setScanStatus('error');
         setError(data.error || 'An error occurred during scanning');
         // Clear scan ID from localStorage on error
         const scanIdKey = getScanIdKey();
@@ -468,14 +480,14 @@ const ScanningPage = () => {
             clearInterval(pollingIntervalRef.current);
             pollingIntervalRef.current = null;
           }
-          setScanningStatus('completed');
+          setScanStatus('completed');
           // Show 100% for 1s before redirecting
           setTimeout(() => {
             navigate('/dashboard', { state: { justScanned: true } });
           }, 1000);
         } else {
           // No subscriptions found, continue polling for quota reset
-          setScanningStatus('analyzing'); // Keep showing progress bar
+          setScanStatus('analyzing'); // Keep showing progress bar
           setError('AI analysis quota temporarily exhausted. Analysis will resume automatically when quota resets.');
           // Continue polling but with longer intervals
           const pollInterval = 10000; // 10 seconds for quota exhausted scans
@@ -527,7 +539,7 @@ const ScanningPage = () => {
       // Handle authentication-specific errors
       if (error.response?.status === 401 || error.response?.status === 403) {
         console.log('Authentication error detected in checkScanStatus');
-        setScanningStatus('error');
+        setScanStatus('error');
         setError('Session expired. Please log in again.');
         
         // Clear any stored scan data
@@ -605,7 +617,7 @@ const ScanningPage = () => {
     // Ensure we start from a clean state
     scanInitiatedRef.current = false;
     setScanId(null);
-    setScanningStatus('idle');
+    setScanStatus('idle');
     setProgress(0);
 
     // Always start the scan automatically when the page loads
@@ -623,16 +635,16 @@ const ScanningPage = () => {
 
   // Add a debugging effect to log state changes
   useEffect(() => {
-    console.log('ScanningStatus changed to:', scanningStatus);
-  }, [scanningStatus]);
+    console.log('ScanningStatus changed to:', scanStatus);
+  }, [scanStatus]);
 
   // Add redirect when status completes (additional safety)
   useEffect(() => {
-    if (scanningStatus === 'completed' || scanningStatus === 'complete') {
+    if (scanStatus === 'completed' || scanStatus === 'complete') {
       const timer = setTimeout(() => navigate('/dashboard', { state: { justScanned: true } }), 1000);
       return () => clearTimeout(timer);
     }
-  }, [scanningStatus, navigate]);
+  }, [scanStatus, navigate]);
 
   // --- STEP-BASED PROGRESS CONFIGURATION -------------------------------------
   // Map every status that can appear in the scan_history table to a percentage
@@ -656,11 +668,11 @@ const ScanningPage = () => {
   // deterministic "jump" between clearly defined steps rather than a smooth
   // incremental bar.  The mapping is defined in STATUS_PROGRESS_MAP above.
   useEffect(() => {
-    const mapped = STATUS_PROGRESS_MAP[scanningStatus];
+    const mapped = STATUS_PROGRESS_MAP[scanStatus as ScanningStatus];
     if (mapped !== undefined && mapped !== progress) {
       setProgress(mapped);
     }
-  }, [scanningStatus, progress]);
+  }, [scanStatus, progress]);
 
   const handleSuggestionAction = async (suggestionId: string, confirmed: boolean) => {
     try {
@@ -875,7 +887,7 @@ const ScanningPage = () => {
                 <div className="ml-3 flex-grow">
                   <p className="text-sm font-medium text-red-800">{error}</p>
                 </div>
-                {scanningStatus === 'error' && (
+                {scanStatus === 'error' && (
                   <div className="mt-4 flex gap-2 justify-center">
                     <button 
                       onClick={handleRetry}
@@ -910,21 +922,21 @@ const ScanningPage = () => {
 
           <>
 
-            {(scanningStatus === 'idle' || scanningStatus === 'initial' || scanningStatus === 'scanning' || scanningStatus === 'analyzing' || scanningStatus === 'in_progress' || scanningStatus === 'ready_for_analysis' || scanningStatus === 'quota_exhausted') && (
+            {(scanStatus === 'idle' || scanStatus === 'initial' || scanStatus === 'scanning' || scanStatus === 'analyzing' || scanStatus === 'in_progress' || scanStatus === 'ready_for_analysis' || scanStatus === 'quota_exhausted') && (
               <div className="text-center">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
-                  {scanningStatus === 'initial' && 'Preparing to scan your emails'}
-                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Fetching emails'}
-                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Analyzing subscriptions'}
-                  {scanningStatus === 'quota_exhausted' && 'AI Analysis Paused'}
-                  {scanningStatus === 'idle' && 'Starting scan...'}
+                  {scanStatus === 'initial' && 'Preparing to scan your emails'}
+                  {(scanStatus === 'scanning' || scanStatus === 'in_progress') && 'Fetching emails'}
+                  {(scanStatus === 'analyzing' || scanStatus === 'ready_for_analysis') && 'Analyzing subscriptions'}
+                  {scanStatus === 'quota_exhausted' && 'AI Analysis Paused'}
+                  {scanStatus === 'idle' && 'Starting scan...'}
                 </h2>
                 <p className="mt-4 text-lg text-gray-600">
-                  {scanningStatus === 'initial' && 'Getting ready to find your subscriptions...'}
-                  {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && 'Please wait while we fetch your emails...'}
-                  {(scanningStatus === 'analyzing' || scanningStatus === 'ready_for_analysis') && 'Extracting subscription details...'}
-                  {scanningStatus === 'quota_exhausted' && 'AI quota temporarily exhausted. Analysis will resume automatically...'}
-                  {scanningStatus === 'idle' && 'Initializing scan process...'}
+                  {scanStatus === 'initial' && 'Getting ready to find your subscriptions...'}
+                  {(scanStatus === 'scanning' || scanStatus === 'in_progress') && 'Please wait while we fetch your emails...'}
+                  {(scanStatus === 'analyzing' || scanStatus === 'ready_for_analysis') && 'Extracting subscription details...'}
+                  {scanStatus === 'quota_exhausted' && 'AI quota temporarily exhausted. Analysis will resume automatically...'}
+                  {scanStatus === 'idle' && 'Initializing scan process...'}
                 </p>
                 <div className="mt-8">
                   {/* Main Progress Bar */}
@@ -942,19 +954,19 @@ const ScanningPage = () => {
                   
                   {/* Phase indicator */}
                   <div className="mt-4 text-sm text-gray-700">
-                    {(scanningStatus === 'scanning' || scanningStatus === 'in_progress') && (
+                    {(scanStatus === 'scanning' || scanStatus === 'in_progress') && (
                       <div className="bg-blue-50 p-3 rounded">
                         <p className="font-medium text-blue-800">Phase 1: Reading Emails</p>
                         <p className="text-blue-600">Searching your Gmail for subscription emails...</p>
                       </div>
                     )}
-                    {(scanningStatus === 'ready_for_analysis' || scanningStatus === 'analyzing') && (
+                    {(scanStatus === 'ready_for_analysis' || scanStatus === 'analyzing') && (
                       <div className="bg-green-50 p-3 rounded">
                         <p className="font-medium text-green-800">Phase 2: AI Analysis</p>
                        
                       </div>
                     )}
-                    {scanningStatus === 'quota_exhausted' && (
+                    {scanStatus === 'quota_exhausted' && (
                       <div className="bg-yellow-50 p-3 rounded">
                         <p className="font-medium text-yellow-800">Phase 2: AI Analysis (Paused)</p>
                         <p className="text-yellow-600">AI quota temporarily exhausted. Analysis will resume automatically when quota resets...</p>
@@ -987,7 +999,7 @@ const ScanningPage = () => {
               </div>
             )}
 
-            {scanningStatus === 'error' && !isRetrying && (
+            {scanStatus === 'error' && !isRetrying && (
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-gray-900">Scanning Error</h2>
                 <p className="mt-4 text-base text-gray-600">
@@ -1016,7 +1028,7 @@ const ScanningPage = () => {
               </div>
             )}
 
-            {scanningStatus === 'completed' && suggestions.length > 0 && (
+            {scanStatus === 'completed' && suggestions.length > 0 && (
               <div>
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
                   Found {suggestions.length} subscription{suggestions.length === 1 ? '' : 's'}

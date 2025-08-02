@@ -248,16 +248,11 @@ async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: an
 }
 
 const AuthCallback = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
-  const dispatch = useDispatch();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
-  const [showDebug, setShowDebug] = useState(false);
-  const [isProcessingToken, setIsProcessingToken] = useState(false);
-  const [authStatus, setAuthStatus] = useState('loading');
+  const { login } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Set up the debug info updater
   useEffect(() => {
@@ -280,40 +275,6 @@ const AuthCallback = () => {
     setDebugInfo(prev => [...prev, `${new Date().toISOString()}: ${message}`]);
     // Also update the global array
     debugInfoArray.push(`${new Date().toISOString()}: ${message}`);
-  };
-
-  const navigatePost = async () => {
-    try {
-      // Verify the token is valid by checking it
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Token not found after authentication');
-      }
-      
-      componentAddDebugInfo('Token stored, verifying with API');
-      
-      // Update Redux state with proper object format
-      dispatch(setLogin({ 
-        isLoggedIn: true,
-        userData: { token }
-      }));
-      
-      // Update auth context
-      if (login) {
-        const loginSuccess = await login(token);
-        if (!loginSuccess) {
-          throw new Error('Auth context login failed');
-        }
-      }
-      
-      // Navigate to scanning page
-      navigate('/scanning');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Error during post-authentication:', errorMessage);
-      setError('Authentication succeeded but encountered an error during login. Please try again.');
-      setIsLoading(false);
-    }
   };
 
   useEffect(() => {
@@ -406,13 +367,6 @@ const AuthCallback = () => {
 
   const handleRetry = () => {
     navigate('/login');
-  };
-
-  // Update the error setter function
-  const setErrorMessage = (message: string) => {
-    setError(message);
-    setIsLoading(false);
-    componentAddDebugInfo(`Error: ${message}`);
   };
 
   if (isLoading) {
