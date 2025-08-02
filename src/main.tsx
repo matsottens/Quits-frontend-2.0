@@ -8,6 +8,7 @@ import authReducer from './reducers/authSlice'
 import './index.css'
 import App from './App'
 import { AuthProvider } from './context/AuthContext'
+import authService from './services/authService'
 
 // Configure the Redux store
 const store = configureStore({
@@ -19,6 +20,9 @@ const store = configureStore({
 
 // Export type for the RootState
 export type RootState = ReturnType<typeof store.getState>
+
+// Setup axios interceptors for global authentication error handling
+authService.setupAxiosInterceptors();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

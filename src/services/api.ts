@@ -464,35 +464,34 @@ const apiService = {
         
         console.log('SCAN-DEBUG: scanEmails called with options:', options);
         
-        // Use production endpoint only
-        const response = await fetch(`${API_URL}/api/email/scan`, {
-          method: 'POST',
+        // Use axios instead of fetch to go through authentication interceptors
+        const response = await axios.post(`${API_URL}/api/email/scan`, {
+          token, // <-- Always include token in body
+          ...options,
+          useRealData: true
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            token, // <-- Always include token in body
-            ...options,
-            useRealData: true
-          })
+          }
         });
         
         console.log('SCAN-DEBUG: /api/email/scan response status:', response.status);
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Email scan failed:', response.status, errorText);
-          throw new Error(`Scan failed: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        const data = response.data;
         console.log('SCAN-DEBUG: Email scan response data:', data);
         console.log('SCAN-DEBUG: scanId in response:', data.scanId);
         return data;
       } catch (error) {
         console.error('Email scan error:', error);
+        
+        // If it's an axios error with 401/403 status, let the interceptor handle it
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          console.log('Authentication error detected in scanEmails, letting interceptor handle logout');
+          throw error;
+        }
+        
         throw error;
       }
     },
@@ -501,23 +500,25 @@ const apiService = {
     analyzeEmails: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/analyze-emails`, {
-          method: 'POST',
+        const response = await axios.post(`${API_URL}/api/analyze-emails`, {
+          scan_id: scanId
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ scan_id: scanId })
+          }
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
-        }
-
-        return await response.json();
+        return response.data;
       } catch (error) {
         console.error('Email analysis error:', error);
+        
+        // If it's an axios error with 401/403 status, let the interceptor handle it
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          console.log('Authentication error detected in analyzeEmails, letting interceptor handle logout');
+          throw error;
+        }
+        
         throw error;
       }
     },
@@ -530,21 +531,22 @@ const apiService = {
           ? `${API_URL}/api/analyzed-subscriptions?scan_id=${scanId}`
           : `${API_URL}/api/analyzed-subscriptions`;
         
-        const response = await fetch(url, {
-          method: 'GET',
+        const response = await axios.get(url, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch analyzed subscriptions: ${response.status} - ${errorText}`);
-        }
-
-        return await response.json();
+        return response.data;
       } catch (error) {
         console.error('Get analyzed subscriptions error:', error);
+        
+        // If it's an axios error with 401/403 status, let the interceptor handle it
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          console.log('Authentication error detected in getAnalyzedSubscriptions, letting interceptor handle logout');
+          throw error;
+        }
+        
         throw error;
       }
     },
@@ -554,29 +556,14 @@ const apiService = {
       try {
         const token = localStorage.getItem('token');
         // Use production endpoint only
-        const response = await fetch(`${API_URL}/api/email/status`, {
-          method: 'GET',
+        const response = await axios.get(`${API_URL}/api/email/status`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           }
         });
         
-        if (!response.ok) {
-          if (response.status === 404) {
-            console.error('Scan ID not found, it may have expired');
-            localStorage.removeItem('current_scan_id'); // Clear invalid scan ID
-            return { 
-              error: 'scan_not_found', 
-              status: 'error', 
-              message: 'Scan not found. It may have expired or been deleted.',
-              progress: 0 
-            };
-          }
-          throw new Error(`Status check failed with ${response.status}`);
-        }
-        
-        const data = await response.json();
+        const data = response.data;
         
         // If we get an error that the scan doesn't exist, clean up localStorage
         if (data.error === 'scan_not_found' || (data.error && data.message?.includes('not found'))) {
@@ -586,6 +573,25 @@ const apiService = {
         return data;
       } catch (error) {
         console.error('Error getting scan status:', error);
+        
+        // Handle 404 errors specifically
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          console.error('Scan ID not found, it may have expired');
+          localStorage.removeItem('current_scan_id'); // Clear invalid scan ID
+          return { 
+            error: 'scan_not_found', 
+            status: 'error', 
+            message: 'Scan not found. It may have expired or been deleted.',
+            progress: 0 
+          };
+        }
+        
+        // If it's an axios error with 401/403 status, let the interceptor handle it
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          console.log('Authentication error detected in getScanStatus, letting interceptor handle logout');
+          throw error;
+        }
+        
         return { error: 'Failed to retrieve scanning status', status: 'error', progress: 0 };
       }
     },
@@ -595,23 +601,18 @@ const apiService = {
       return await apiService.email.getScanStatus(scanId);
     },
 
-    // Get subscription suggestions using fetch
+    // Get subscription suggestions using axios
     getSubscriptionSuggestions: async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/email/suggestions`, {
-          method: 'GET',
+        const response = await axios.get(`${API_URL}/api/email/suggestions`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           }
         });
         
-        if (!response.ok) {
-          throw new Error(`Failed to get suggestions: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        const data = response.data;
         
         // Map the response data to make it more consistent
         if (data?.suggestions && Array.isArray(data.suggestions)) {
@@ -634,31 +635,41 @@ const apiService = {
         return data;
       } catch (error) {
         console.error('Error getting subscription suggestions:', error);
+        
+        // If it's an axios error with 401/403 status, let the interceptor handle it
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          console.log('Authentication error detected in getSubscriptionSuggestions, letting interceptor handle logout');
+          throw error;
+        }
+        
         return { error: 'Failed to retrieve suggestions', suggestions: [] };
       }
     },
 
-    // Confirm or reject a subscription suggestion using fetch
+    // Confirm or reject a subscription suggestion using axios
     confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/email/suggestions/${suggestionId}/confirm`, {
-          method: 'POST',
+        const response = await axios.post(`${API_URL}/api/email/suggestions/${suggestionId}/confirm`, {
+          confirmed
+        }, {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ confirmed })
+          }
         });
         
-        if (!response.ok) {
-          throw new Error(`Failed to confirm suggestion: ${response.status}`);
-        }
-        
-        return await response.json();
+        return response.data;
       } catch (error) {
         console.error('Error confirming suggestion:', error);
+        
+        // If it's an axios error with 401/403 status, let the interceptor handle it
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          console.log('Authentication error detected in confirmSubscriptionSuggestion, letting interceptor handle logout');
+          throw error;
+        }
+        
         throw error;
       }
     }
