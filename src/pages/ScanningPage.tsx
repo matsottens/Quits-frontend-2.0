@@ -4,6 +4,7 @@ import api from '../services/api';
 import Header from '../components/Header';
 import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios'; // Added axios import
 
 // Define the ScanningStatus type
 type ScanningStatus = 'idle' | 'initial' | 'scanning' | 'in_progress' | 'analyzing' | 'ready_for_analysis' | 'complete' | 'completed' | 'error' | 'quota_exhausted';
@@ -215,11 +216,20 @@ const ScanningPage = () => {
       // Handle authentication-specific errors
       if (err.message?.includes('Authentication') || 
           err.message?.includes('token') || 
-          err.message?.includes('Gmail access')) {
-        // Don't show an error here since we're redirecting to login
-        // The window.location redirect in the API service will handle this
+          err.message?.includes('Gmail access') ||
+          err.response?.status === 401 ||
+          err.response?.status === 403) {
+        // Show session expired message and let the auth interceptor handle logout
         setScanningStatus('error');
-        setError('Authentication error. Redirecting to login...');
+        setError('Session expired. Please log in again.');
+        
+        // Clear any stored scan data
+        const scanIdKey = getScanIdKey();
+        if (scanIdKey) {
+          localStorage.removeItem(scanIdKey);
+        }
+        
+        // Let the axios interceptor handle the logout and redirect
         return;
       }
       
@@ -318,23 +328,18 @@ const ScanningPage = () => {
         return;
       }
       
-      // Ensure we don't end up with duplicated '/api/api' in production where API_URL may already include '/api'
-      const apiBase = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
-      const statusUrl = currentScanId.startsWith('scan_')
-        ? `${apiBase}/email/status?scanId=${currentScanId}`
-        : `${apiBase}/email/status/${currentScanId}`;
-      console.log('SCAN-DEBUG: Making request to:', statusUrl);
-      const response = await fetch(statusUrl, {
-        headers: {
-          'Authorization': `Bearer ${getToken()}`
-        }
-      });
+      // Use the API service instead of fetch to go through authentication interceptors
+      const data = await api.email.getScanStatus(currentScanId);
       
-      if (!response.ok) {
-        throw new Error('Failed to check scan status');
+      // Handle scan not found error
+      if (data.error === 'scan_not_found') {
+        console.log('SCAN-DEBUG: Scan not found, clearing scan ID');
+        localStorage.removeItem(scanIdKey);
+        setScanningStatus('error');
+        setError('Scan not found. It may have expired or been deleted.');
+        return;
       }
       
-      const data = await response.json();
       const { status: uiStatus, progress, stats, scan_id: returnedScanId, warning, completed_count } = data;
       
       // Log warning if present
@@ -509,8 +514,31 @@ const ScanningPage = () => {
           }, pollInterval);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking scan status:', error);
+      
+      // Handle authentication-specific errors
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        console.log('Authentication error detected in checkScanStatus');
+        setScanningStatus('error');
+        setError('Session expired. Please log in again.');
+        
+        // Clear any stored scan data
+        const scanIdKey = getScanIdKey();
+        if (scanIdKey) {
+          localStorage.removeItem(scanIdKey);
+        }
+        
+        // Stop polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        
+        // Let the axios interceptor handle the logout and redirect
+        return;
+      }
+      
       setError('Failed to check scan status. Please try again.');
     }
   };
@@ -636,6 +664,15 @@ const ScanningPage = () => {
     } catch (err: any) {
       console.error('Suggestion action error:', err);
       
+      // Handle authentication-specific errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        console.log('Authentication error detected in handleSuggestionAction');
+        setError('Session expired. Please log in again.');
+        
+        // Let the axios interceptor handle the logout and redirect
+        return;
+      }
+      
       // More specific error message
       let errorMessage = 'Failed to process subscription suggestion';
       if (err.message?.includes('Network')) {
@@ -657,20 +694,14 @@ const ScanningPage = () => {
         return;
       }
 
-      const response = await fetch('https://api.quits.cc/api/debug-google-token', {
-        method: 'GET',
+      const response = await axios.get('https://api.quits.cc/api/debug-google-token', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         }
       });
 
-      if (!response.ok) {
-        setError(`Token check failed: ${response.status}`);
-        return;
-      }
-
-      const data = await response.json();
+      const data = response.data;
       if (data.tokenInfo.gmail_token_present) {
         setError(null);
         console.log('Gmail token is present:', data.tokenInfo);
@@ -678,8 +709,16 @@ const ScanningPage = () => {
       } else {
         setError('Gmail token is missing from your JWT. Please re-authenticate with Gmail permissions.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error checking Gmail token:', err);
+      
+      // Handle authentication-specific errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        console.log('Authentication error detected in checkGmailToken');
+        setError('Session expired. Please log in again.');
+        return;
+      }
+      
       setError(`Error checking token: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
@@ -694,26 +733,27 @@ const ScanningPage = () => {
         return;
       }
 
-      const response = await fetch('https://api.quits.cc/api/debug-gmail', {
-        method: 'GET',
+      const response = await axios.get('https://api.quits.cc/api/debug-gmail', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         }
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        setError(`Gmail API test failed: ${response.status} - ${text}`);
-        return;
-      }
-
-      const data = await response.json();
+      const data = response.data;
       setError(null);
       console.log('Gmail API test:', data);
       alert(`Gmail API test results:\n- Connected: ${data.connected}\n- Messages: ${data.messageCount}\n- Error: ${data.error || 'None'}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error testing Gmail API:', err);
+      
+      // Handle authentication-specific errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        console.log('Authentication error detected in testGmailConnection');
+        setError('Session expired. Please log in again.');
+        return;
+      }
+      
       setError(`Error testing Gmail API: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
@@ -735,21 +775,14 @@ const ScanningPage = () => {
         return;
       }
 
-      const response = await fetch(`https://api.quits.cc/api/debug-gmail?scanId=${currentScanId}`, {
-        method: 'GET',
+      const response = await axios.get(`https://api.quits.cc/api/debug-gmail?scanId=${currentScanId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         }
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        setError(`Diagnostic check failed: ${response.status} - ${text}`);
-        return;
-      }
-
-      const data = await response.json();
+      const data = response.data;
       console.log('Diagnostic results:', data);
       
       // Format diagnostic info for display
@@ -794,8 +827,16 @@ const ScanningPage = () => {
       } else {
         setError(`Diagnostic completed. Check console for details.`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error running diagnostics:', err);
+      
+      // Handle authentication-specific errors
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        console.log('Authentication error detected in diagnoseScan');
+        setError('Session expired. Please log in again.');
+        return;
+      }
+      
       setError(`Error running diagnostics: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
