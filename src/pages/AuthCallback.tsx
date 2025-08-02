@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getParam } from '../utils/url';
@@ -248,11 +248,15 @@ async function verifyAndProcessToken(token: string, maxRetries = 3, dispatch: an
 }
 
 const AuthCallback = () => {
-  const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
-  const { login } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+  const dispatch = useDispatch();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [isProcessingToken, setIsProcessingToken] = useState(false);
+  const [authStatus, setAuthStatus] = useState('loading');
 
   // Set up the debug info updater
   useEffect(() => {
