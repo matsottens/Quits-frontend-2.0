@@ -37,6 +37,8 @@ const EmailAccountsSettings = () => {
   useEffect(() => {
     if (!loading && settings?.email) {
       const e = settings.email;
+      console.log('EmailAccountsSettings: Loading settings:', e);
+      console.log('EmailAccountsSettings: scanFrequency from settings:', e.scanFrequency);
       setSelectedFrequency(e.scanFrequency || 'manual');
       setPermissions({ ...permissions, ...e.permissions });
       
@@ -52,10 +54,14 @@ const EmailAccountsSettings = () => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user]);
+  }, [loading, user, settings]);
 
   const push = (patch: Partial<Record<string, any>>) => {
-    update({ email: { ...(settings?.email || {}), ...patch } });
+    console.log('EmailAccountsSettings: Pushing update:', patch);
+    console.log('EmailAccountsSettings: Current settings:', settings?.email);
+    const updatedSettings = { email: { ...(settings?.email || {}), ...patch } };
+    console.log('EmailAccountsSettings: Updated settings to send:', updatedSettings);
+    update(updatedSettings);
   };
 
   const togglePermission = (key: string) => {
