@@ -39,7 +39,7 @@ interface ScanStatus {
 
 const ScanningPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const { settings } = useSettings();
   const [scanningStatus, setScanningStatus] = useState<ScanningStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -220,7 +220,7 @@ const ScanningPage = () => {
           err.message?.includes('Gmail access') ||
           err.response?.status === 401 ||
           err.response?.status === 403) {
-        // Show session expired message and let the auth interceptor handle logout
+        
         setScanningStatus('error');
         setError('Session expired. Please log in again.');
         
@@ -230,7 +230,11 @@ const ScanningPage = () => {
           localStorage.removeItem(scanIdKey);
         }
         
-        // Let the axios interceptor handle the logout and redirect
+        // Wait 3 seconds to show the message, then log out
+        setTimeout(() => {
+          logout();
+        }, 3000);
+        
         return;
       }
       
@@ -538,7 +542,11 @@ const ScanningPage = () => {
           pollingIntervalRef.current = null;
         }
         
-        // Let the axios interceptor handle the logout and redirect
+        // Wait 3 seconds to show the message, then log out
+        setTimeout(() => {
+          logout();
+        }, 3000);
+        
         return;
       }
       
@@ -577,9 +585,18 @@ const ScanningPage = () => {
   // --- SCAN FREQUENCY AWARE SCAN FLOW --------------------------------------
   // Check user's scan frequency setting and only start scans when appropriate
   useEffect(() => {
-    if (!user) return; // Wait until AuthContext provides user details
+    console.log('SCAN-DEBUG: useEffect triggered');
+    console.log('SCAN-DEBUG: user:', user);
+    console.log('SCAN-DEBUG: isAuthenticated:', isAuthenticated);
+    
+    if (!user) {
+      console.log('SCAN-DEBUG: No user, returning');
+      return; // Wait until AuthContext provides user details
+    }
 
     const scanIdKey = getScanIdKey();
+    console.log('SCAN-DEBUG: scanIdKey:', scanIdKey);
+    
     if (scanIdKey) {
       // Remove any stale scan reference so the backend will create a new row
       localStorage.removeItem(scanIdKey);
@@ -592,8 +609,8 @@ const ScanningPage = () => {
     setProgress(0);
 
     // Always start the scan automatically when the page loads
-    // This ensures that when users navigate from the dashboard, the scan starts immediately
-    console.log('Starting scan automatically');
+    // Don't wait for settings to load - start scan immediately
+    console.log('SCAN-DEBUG: Starting scan automatically');
     startScanning();
 
     return () => {
@@ -602,7 +619,7 @@ const ScanningPage = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user]); // Remove settings dependency
 
   // Add a debugging effect to log state changes
   useEffect(() => {

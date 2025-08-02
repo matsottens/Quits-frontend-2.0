@@ -33,12 +33,8 @@ settingsApi.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401) {
-        console.error('[settingsService] Authentication failed - clearing token');
-        localStorage.removeItem('token');
-        // Optionally redirect to login
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login?error=session_expired';
-        }
+        console.error('[settingsService] Authentication failed - letting main interceptor handle it');
+        // Don't automatically logout - let the main interceptor handle it
       }
     }
     return Promise.reject(error);

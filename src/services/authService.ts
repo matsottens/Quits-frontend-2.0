@@ -189,10 +189,16 @@ const authService = {
     axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        // Don't automatically logout on 401 errors
-        // Let individual components handle authentication errors
         if (error.response && error.response.status === 401) {
-          console.log('Received 401 unauthorized response - letting component handle it');
+          // On the scanning page, we want to show a specific message before logging out.
+          // The page itself will handle the logout call.
+          if (window.location.pathname.includes('/scanning')) {
+            console.log('Received 401 on scanning page, letting component handle error display and logout.');
+          } else {
+            console.log('Received 401 unauthorized response, logging out');
+            // Auto logout if 401 response returned from API on any other page
+            authService.logout();
+          }
         }
         return Promise.reject(error);
       }
