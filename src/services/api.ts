@@ -10,13 +10,17 @@ declare global {
 
 // API base URL - ALWAYS use api.quits.cc for auth in both prod and dev
 const isProd = window.location.hostname !== 'localhost';
-const API_URL = isProd 
-  ? 'https://api.quits.cc' 
+
+// Allow overriding the production API URL via env variable for flexibility
+const PROD_API_URL = import.meta.env.VITE_PROD_API_URL || 'https://api.quits.cc';
+
+const API_URL = isProd
+  ? PROD_API_URL
   : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
 
-// Auth-specific API URL (always use production)
+// Auth-specific API URL (same as API_URL in production)
 const AUTH_API_URL = isProd
-  ? 'https://api.quits.cc'
+  ? PROD_API_URL
   : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
 
 console.log(`Using API URL: ${API_URL} in ${isProd ? 'production' : 'development'} mode`);
