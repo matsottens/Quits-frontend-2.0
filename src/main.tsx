@@ -32,7 +32,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <HelmetProvider>
           <AuthProvider>
             <SettingsProvider>
-              <App />
+            <App />
             </SettingsProvider>
           </AuthProvider>
         </HelmetProvider>

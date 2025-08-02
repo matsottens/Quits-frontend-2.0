@@ -20,14 +20,14 @@ export interface AuthResponse {
   message?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.quits.cc';
+const API_URL = window.location.hostname === 'localhost'
+  ? '' // Use a relative path for local development to use the proxy
+  : (import.meta.env.VITE_API_URL || 'https://api.quits.cc');
 
 // Helper to avoid double /api/ segments when building URLs
 const buildAuthUrl = (endpoint: string): string => {
-  // Ensure the endpoint starts with a single leading slash, but do NOT automatically
-  // insert an extra "/api" segment – our backend already handles correct routing.
-  const ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${API_URL}${ep}`;
+  // Use a relative path to leverage the Vite proxy in development
+  return `/api${endpoint}`;
 };
 
 // Service for handling authentication
@@ -46,9 +46,13 @@ const authService = {
       // Persist state for later CSRF check in AuthCallback
       localStorage.setItem('oauth_state', stateParam);
 
+      const redirect_uri = window.location.hostname === 'localhost'
+        ? `${window.location.origin}/api/auth/google/callback`
+        : `${window.location.origin}/auth/callback`;
+
       const response = await axios.get(`${API_URL}/api/google-auth-url`, {
         params: {
-          redirect_uri: window.location.origin + '/auth/callback',
+          redirect_uri: redirect_uri,
           state: stateParam, // Include explicit link to current account when available
         }
       });

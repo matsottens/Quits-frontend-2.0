@@ -270,7 +270,7 @@ const apiService = {
     // link this OAuth flow to an existing user account (uid:<uuid> pattern).
     handleGoogleCallback: async (code: string, state?: string | null) => {
       console.log('Starting OAuth callback process for code:', code.substring(0, 8) + '...');
-
+      
       // Prevent multiple simultaneous exchanges of the same code
       if (oauthCodeProcessing) {
         console.log('OAuth code already being processed, waiting for completion');
@@ -280,22 +280,22 @@ const apiService = {
           message: 'Authentication is already in progress. Please wait.'
         };
       }
-
+      
       oauthCodeProcessing = true;
       console.log('OAuth code processing flag set to true.');
-
+      
       try {
         const timestamp = Date.now();
         const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
-
+        
         console.log('Trying proxy URL:', proxyUrl);
-
+        
         // Use standard fetch
         const authToken = localStorage.getItem('token');
-        const response = await fetch(proxyUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json, text/html, */*',
+          const response = await fetch(proxyUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json, text/html, */*',
             'Cache-Control': 'no-cache',
             ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
           },
@@ -303,19 +303,19 @@ const apiService = {
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
+            const errorText = await response.text();
           console.log(`Proxy response not OK: ${response.status}`, errorText);
           // Try to parse the error text as JSON, otherwise return the text
-          try {
-            return JSON.parse(errorText);
-          } catch {
-            return {
-              success: false,
-              error: 'proxy_error',
-              message: `Server returned ${response.status}: ${errorText}`
-            };
+            try {
+              return JSON.parse(errorText);
+            } catch {
+              return {
+                success: false,
+                error: 'proxy_error',
+                message: `Server returned ${response.status}: ${errorText}`
+              };
+            }
           }
-        }
 
         // Handle successful response
         const contentType = response.headers.get('content-type');
@@ -702,12 +702,12 @@ const apiService = {
             }
           });
         }
-
+        
         if (!response.ok) {
           console.error(`Subscription fetch failed with status: ${response.status}`);
           return { error: `Failed to fetch subscriptions: ${response.status}`, subscriptions: [] };
         }
-
+        
         const data = await response.json();
         return data;
       } catch (error) {
@@ -769,13 +769,13 @@ const apiService = {
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(payload)
-          });
+        });
         }
         
         if (!response.ok) {
           throw new Error(`Failed to create subscription: ${response.status}`);
         }
-
+        
         return await response.json();
       } catch (error) {
         console.error('Error creating subscription:', error);

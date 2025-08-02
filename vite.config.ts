@@ -27,14 +27,14 @@ export default defineConfig(({ command, mode }) => {
     },
     envPrefix: 'VITE_',
     server: {
-      host: true,
       port: 5173,
-      strictPort: true,
+      strictPort: true, // Fail if port is already in use
       proxy: {
         '/api': {
-          target: env.VITE_API_URL,
+          target: 'http://localhost:3000',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
+          secure: false,
+          // The rewrite was removed to ensure the /api prefix is preserved
         },
         '/auth/google/callback/direct2': {
           target: 'https://api.quits.cc',

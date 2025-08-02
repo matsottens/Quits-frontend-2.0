@@ -176,19 +176,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
     // Unregister service workers to clear caches and prevent stale auth state
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (const registration of registrations) {
-          registration.unregister();
-          console.log('[Logout] Service worker unregistered.');
+    const unregisterServiceWorkers = async () => {
+      if ('serviceWorker' in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          if (registrations.length) {
+            await Promise.all(registrations.map(reg => reg.unregister()));
+            console.log('[Logout] All service workers unregistered successfully.');
+          }
+        } catch (error) {
+          console.error('[Logout] Service worker unregistration failed:', error);
         }
-      });
-    }
-    
-    // Navigate to login page after a short delay to allow cleanup to complete
-    setTimeout(() => {
+      }
+    };
+
+    // Wait for cleanup to finish before redirecting
+    unregisterServiceWorkers().finally(() => {
       window.location.href = '/login';
-    }, 100);
+    });
   };
 
   const value = {
