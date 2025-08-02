@@ -17,7 +17,9 @@ const settingsService = {
 
   async updateSettings(patch: Record<string, any>) {
     try {
+      console.log('[settingsService] Sending update request with patch:', patch);
       const res = await axios.put(`${apiBase}/settings`, patch);
+      console.log('[settingsService] Received response:', res.data);
       return res.data;
     } catch (err) {
       console.error('[settingsService] UPDATE failed', err);

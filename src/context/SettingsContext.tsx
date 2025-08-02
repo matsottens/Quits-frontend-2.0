@@ -60,7 +60,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const update = async (patch: Partial<Settings>) => {
     try {
+      console.log('[SettingsContext] Updating settings with patch:', patch);
       const updated = await settingsService.updateSettings(patch);
+      console.log('[SettingsContext] Received updated settings:', updated);
       setSettings(updated);
       localStorage.setItem('quits-settings', JSON.stringify(updated));
     } catch (err) {
