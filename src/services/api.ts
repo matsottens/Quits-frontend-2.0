@@ -502,19 +502,9 @@ const apiService = {
     },
 
     // Get analyzed subscriptions
-    getAnalyzedSubscriptions: async (scanId?: string) => {
+    getAnalyzedSubscriptions: async (scanId: string) => {
       try {
-        const token = localStorage.getItem('token');
-        const url = scanId 
-          ? `${API_URL}/api/analyzed-subscriptions?scan_id=${scanId}`
-          : `${API_URL}/api/analyzed-subscriptions`;
-        
-        const response = await axios.get(url, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
+        const response = await axios.get(`${API_URL}/analyzed-subscriptions?scanId=${scanId}`);
         return response.data;
       } catch (error: any) {
         console.error('Get analyzed subscriptions error:', error);
@@ -580,10 +570,10 @@ const apiService = {
     },
 
     // Get subscription suggestions using axios
-    getSubscriptionSuggestions: async () => {
+    getSubscriptionSuggestions: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/api/email/suggestions`, {
+        const response = await axios.get(`${API_URL}/api/email/suggestions?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
