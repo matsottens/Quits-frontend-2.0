@@ -150,11 +150,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = () => {
+    // Keep a reference to the user ID before clearing it
+    const userId = user?.id || localStorage.getItem('user_id');
+
+    // Clear authentication data
     localStorage.removeItem('token');
     localStorage.removeItem('user_id');
     setUser(null);
     setIsAuthenticated(false);
     delete axios.defaults.headers.common['Authorization'];
+
+    // Thoroughly clean up all session-related data
+    if (userId) {
+      const scanIdKey = `current_scan_id_${userId}`;
+      console.log(`[Logout] Clearing stale scan data for key: ${scanIdKey}`);
+      localStorage.removeItem(scanIdKey);
+    }
+
+    // Also remove any other potential lingering scan keys
+    Object.keys(localStorage)
+      .filter(key => key.startsWith('current_scan_id_'))
+      .forEach(key => {
+        console.log(`[Logout] Clearing orphaned scan key: ${key}`);
+        localStorage.removeItem(key);
+      });
     
     // Navigate to login page
     window.location.href = '/login';
