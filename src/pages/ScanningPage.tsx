@@ -145,15 +145,9 @@ const ScanningPage = () => {
     console.log('SCAN-DEBUG: Current scanId state:', scanId);
     console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey!));
     
+    // Prevent multiple simultaneous scans
     if (scanInitiatedRef.current) {
       console.log('SCAN-DEBUG: Scan already initiated, skipping');
-      return;
-    }
-
-    // Additional check: if there's a scan ID in localStorage, don't start a new scan
-    const storedScanId = localStorage.getItem(scanIdKey);
-    if (storedScanId && storedScanId.startsWith('scan_')) {
-      console.log('SCAN-DEBUG: Found existing scan ID in localStorage, not starting new scan');
       return;
     }
 
@@ -600,6 +594,7 @@ const ScanningPage = () => {
     const scanFrequency = settings?.email?.scanFrequency || 'manual';
     
     // Only start scan automatically if frequency is not 'manual'
+    // Manual scans from dashboard should always work regardless of frequency setting
     if (scanFrequency !== 'manual') {
       console.log(`Auto-scan enabled with frequency: ${scanFrequency}`);
       startScanning();
@@ -904,14 +899,18 @@ const ScanningPage = () => {
           )}
 
           <>
-            {/* Manual scan button for manual mode */}
-            {scanningStatus === 'idle' && settings?.email?.scanFrequency === 'manual' && (
+
+            {/* Manual scan button - always available when in idle state */}
+            {scanningStatus === 'idle' && (
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl mb-4">
-                  Manual Scan Mode
+                  {settings?.email?.scanFrequency === 'manual' ? 'Manual Scan Mode' : 'Start New Scan'}
                 </h2>
                 <p className="text-lg text-gray-600 mb-6">
-                  Your scan frequency is set to manual. Click the button below to start a new scan.
+                  {settings?.email?.scanFrequency === 'manual' 
+                    ? 'Your scan frequency is set to manual. Click the button below to start a new scan.'
+                    : 'Click the button below to start a new scan, regardless of your automatic scan settings.'
+                  }
                 </p>
                 <button
                   onClick={startScanning}
