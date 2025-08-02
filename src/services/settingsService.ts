@@ -14,7 +14,7 @@ const settingsApi = axios.create({
 
 // Add request interceptor to add token to every request
 settingsApi.interceptors.request.use(
-  (config) => {
+  (config: any) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -24,13 +24,17 @@ settingsApi.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error: any) => {
+    return Promise.reject(error);
+  }
 );
 
 // Add response interceptor to handle authentication errors
 settingsApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response: any) => {
+    return response;
+  },
+  (error: any) => {
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 401) {
         console.error('[settingsService] Authentication failed - letting main interceptor handle it');

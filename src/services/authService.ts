@@ -178,21 +178,21 @@ const authService = {
   setupAxiosInterceptors: (): void => {
     console.log('Setting up axios interceptors for auth headers');
     axios.interceptors.request.use(
-      (config) => {
+      (config: any) => {
         const token = authService.getToken();
         if (token) {
           config.headers['Authorization'] = `Bearer ${token}`;
         }
         return config;
       },
-      (error) => {
+      (error: any) => {
         return Promise.reject(error);
       }
     );
     
     axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
+      (response: any) => response,
+      (error: any) => {
         if (error.response && error.response.status === 401) {
           // On the scanning page, we want to show a specific message before logging out.
           // The page itself will handle the logout call.

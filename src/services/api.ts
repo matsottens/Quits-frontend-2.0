@@ -483,7 +483,7 @@ const apiService = {
         console.log('SCAN-DEBUG: Email scan response data:', data);
         console.log('SCAN-DEBUG: scanId in response:', data.scanId);
         return data;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Email scan error:', error);
         
         // If it's an axios error with 401/403 status, let the interceptor handle it
@@ -510,7 +510,7 @@ const apiService = {
         });
 
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Email analysis error:', error);
         
         // If it's an axios error with 401/403 status, let the interceptor handle it
@@ -538,7 +538,7 @@ const apiService = {
         });
 
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Get analyzed subscriptions error:', error);
         
         // If it's an axios error with 401/403 status, let the interceptor handle it
@@ -571,7 +571,7 @@ const apiService = {
         }
         
         return data;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error getting scan status:', error);
         
         // Handle 404 errors specifically
@@ -633,7 +633,7 @@ const apiService = {
         }
         
         return data;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error getting subscription suggestions:', error);
         
         // If it's an axios error with 401/403 status, let the interceptor handle it
@@ -661,7 +661,7 @@ const apiService = {
         });
         
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error confirming suggestion:', error);
         
         // If it's an axios error with 401/403 status, let the interceptor handle it

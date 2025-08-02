@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { AxiosResponse } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -51,12 +52,18 @@ export const health = {
 
 // Response interceptor for handling errors
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      // You might want to redirect to login page or refresh token
-      console.error('Unauthorized access');
+  (response: AxiosResponse) => {
+    // Any status code that lie within the range of 2xx cause this function to trigger
+    return response;
+  },
+  (error: any) => {
+    // Any status codes that falls outside the range of 2xx cause this function to trigger
+    if (error.response) {
+      if (error.response.status === 401) {
+        // Handle unauthorized access
+        // You might want to redirect to login page or refresh token
+        console.error('Unauthorized access');
+      }
     }
     return Promise.reject(error);
   }
