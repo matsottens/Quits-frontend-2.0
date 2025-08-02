@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import settingsService from '../services/settingsService';
+import { useAuth } from './AuthContext'; // Import useAuth
 
 export interface Settings {
   // This is a flexible shape for now; narrow as the schema stabilizes
@@ -30,6 +31,7 @@ export const useSettings = () => {
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useAuth(); // Get authentication status
 
   // Load settings from backend, falling back to cached localStorage on failure
   const fetchSettings = async () => {
@@ -55,8 +57,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    // Only fetch settings if the user is authenticated
+    if (isAuthenticated) {
+      fetchSettings();
+    } else {
+      // If user is not authenticated, clear settings and stop loading
+      setSettings(null);
+      setLoading(false);
+    }
+  }, [isAuthenticated]); // Re-run when authentication status changes
 
   const update = async (patch: Partial<Settings>) => {
     try {
