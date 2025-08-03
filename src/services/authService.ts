@@ -27,18 +27,31 @@ const API_BASE = window.location.hostname === 'localhost'
   // Production: use the backend domain provided at build time, defaulting to legacy api.quits.cc
   : (import.meta.env.VITE_PROD_API_URL || 'https://api.quits.cc');
 
-// Helper to construct full auth endpoint URLs
+// Helper to construct full auth endpoint URLs without duplicating the `/api` segment.
 const buildAuthUrl = (endpoint: string): string => {
-  // Always hit /api in backend
-  const fullEndpoint = endpoint.startsWith('/api/') ? endpoint : `/api${endpoint}`;
+  // Ensure the endpoint always starts with a single leading slash
+  let ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
-  if (API_BASE.endsWith('/') && fullEndpoint.startsWith('/')) {
-    return `${API_BASE.slice(0, -1)}${fullEndpoint}`;
+  // Make sure the endpoint contains a single "/api" prefix
+  if (!ep.startsWith('/api')) {
+    ep = `/api${ep}`;
   }
-  if (!API_BASE.endsWith('/') && !fullEndpoint.startsWith('/')) {
-    return `${API_BASE}/${fullEndpoint}`;
+
+  // If API_BASE itself already ends with "/api", drop the extra prefix we just added
+  if (API_BASE.endsWith('/api') && ep.startsWith('/api/')) {
+    ep = ep.replace(/^\/api/, '');
   }
-  return `${API_BASE}${fullEndpoint}`;
+
+  // Join base and endpoint, taking care of slashes so we don't get "//"
+  if (API_BASE.endsWith('/') && ep.startsWith('/')) {
+    return `${API_BASE.slice(0, -1)}${ep}`;
+  }
+
+  if (!API_BASE.endsWith('/') && !ep.startsWith('/')) {
+    return `${API_BASE}/${ep}`;
+  }
+
+  return `${API_BASE}${ep}`;
 };
 
 // Service for handling authentication

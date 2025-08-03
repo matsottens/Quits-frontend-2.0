@@ -130,10 +130,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
         // Make a request to verify the token
-        const apiUrl = window.location.hostname === 'localhost' 
-          ? 'http://localhost:3000/api'
+        const apiUrl = window.location.hostname === 'localhost'
+          ? 'http://localhost:3000'
           : 'https://api.quits.cc';
-          
+
         await axios.get(`${apiUrl}/api/auth/me`);
       } catch (error) {
         console.error('Token validation error:', error);

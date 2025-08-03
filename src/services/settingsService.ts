@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const apiBase = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000/api'
-  : 'https://api.quits.cc/api';
+  ? 'http://localhost:3000'
+  : 'https://api.quits.cc';
 
 // Create axios instance with interceptors for authentication
 const settingsApi = axios.create({
@@ -48,7 +48,7 @@ settingsApi.interceptors.response.use(
 const settingsService = {
   async getSettings() {
     try {
-      const res = await settingsApi.get('/settings');
+      const res = await settingsApi.get('/api/settings');
       return res.data;
     } catch (err) {
       console.error('[settingsService] GET failed', err);
@@ -59,7 +59,7 @@ const settingsService = {
   async updateSettings(patch: Record<string, any>) {
     try {
       console.log('[settingsService] Sending update request with patch:', patch);
-      const res = await settingsApi.put('/settings', patch);
+      const res = await settingsApi.put('/api/settings', patch);
       console.log('[settingsService] Received response:', res.data);
       return res.data;
     } catch (err) {

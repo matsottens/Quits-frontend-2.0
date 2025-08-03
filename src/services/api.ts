@@ -16,12 +16,12 @@ const PROD_API_URL = import.meta.env.VITE_PROD_API_URL || 'https://api.quits.cc'
 
 const API_URL = isProd
   ? PROD_API_URL
-  : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
+  : (import.meta.env.VITE_API_URL || 'http://localhost:3000');
 
 // Auth-specific API URL (same as API_URL in production)
 const AUTH_API_URL = isProd
   ? PROD_API_URL
-  : (import.meta.env.VITE_API_URL || 'http://localhost:3000/api');
+  : (import.meta.env.VITE_API_URL || 'http://localhost:3000');
 
 console.log(`Using API URL: ${API_URL} in ${isProd ? 'production' : 'development'} mode`);
 console.log(`Using AUTH_API_URL: ${AUTH_API_URL} for all auth operations`);
@@ -196,7 +196,7 @@ let oauthCodeProcessing = false;
 const apiService = {
   // Expose utility methods at the root level for direct access
   getGoogleCallbackUrl: (code: string) => {
-    const baseUrl = `${AUTH_API_URL}/api/google-proxy`;
+    const baseUrl = `${AUTH_API_URL}/api/google-proxy`; // AUTH_API_URL now has no trailing /api in dev, so this yields correct path
     const timestamp = Date.now();
     const redirectUrl = 'https://www.quits.cc/dashboard';
     return `${baseUrl}?code=${encodeURIComponent(code)}&redirect=${encodeURIComponent(redirectUrl)}&_t=${timestamp}`;
@@ -268,7 +268,8 @@ const apiService = {
       
       try {
         const timestamp = Date.now();
-        const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}&_t=${timestamp}`;
+        const redirectParam = isProd ? `&redirect=${encodeURIComponent('https://www.quits.cc/dashboard')}` : '';
+        const proxyUrl = `${AUTH_API_URL}/api/google-proxy?code=${encodeURIComponent(code)}${state ? `&state=${encodeURIComponent(state)}` : ''}${redirectParam}&_t=${timestamp}`;
         
         console.log('Trying proxy URL:', proxyUrl);
         
@@ -331,7 +332,7 @@ const apiService = {
     // Get current user info
     getMe: async () => {
       console.log(`Getting user info`);
-      const response = await authApi.get('/api/auth/me');
+      const response = await authApi.get('/auth/me');
       return response.data;
     },
     
