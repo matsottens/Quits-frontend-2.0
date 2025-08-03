@@ -29,14 +29,16 @@ const API_BASE = window.location.hostname === 'localhost'
 
 // Helper to construct full auth endpoint URLs
 const buildAuthUrl = (endpoint: string): string => {
-  // Ensure there is exactly one slash between base and endpoint
-  if (API_BASE.endsWith('/') && endpoint.startsWith('/')) {
-    return `${API_BASE.slice(0, -1)}${endpoint}`;
+  // Always hit /api in backend
+  const fullEndpoint = endpoint.startsWith('/api/') ? endpoint : `/api${endpoint}`;
+
+  if (API_BASE.endsWith('/') && fullEndpoint.startsWith('/')) {
+    return `${API_BASE.slice(0, -1)}${fullEndpoint}`;
   }
-  if (!API_BASE.endsWith('/') && !endpoint.startsWith('/')) {
-    return `${API_BASE}/${endpoint}`;
+  if (!API_BASE.endsWith('/') && !fullEndpoint.startsWith('/')) {
+    return `${API_BASE}/${fullEndpoint}`;
   }
-  return `${API_BASE}${endpoint}`;
+  return `${API_BASE}${fullEndpoint}`;
 };
 
 // Service for handling authentication
