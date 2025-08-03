@@ -655,9 +655,10 @@ const apiService = {
       try {
         const token = localStorage.getItem('token');
 
-        // 1️⃣  Try the user-scoped singular endpoint first – this explicitly filters by the
-        //     authenticated user on the server side.
-        let response = await fetch(`${API_URL}/api/subscription`, {
+        // 1️⃣  Prefer the plural endpoint first – this is the primary implementation that queries
+        //     Supabase. The singular endpoint is a legacy route that currently returns mock data
+        //     in some environments, so we only fall back to it when absolutely necessary.
+        let response = await fetch(`${API_URL}/api/subscriptions`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -665,9 +666,9 @@ const apiService = {
           }
         });
 
-        // If the endpoint is missing (404) or not allowed (405) fall back to the plural version
+        // If the plural endpoint is missing (404) or not allowed (405) fall back to the singular version
         if (!response.ok && (response.status === 404 || response.status === 405)) {
-          response = await fetch(`${API_URL}/api/subscriptions`, {
+          response = await fetch(`${API_URL}/api/subscription`, {
             method: 'GET',
             headers: {
               'Accept': 'application/json',
