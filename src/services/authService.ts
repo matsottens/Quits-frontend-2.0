@@ -20,14 +20,23 @@ export interface AuthResponse {
   message?: string;
 }
 
-const API_URL = window.location.hostname === 'localhost'
-  ? '' // Use a relative path for local development to use the proxy
-  : (import.meta.env.VITE_API_URL || 'https://api.quits.cc');
+// Determine the base URL for auth endpoints
+const API_BASE = window.location.hostname === 'localhost'
+  // Local dev: use explicit API URL (e.g. http://localhost:3000/api) or fall back to proxy
+  ? (import.meta.env.VITE_API_URL || '/api')
+  // Production: use the backend domain provided at build time, defaulting to legacy api.quits.cc
+  : (import.meta.env.VITE_PROD_API_URL || 'https://api.quits.cc');
 
-// Helper to avoid double /api/ segments when building URLs
+// Helper to construct full auth endpoint URLs
 const buildAuthUrl = (endpoint: string): string => {
-  // Use a relative path to leverage the Vite proxy in development
-  return `/api${endpoint}`;
+  // Ensure there is exactly one slash between base and endpoint
+  if (API_BASE.endsWith('/') && endpoint.startsWith('/')) {
+    return `${API_BASE.slice(0, -1)}${endpoint}`;
+  }
+  if (!API_BASE.endsWith('/') && !endpoint.startsWith('/')) {
+    return `${API_BASE}/${endpoint}`;
+  }
+  return `${API_BASE}${endpoint}`;
 };
 
 // Service for handling authentication
@@ -35,7 +44,7 @@ const authService = {
   // Get the Google Auth URL for initiating login
   getGoogleAuthUrl: async (): Promise<string> => {
     try {
-      console.log(`Requesting Google auth URL from ${API_URL}/api/google-auth-url`);
+      console.log(`Requesting Google auth URL from ${API_BASE}/google-auth-url`);
 
       // If the user is already authenticated we attach their UUID in the state
       // parameter so the backend can reliably link the Google account even when
@@ -50,7 +59,7 @@ const authService = {
         ? `${window.location.origin}/api/auth/google/callback`
         : `${window.location.origin}/auth/callback`;
 
-      const response = await axios.get(`${API_URL}/api/google-auth-url`, {
+      const response = await axios.get(`${API_BASE}/google-auth-url`, {
         params: {
           redirect_uri: redirect_uri,
           state: stateParam, // Include explicit link to current account when available
