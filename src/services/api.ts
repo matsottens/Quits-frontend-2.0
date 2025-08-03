@@ -655,9 +655,8 @@ const apiService = {
       try {
         const token = localStorage.getItem('token');
 
-        // 1️⃣  Prefer the plural endpoint first – this is the primary implementation that queries
-        //     Supabase. The singular endpoint is a legacy route that currently returns mock data
-        //     in some environments, so we only fall back to it when absolutely necessary.
+        // Prefer the plural endpoint first. If it's missing in the current environment (e.g. local dev),
+        // gracefully fall back to the singular `/api/subscription` route so the dashboard still works.
         let response = await fetch(`${API_URL}/api/subscriptions`, {
           method: 'GET',
           headers: {
@@ -666,7 +665,7 @@ const apiService = {
           }
         });
 
-        // If the plural endpoint is missing (404) or not allowed (405) fall back to the singular version
+        // Fallback to singular endpoint if plural is not available
         if (!response.ok && (response.status === 404 || response.status === 405)) {
           response = await fetch(`${API_URL}/api/subscription`, {
             method: 'GET',
