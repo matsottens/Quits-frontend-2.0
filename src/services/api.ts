@@ -693,6 +693,11 @@ const apiService = {
     getById: async (id: string) => {
       try {
         const token = localStorage.getItem('token');
+        
+        if (!token) {
+          throw new Error('No authentication token found. Please log in again.');
+        }
+        
         const response = await fetch(`${API_URL}/api/subscriptions/${id}`, {
           method: 'GET',
           headers: {
@@ -702,7 +707,19 @@ const apiService = {
         });
         
         if (!response.ok) {
-          throw new Error(`Failed to fetch subscription: ${response.status}`);
+          // Handle different error types
+          if (response.status === 401) {
+            // Clear invalid token and redirect to login
+            localStorage.removeItem('token');
+            localStorage.removeItem('quits_auth_token');
+            throw new Error('Authentication expired. Please log in again.');
+          } else if (response.status === 404) {
+            throw new Error('Subscription not found.');
+          } else if (response.status === 403) {
+            throw new Error('Access denied to this subscription.');
+          } else {
+            throw new Error(`Failed to fetch subscription: ${response.status} ${response.statusText}`);
+          }
         }
         
         return await response.json();

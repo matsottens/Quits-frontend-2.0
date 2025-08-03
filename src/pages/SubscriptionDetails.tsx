@@ -25,6 +25,14 @@ const SubscriptionDetails = () => {
     const fetchSubscription = async () => {
       if (!id) return;
       
+      // Debug: Check authentication state
+      const token = localStorage.getItem('token');
+      console.log('Subscription fetch - Auth state:', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+        subscriptionId: id
+      });
+      
       try {
         setLoading(true);
         const response = await api.subscriptions.getById(id);
@@ -47,7 +55,23 @@ const SubscriptionDetails = () => {
         }
       } catch (err) {
         console.error('Error fetching subscription:', err);
-        setError('Failed to load subscription details');
+        
+        // Handle authentication errors specifically
+        if (err instanceof Error) {
+          if (err.message.includes('Authentication expired') || err.message.includes('log in again')) {
+            // Redirect to login page
+            navigate('/login');
+            return;
+          } else if (err.message.includes('not found')) {
+            setError('Subscription not found');
+          } else if (err.message.includes('Access denied')) {
+            setError('You do not have permission to view this subscription');
+          } else {
+            setError(`Failed to load subscription: ${err.message}`);
+          }
+        } else {
+          setError('Failed to load subscription details');
+        }
       } finally {
         setLoading(false);
       }
