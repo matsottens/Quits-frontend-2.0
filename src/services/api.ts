@@ -125,6 +125,13 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Debug logging
+    console.log('SCAN-DEBUG: axios request interceptor - baseURL:', config.baseURL);
+    console.log('SCAN-DEBUG: axios request interceptor - url:', config.url);
+    console.log('SCAN-DEBUG: axios request interceptor - full URL would be:', 
+      config.baseURL ? config.baseURL + config.url : config.url);
+    
     return config;
   },
   (error) => Promise.reject(error)
@@ -446,10 +453,13 @@ const apiService = {
         if (!token) throw new Error('No authentication token found');
         
         console.log('SCAN-DEBUG: scanEmails called with options:', options);
+        console.log('SCAN-DEBUG: API_URL configured as:', API_URL);
+        console.log('SCAN-DEBUG: axios baseURL:', api.defaults.baseURL);
         
         // Use axios instead of fetch to go through authentication interceptors
-        const base = import.meta.env.DEV ? '' : API_URL;
-        const response = await axios.post(`${base}/api/email/scan`, {
+        // Since api has baseURL configured, we only need the relative path
+        console.log('SCAN-DEBUG: Making axios.post request to /api/email/scan');
+        const response = await api.post('/api/email/scan', {
           token, // <-- Always include token in body
           ...options,
           useRealData: true
@@ -484,8 +494,7 @@ const apiService = {
     analyzeEmails: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const base = import.meta.env.DEV ? '' : API_URL;
-        const response = await axios.post(`${base}/api/email/analyze`, {
+        const response = await api.post('/api/email/analyze', {
           scan_id: scanId
         }, {
           headers: {
@@ -511,8 +520,7 @@ const apiService = {
     // Get analyzed subscriptions
     getAnalyzedSubscriptions: async (scanId: string) => {
       try {
-        const base = import.meta.env.DEV ? '' : API_URL;
-        const response = await axios.get(`${base}/analyzed-subscriptions?scanId=${scanId}`);
+        const response = await api.get(`/analyzed-subscriptions?scanId=${scanId}`);
         return response.data;
       } catch (error: any) {
         console.error('Get analyzed subscriptions error:', error);
@@ -531,9 +539,7 @@ const apiService = {
     getScanStatus: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        // Use production endpoint only
-        const base = import.meta.env.DEV ? '' : API_URL;
-        const response = await axios.get(`${base}/api/email/status?scanId=${scanId}`, {
+        const response = await api.get(`/api/email/status?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -582,8 +588,7 @@ const apiService = {
     getSubscriptionSuggestions: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const base = import.meta.env.DEV ? '' : API_URL;
-        const response = await axios.get(`${base}/api/email/suggestions?scanId=${scanId}`, {
+        const response = await api.get(`/api/email/suggestions?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -628,8 +633,7 @@ const apiService = {
     confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
       try {
         const token = localStorage.getItem('token');
-        const base = import.meta.env.DEV ? '' : API_URL;
-        const response = await axios.post(`${base}/api/email/suggestions/${suggestionId}/confirm`, {
+        const response = await api.post(`/api/email/suggestions/${suggestionId}/confirm`, {
           confirmed
         }, {
           headers: {
