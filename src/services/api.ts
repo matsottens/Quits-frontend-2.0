@@ -484,7 +484,8 @@ const apiService = {
     analyzeEmails: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.post(`${API_URL}/api/analyze-emails`, {
+        const base = import.meta.env.DEV ? '' : API_URL;
+        const response = await axios.post(`${base}/api/email/analyze`, {
           scan_id: scanId
         }, {
           headers: {
@@ -510,7 +511,8 @@ const apiService = {
     // Get analyzed subscriptions
     getAnalyzedSubscriptions: async (scanId: string) => {
       try {
-        const response = await axios.get(`${API_URL}/analyzed-subscriptions?scanId=${scanId}`);
+        const base = import.meta.env.DEV ? '' : API_URL;
+        const response = await axios.get(`${base}/analyzed-subscriptions?scanId=${scanId}`);
         return response.data;
       } catch (error: any) {
         console.error('Get analyzed subscriptions error:', error);
@@ -580,7 +582,8 @@ const apiService = {
     getSubscriptionSuggestions: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/api/email/suggestions?scanId=${scanId}`, {
+        const base = import.meta.env.DEV ? '' : API_URL;
+        const response = await axios.get(`${base}/api/email/suggestions?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -625,7 +628,8 @@ const apiService = {
     confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.post(`${API_URL}/api/email/suggestions/${suggestionId}/confirm`, {
+        const base = import.meta.env.DEV ? '' : API_URL;
+        const response = await axios.post(`${base}/api/email/suggestions/${suggestionId}/confirm`, {
           confirmed
         }, {
           headers: {
