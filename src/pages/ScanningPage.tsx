@@ -951,17 +951,16 @@ const ScanningPage: React.FC = () => {
                   </div>
                   
                   {/* Phase indicator */}
-                  <div className="mt-4 text-sm text-gray-700">
+                  <div className="mt-8 text-sm text-gray-700 space-y-4">
                     {(scanStatus === 'scanning' || scanStatus === 'in_progress') && (
-                      <div className="bg-blue-50 p-3 rounded">
-                        <p className="font-medium text-blue-800">Phase 1: Reading Emails</p>
-                        <p className="text-blue-600">Searching your Gmail for subscription emails...</p>
+                      <div className="bg-blue-50 p-4 rounded border-2 border-primary-600">
+                        <p className="font-medium text-primary-700">Phase 1: Reading Emails</p>
+                        <p className="text-primary-600">Searching your Gmail for subscription emails...</p>
                       </div>
                     )}
                     {(scanStatus === 'ready_for_analysis' || scanStatus === 'analyzing') && (
-                      <div className="bg-green-50 p-3 rounded">
-                        <p className="font-medium text-green-800">Phase 2: AI Analysis</p>
-                       
+                      <div className="bg-gray-50 p-4 rounded border-2 border-primary-600">
+                        <p className="font-medium text-primary-700">Phase 2: AI Analysis</p>
                       </div>
                     )}
                     {scanStatus === 'quota_exhausted' && (
@@ -971,7 +970,7 @@ const ScanningPage: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Add scan stats when emails are being processed */}
                   {scanStats && scanStats.emailsToProcess > 0 && (
                     <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
@@ -993,6 +992,9 @@ const ScanningPage: React.FC = () => {
                       )}
                     </div>
                   )}
+
+                  {/* Info sentence */}
+                  <p className="text-gray-600 text-center">Please wait, this might take a few minutes.</p>
                 </div>
               </div>
             )}

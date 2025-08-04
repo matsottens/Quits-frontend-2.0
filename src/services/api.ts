@@ -448,7 +448,7 @@ const apiService = {
         console.log('SCAN-DEBUG: scanEmails called with options:', options);
         
         // Use axios instead of fetch to go through authentication interceptors
-        const response = await axios.post(`${API_URL}/api/email/scan`, {
+        const response = await axios.post(`/api/email/scan`, {
           token, // <-- Always include token in body
           ...options,
           useRealData: true
