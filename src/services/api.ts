@@ -442,6 +442,39 @@ const apiService = {
       localStorage.removeItem('oauth_state');
       localStorage.removeItem('oauth_start_time');
     },
+
+    // Debug function to check JWT token contents
+    debugToken: () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('No token found in localStorage');
+        return null;
+      }
+      
+      try {
+        // Decode JWT without verification to see contents
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        
+        const payload = JSON.parse(jsonPayload);
+        console.log('JWT Token Debug:', {
+          keys: Object.keys(payload),
+          hasGmailToken: !!payload.gmail_token,
+          hasAccessToken: !!payload.access_token,
+          email: payload.email,
+          exp: new Date(payload.exp * 1000).toISOString(),
+          isExpired: payload.exp * 1000 < Date.now()
+        });
+        
+        return payload;
+      } catch (error) {
+        console.error('Error parsing JWT:', error);
+        return null;
+      }
+    },
   },
   
   // Email scanning endpoints
