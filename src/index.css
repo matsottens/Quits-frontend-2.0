@@ -66,3 +66,49 @@ h1, h2, h3, h4, h5, h6 {
 .app-card {
   @apply bg-white rounded-lg shadow-sm border border-gray-100;
 }
+
+@keyframes scanline-move {
+  0% { transform: translateY(0%); opacity: 0.3; }
+  50% { opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0.3; }
+}
+
+.animate-scanline {
+  animation: scanline-move 2s linear infinite;
+}
+
+@keyframes hexpulse {
+  0%   { stroke-dashoffset: 360; opacity: .0; }
+  10%  { opacity: 1; }
+  50%  { opacity: 1; }
+  60%  { opacity: .0; }
+  100% { stroke-dashoffset: 0;   opacity: .0; }
+}
+
+.animate-hexpulse {
+  stroke-dasharray: 360;
+  stroke-dashoffset: 360;
+  animation: hexpulse 2s linear infinite;
+}
+
+/* Hexagon sweep animation */
+@keyframes hex-lead {
+  to { stroke-dashoffset: -360; }
+}
+@keyframes hex-trail {
+  0%   { stroke-dashoffset: 0;   opacity: 0; }
+  10%  { opacity: 0.5; }
+  80%  { opacity: 0.5; }
+  100% { stroke-dashoffset: -360; opacity: 0; }
+}
+.animate-hex-lead {
+  stroke-dasharray: 40 320; /* bright segment length 40 */
+  stroke-dashoffset: 0;
+  animation: hex-lead 3s linear infinite;
+}
+.animate-hex-trail {
+  stroke-dasharray: 120 240; /* longer trail */
+  stroke-dashoffset: 0;
+  animation: hex-trail 3s linear infinite;
+  opacity: 0;
+}

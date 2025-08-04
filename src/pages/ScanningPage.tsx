@@ -6,7 +6,7 @@ import { useSettings } from '../context/SettingsContext';
 
 import api from '../services/api';
 import Header from '../components/Header';
-import { ScanProgressBar } from '../components/ScanProgressBar';
+import ShapeScan from '../components/HexScan';
 import SubscriptionList from '../components/SubscriptionList';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -942,15 +942,10 @@ const ScanningPage: React.FC = () => {
                   {scanStatus === 'idle' && 'Initializing scan process...'}
                 </p>
                 <div className="mt-8">
-                  {/* Main Progress Bar */}
-                  <div className="w-full max-w-md mx-auto mb-6">
-                    <div className="bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-primary-600 h-3 rounded-full transition-all duration-500 ease-out" 
-                        style={{ width: `${progress}%` }}
-                      ></div>
-                    </div>
-                    <div className="mt-2 text-sm text-gray-600 text-center">
+                  {/* Hexagon Scan Animation */}
+                  <div className="w-full max-w-md mx-auto mb-6 flex flex-col items-center">
+                    <ShapeScan size={128} sides={6} />
+                    <div className="mt-4 text-sm text-gray-600 text-center">
                       {progress}% Complete
                     </div>
                   </div>
