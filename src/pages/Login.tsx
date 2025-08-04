@@ -129,6 +129,8 @@ const Login: React.FC = () => {
     try {
       const resp = await authService.login(email, password);
       if (resp.token) {
+        // Update auth context so other pages immediately have user info
+        await login(resp.token);
         navigate('/dashboard');
       } else {
         setError(resp.error || 'Login failed');

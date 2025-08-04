@@ -42,7 +42,7 @@ interface ScanStatus {
 
 const ScanningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const { settings, loading: settingsLoading } = useSettings();
 
   const [scanId, setScanId] = useState<string | null>(null);
@@ -189,6 +189,15 @@ const ScanningPage: React.FC = () => {
       }
       
       console.log('SCAN-DEBUG: api.email.scanEmails() response:', response);
+
+      // If backend already completed the processing (development mock), skip polling
+      if (response.processingCompleted) {
+        console.log('SCAN-DEBUG: Scan processing already completed – skipping status polling');
+        setProgress(100);
+        setScanStatus('completed');
+        navigate('/dashboard', { state: { justScanned: true, subscriptionsFound: response?.subscriptions?.length || 0 } });
+        return;
+      }
       
       // Check for mock response (indicating connection issues)
       if (response.mock) {
@@ -601,11 +610,28 @@ const ScanningPage: React.FC = () => {
   // Check user's scan frequency setting and only start scans when appropriate
   useEffect(() => {
     console.log('SCAN-DEBUG: useEffect triggered');
+    console.log('SCAN-DEBUG: authLoading:', authLoading);
     console.log('SCAN-DEBUG: user:', user);
     console.log('SCAN-DEBUG: isAuthenticated:', isAuthenticated);
-    
+
+    if (authLoading) {
+      console.log('SCAN-DEBUG: Auth is loading, waiting...');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      const stored = localStorage.getItem('token');
+      if (!stored) {
+        console.log('SCAN-DEBUG: No auth token, redirecting to login');
+        navigate('/login');
+      } else {
+        console.log('SCAN-DEBUG: Token present but auth not ready – waiting');
+      }
+      return;
+    }
+ 
     if (!user) {
-      console.log('SCAN-DEBUG: No user, returning');
+      console.log('SCAN-DEBUG: Authenticated but user object not yet available, waiting');
       return; // Wait until AuthContext provides user details
     }
 
@@ -634,7 +660,7 @@ const ScanningPage: React.FC = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]); // Remove settings dependency
+  }, [user, authLoading, isAuthenticated, navigate]);
 
   // Add a debugging effect to log state changes
   useEffect(() => {

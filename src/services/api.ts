@@ -448,7 +448,8 @@ const apiService = {
         console.log('SCAN-DEBUG: scanEmails called with options:', options);
         
         // Use axios instead of fetch to go through authentication interceptors
-        const response = await axios.post(`/api/email/scan`, {
+        const base = import.meta.env.DEV ? '' : API_URL;
+        const response = await axios.post(`${base}/api/email/scan`, {
           token, // <-- Always include token in body
           ...options,
           useRealData: true
@@ -529,7 +530,8 @@ const apiService = {
       try {
         const token = localStorage.getItem('token');
         // Use production endpoint only
-        const response = await axios.get(`${API_URL}/api/email/status`, {
+        const base = import.meta.env.DEV ? '' : API_URL;
+        const response = await axios.get(`${base}/api/email/status?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
