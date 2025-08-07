@@ -970,8 +970,7 @@ const ScanningPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Add scan stats when emails are being processed */}
-                  
+                  {/* Removed obsolete email processing stats */}
 
                   {/* Info sentence */}
                   <p className="text-gray-600 text-center">Please wait, this might take a few minutes.</p>
