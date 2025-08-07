@@ -579,14 +579,7 @@ const apiService = {
           }
         });
         
-        const data = response.data;
-        
-        // If we get an error that the scan doesn't exist, clean up localStorage
-        if (data.error === 'scan_not_found' || (data.error && data.message?.includes('not found'))) {
-          localStorage.removeItem('current_scan_id');
-        }
-        
-        return data;
+        return response.data;
       } catch (error: any) {
         console.error('Error getting scan status:', error);
         

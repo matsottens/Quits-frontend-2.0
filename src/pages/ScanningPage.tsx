@@ -601,16 +601,18 @@ const ScanningPage: React.FC = () => {
       localStorage.removeItem(scanIdKey);
     }
 
-    // Ensure we start from a clean state
-    scanInitiatedRef.current = false;
+    // Ensure we start from a clean state (do not reset scanInitiatedRef here to avoid double-starts in React StrictMode)
     setScanId(null);
     setScanStatus('idle');
     setProgress(0);
 
-    // Always start the scan automatically when the page loads
-    // Don't wait for settings to load - start scan immediately
-    console.log('SCAN-DEBUG: Starting scan automatically');
-    startScanning();
+    // Start the scan automatically only if not already initiated
+    if (!scanInitiatedRef.current) {
+      console.log('SCAN-DEBUG: Starting scan automatically');
+      startScanning();
+    } else {
+      console.log('SCAN-DEBUG: Scan already initiated, skipping auto-start');
+    }
 
     return () => {
       if (pollingIntervalRef.current) {
