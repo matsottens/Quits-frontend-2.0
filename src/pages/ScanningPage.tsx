@@ -425,51 +425,24 @@ const ScanningPage: React.FC = () => {
       
       // Handle different scan statuses
       if (uiStatus === 'completed' || uiStatus === 'complete') {
-        // Only redirect when at least one subscription has been discovered. This guarantees
-        // that the Edge Function had time to write results into the subscriptions table and that
-        // the dashboard will show meaningful data straight away.
-
-        // API returns stats with snake_case (subscriptions_found). The component's mapping later converts
-        // to camelCase, but here we are still dealing with the raw `stats` object coming from the API.
-        const subsFound = (stats as any)?.subscriptions_found ?? (stats as any)?.subscriptionsFound ?? 0;
-        const analysisCompleted = completed_count ?? 0;
-        const totalDetected = subsFound + analysisCompleted;
-
-        if (totalDetected > 0) {
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
-          setScanStatus('completed');
-
-          // Ensure future scans are not blocked by a stale scan_id from this run.
-          const scanIdKeyForRemoval = getScanIdKey();
-          if (scanIdKeyForRemoval) {
-            localStorage.removeItem(scanIdKeyForRemoval);
-          }
-
-          // Show 100 % for a brief moment so users perceive completion, then
-          // take them to their updated dashboard.
-          setTimeout(() => {
-            navigate('/dashboard', { state: { justScanned: true } });
-          }, 1000);
-        } else {
-          console.log('SCAN-DEBUG: Scan marked completed but subscriptions_found = 0 – waiting…');
-          // Force an extra poll every 2 s until subscriptions appear or we hit the max polling count.
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-          }
-          pollingIntervalRef.current = setInterval(() => {
-            setPollingCount(prev => {
-              const newCount = prev + 1;
-              if (newCount >= MAX_POLLING_COUNT) {
-                checkScanTimeout();
-              }
-              return newCount;
-            });
-            checkScanStatus();
-          }, 2000);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
         }
+        setScanStatus('completed');
+        
+        // Ensure future scans are not blocked by a stale scan_id from this run.
+        const scanIdKeyForRemoval = getScanIdKey();
+        if (scanIdKeyForRemoval) {
+          localStorage.removeItem(scanIdKeyForRemoval);
+        }
+        
+        // Show 100% for a brief moment so users perceive completion, then
+        // take them to their updated dashboard.
+        setTimeout(() => {
+          navigate('/dashboard', { state: { justScanned: true } });
+        }, 1000);
+
       } else if (uiStatus === 'error' || uiStatus === 'failed') {
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
@@ -998,26 +971,7 @@ const ScanningPage: React.FC = () => {
                   </div>
 
                   {/* Add scan stats when emails are being processed */}
-                  {scanStats && scanStats.emailsToProcess > 0 && (
-                    <div className="mt-4 text-sm text-gray-700 bg-gray-50 p-3 rounded">
-                      <p>Found <strong>{scanStats.emailsFound}</strong> emails in your inbox</p>
-                      <p>Processing <strong>{scanStats.emailsToProcess}</strong> recent emails</p>
-                      <p>Processed <strong>{scanStats.emailsProcessed}</strong> so far</p>
-                      {scanStats.subscriptionsFound > 0 && (
-                        <p className="text-green-600 font-medium">
-                          Found <strong>{scanStats.subscriptionsFound}</strong> confirmed subscription{scanStats.subscriptionsFound !== 1 ? 's' : ''}!
-                        </p>
-                      )}
-                      {scanStats.emailsToProcess > 0 && (
-                        <div className="w-full bg-gray-200 rounded-full h-2.5 my-2">
-                          <div 
-                            className="bg-green-500 h-2.5 rounded-full transition-all duration-300" 
-                            style={{ width: `${Math.min(100, (scanStats.emailsProcessed / scanStats.emailsToProcess) * 100)}%` }}
-                          ></div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  
 
                   {/* Info sentence */}
                   <p className="text-gray-600 text-center">Please wait, this might take a few minutes.</p>
