@@ -26,17 +26,11 @@ interface SubscriptionSuggestion {
   next_billing_date: string | null;
 }
 
-interface ScanStats {
-  emailsFound: number;
-  emailsToProcess: number;
-  emailsProcessed: number;
-  subscriptionsFound: number;
-}
+// Removed obsolete ScanStats interface
 
 interface ScanStatus {
   status: ScanningStatus;
   progress: number;
-  stats: ScanStats;
   is_test_data?: boolean;
 }
 
@@ -82,8 +76,7 @@ const ScanningPage: React.FC = () => {
 
   const MAX_STATUS_CHECK_FAILURES = 5;
 
-  // Add these new state variables near the top
-  const [scanStats, setScanStats] = useState<ScanStats | null>(null);
+  // Removed obsolete scanStats state
   const [isTestData, setIsTestData] = useState<boolean>(false);
 
   // Add a timer ref to track scan duration
@@ -404,15 +397,7 @@ const ScanningPage: React.FC = () => {
         setScanStatus(uiStatus);
       }
       
-      // Update scan stats if available
-      if (stats) {
-        setScanStats({
-          emailsFound: stats.emails_found || 0,
-          emailsToProcess: stats.emails_to_process || 0,
-          emailsProcessed: stats.emails_processed || 0,
-          subscriptionsFound: stats.subscriptions_found || 0
-        });
-      }
+      // Removed obsolete scanStats update logic
       
       // Use the progress from the API (which now handles two-phase calculation)
       // Remove this block from checkScanStatus:
