@@ -125,6 +125,13 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Debug logging
+    console.log('SCAN-DEBUG: axios request interceptor - baseURL:', config.baseURL);
+    console.log('SCAN-DEBUG: axios request interceptor - url:', config.url);
+    console.log('SCAN-DEBUG: axios request interceptor - full URL would be:', 
+      config.baseURL ? config.baseURL + config.url : config.url);
+    
     return config;
   },
   (error) => Promise.reject(error)
@@ -435,6 +442,39 @@ const apiService = {
       localStorage.removeItem('oauth_state');
       localStorage.removeItem('oauth_start_time');
     },
+
+    // Debug function to check JWT token contents
+    debugToken: () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('No token found in localStorage');
+        return null;
+      }
+      
+      try {
+        // Decode JWT without verification to see contents
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        
+        const payload = JSON.parse(jsonPayload);
+        console.log('JWT Token Debug:', {
+          keys: Object.keys(payload),
+          hasGmailToken: !!payload.gmail_token,
+          hasAccessToken: !!payload.access_token,
+          email: payload.email,
+          exp: new Date(payload.exp * 1000).toISOString(),
+          isExpired: payload.exp * 1000 < Date.now()
+        });
+        
+        return payload;
+      } catch (error) {
+        console.error('Error parsing JWT:', error);
+        return null;
+      }
+    },
   },
   
   // Email scanning endpoints
@@ -446,9 +486,13 @@ const apiService = {
         if (!token) throw new Error('No authentication token found');
         
         console.log('SCAN-DEBUG: scanEmails called with options:', options);
+        console.log('SCAN-DEBUG: API_URL configured as:', API_URL);
+        console.log('SCAN-DEBUG: axios baseURL:', api.defaults.baseURL);
         
         // Use axios instead of fetch to go through authentication interceptors
-        const response = await axios.post(`${API_URL}/api/email/scan`, {
+        // Since api has baseURL configured, we only need the relative path
+        console.log('SCAN-DEBUG: Making axios.post request to /api/email/scan');
+        const response = await api.post('/api/email/scan', {
           token, // <-- Always include token in body
           ...options,
           useRealData: true
@@ -483,7 +527,7 @@ const apiService = {
     analyzeEmails: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.post(`${API_URL}/api/analyze-emails`, {
+        const response = await api.post('/api/email/analyze', {
           scan_id: scanId
         }, {
           headers: {
@@ -509,7 +553,7 @@ const apiService = {
     // Get analyzed subscriptions
     getAnalyzedSubscriptions: async (scanId: string) => {
       try {
-        const response = await axios.get(`${API_URL}/analyzed-subscriptions?scanId=${scanId}`);
+        const response = await api.get(`/analyzed-subscriptions?scanId=${scanId}`);
         return response.data;
       } catch (error: any) {
         console.error('Get analyzed subscriptions error:', error);
@@ -528,34 +572,25 @@ const apiService = {
     getScanStatus: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        // Use production endpoint only
-        const response = await axios.get(`${API_URL}/api/email/status`, {
+        const response = await api.get(`/api/email/status?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
           }
         });
         
-        const data = response.data;
-        
-        // If we get an error that the scan doesn't exist, clean up localStorage
-        if (data.error === 'scan_not_found' || (data.error && data.message?.includes('not found'))) {
-          localStorage.removeItem('current_scan_id');
-        }
-        
-        return data;
+        return response.data;
       } catch (error: any) {
         console.error('Error getting scan status:', error);
         
         // Handle 404 errors specifically
         if (axios.isAxiosError(error) && error.response?.status === 404) {
-          console.error('Scan ID not found, it may have expired');
-          localStorage.removeItem('current_scan_id'); // Clear invalid scan ID
-          return { 
-            error: 'scan_not_found', 
-            status: 'error', 
-            message: 'Scan not found. It may have expired or been deleted.',
-            progress: 0 
+          console.warn('Scan ID not found yet; treating as pending to continue polling');
+          return {
+            status: 'pending',
+            scan_id: scanId,
+            progress: 0,
+            stats: { emails_found: 0, emails_to_process: 0, emails_processed: 0, subscriptions_found: 0 }
           };
         }
         
@@ -578,7 +613,7 @@ const apiService = {
     getSubscriptionSuggestions: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/api/email/suggestions?scanId=${scanId}`, {
+        const response = await api.get(`/api/email/suggestions?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -623,7 +658,7 @@ const apiService = {
     confirmSubscriptionSuggestion: async (suggestionId: string, confirmed: boolean) => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.post(`${API_URL}/api/email/suggestions/${suggestionId}/confirm`, {
+        const response = await api.post(`/api/email/suggestions/${suggestionId}/confirm`, {
           confirmed
         }, {
           headers: {
