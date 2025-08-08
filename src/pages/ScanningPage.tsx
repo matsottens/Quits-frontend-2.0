@@ -675,7 +675,7 @@ const ScanningPage: React.FC = () => {
     initial: 0,
     scanning: 10,
     in_progress: 30,
-    ready_for_analysis: 60,
+    ready_for_analysis: 70,
     analyzing: 80,
     complete: 100,     // some legacy flows use "complete"
     completed: 100,
