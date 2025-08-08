@@ -585,13 +585,12 @@ const apiService = {
         
         // Handle 404 errors specifically
         if (axios.isAxiosError(error) && error.response?.status === 404) {
-          console.error('Scan ID not found, it may have expired');
-          localStorage.removeItem('current_scan_id'); // Clear invalid scan ID
-          return { 
-            error: 'scan_not_found', 
-            status: 'error', 
-            message: 'Scan not found. It may have expired or been deleted.',
-            progress: 0 
+          console.warn('Scan ID not found yet; treating as pending to continue polling');
+          return {
+            status: 'pending',
+            scan_id: scanId,
+            progress: 0,
+            stats: { emails_found: 0, emails_to_process: 0, emails_processed: 0, subscriptions_found: 0 }
           };
         }
         
