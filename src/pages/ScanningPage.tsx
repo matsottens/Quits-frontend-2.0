@@ -310,7 +310,7 @@ const ScanningPage: React.FC = () => {
       // Set initial poll immediately with the current scan ID
       checkScanStatus(scanIdToUse);
       
-      // Set up the polling interval
+      // Set up the polling interval - poll more frequently during active scan
       pollingIntervalRef.current = setInterval(() => {
         setPollingCount(prev => {
           const newCount = prev + 1;
@@ -326,7 +326,7 @@ const ScanningPage: React.FC = () => {
         if (latest) {
           checkScanStatus(latest);
         }
-      }, 3000);
+      }, 2000); // Poll every 2 seconds for better progress visibility
     } else {
       console.warn('Cannot start polling: No scan ID available');
     }
@@ -364,10 +364,27 @@ const ScanningPage: React.FC = () => {
       // Use the API service instead of fetch to go through authentication interceptors
       const data = await api.email.getScanStatus(currentScanId);
       
+      console.log('SCAN-DEBUG: Received status data:', data);
+      
       // Handle scan not found or pending state gracefully
       if (data && (data.status === 'pending' || data.error === 'scan_not_found')) {
+        console.log('SCAN-DEBUG: Scan still pending, continuing to poll');
         // Keep polling; do not clear scan ID or set error
         return;
+      }
+      
+      // Handle auth errors by continuing to poll (token might refresh)
+      if (data && data.auth_error) {
+        console.log('SCAN-DEBUG: Auth error detected, but continuing to poll');
+        setStatusCheckFailures(prev => prev + 1);
+        // Continue polling up to max failures
+        if (statusCheckFailures < MAX_STATUS_CHECK_FAILURES) {
+          return;
+        } else {
+          console.error('SCAN-DEBUG: Too many auth failures, stopping');
+          setError('Authentication failed. Please refresh the page.');
+          return;
+        }
       }
       
       const { status: uiStatus, progress, stats, scan_id: returnedScanId, warning, completed_count } = data;
@@ -375,6 +392,15 @@ const ScanningPage: React.FC = () => {
       // Log warning if present
       if (warning) {
         console.log('SCAN-DEBUG: API warning:', warning);
+      }
+
+      // Update numeric progress directly from backend when provided
+      if (typeof progress === 'number' && !Number.isNaN(progress)) {
+        // Clamp to [0,100] for safety
+        const clamped = Math.max(0, Math.min(100, progress));
+        if (clamped !== undefined) {
+          setProgress(clamped);
+        }
       }
       
       // Update scan ID if the API returned a different one (e.g., latest scan)

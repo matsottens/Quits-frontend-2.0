@@ -572,6 +572,12 @@ const apiService = {
     getScanStatus: async (scanId: string) => {
       try {
         const token = localStorage.getItem('token');
+        if (!token) {
+          console.error('No auth token available for scan status check');
+          return { error: 'Authentication required', status: 'error', progress: 0 };
+        }
+
+        console.log(`[API] Checking scan status for: ${scanId}`);
         const response = await api.get(`/api/email/status?scanId=${scanId}`, {
           headers: {
             'Accept': 'application/json',
@@ -579,11 +585,12 @@ const apiService = {
           }
         });
         
+        console.log(`[API] Scan status response:`, response.data);
         return response.data;
       } catch (error: any) {
         console.error('Error getting scan status:', error);
         
-        // Handle 404 errors specifically
+        // Handle 404 errors specifically - scan might not be ready yet
         if (axios.isAxiosError(error) && error.response?.status === 404) {
           console.warn('Scan ID not found yet; treating as pending to continue polling');
           return {
@@ -594,13 +601,26 @@ const apiService = {
           };
         }
         
-        // If it's an axios error with 401/403 status, let the interceptor handle it
+        // Handle auth errors but don't stop polling immediately
         if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
-          console.log('Authentication error detected in getScanStatus, letting interceptor handle logout');
-          throw error;
+          console.warn('Authentication error in getScanStatus, may need to refresh token');
+          // Don't throw immediately - return a temporary error state to keep polling alive
+          return {
+            status: 'pending', // Keep as pending to maintain polling
+            scan_id: scanId,
+            progress: 0,
+            auth_error: true
+          };
         }
         
-        return { error: 'Failed to retrieve scanning status', status: 'error', progress: 0 };
+        // For other errors, return error state but don't crash
+        console.error(`Scan status check failed: ${error.message}`);
+        return { 
+          error: 'Failed to retrieve scanning status', 
+          status: 'pending', // Keep as pending to maintain polling
+          progress: 0,
+          scan_id: scanId 
+        };
       }
     },
 
