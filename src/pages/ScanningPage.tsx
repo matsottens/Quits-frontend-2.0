@@ -1083,14 +1083,14 @@ const ScanningPage: React.FC = () => {
 
             {(scanStatus === 'idle' || scanStatus === 'initial' || scanStatus === 'scanning' || scanStatus === 'analyzing' || scanStatus === 'in_progress' || scanStatus === 'ready_for_analysis' || scanStatus === 'quota_exhausted') && (
               <div className="text-center">
-                <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+                <h2 className="heading-1">
                   {scanStatus === 'initial' && 'Preparing to scan your emails'}
                   {(scanStatus === 'scanning' || scanStatus === 'in_progress') && 'Fetching emails'}
                   {(scanStatus === 'analyzing' || scanStatus === 'ready_for_analysis') && 'Analyzing subscriptions'}
                   {scanStatus === 'quota_exhausted' && 'AI Analysis Paused'}
                   {scanStatus === 'idle' && 'Starting scan...'}
                 </h2>
-                <p className="mt-4 text-lg text-gray-600">
+                 <p className="mt-4 body-text">
                   {scanStatus === 'initial' && 'Getting ready to find your subscriptions...'}
                   {(scanStatus === 'scanning' || scanStatus === 'in_progress') && 'Please wait while we fetch your emails...'}
                   {(scanStatus === 'analyzing' || scanStatus === 'ready_for_analysis') && 'Extracting subscription details...'}
@@ -1099,9 +1099,9 @@ const ScanningPage: React.FC = () => {
                 </p>
                 <div className="mt-8">
                   {/* Hexagon Scan Animation */}
-                  <div className="w-full max-w-md mx-auto mb-6 flex flex-col items-center">
+                    <div className="w-full max-w-md mx-auto mb-6 flex flex-col items-center">
                     <ShapeScan size={128} sides={6} />
-                    <div className="mt-4 text-sm text-gray-600 text-center">
+                      <div className="mt-4 small-label text-center">
                       {progress}% Complete
                     </div>
                   </div>
@@ -1110,13 +1110,13 @@ const ScanningPage: React.FC = () => {
                   <div className="mt-8 text-sm text-gray-700 space-y-4">
                     {(scanStatus === 'scanning' || scanStatus === 'in_progress') && (
                       <div className="bg-blue-50 p-4 rounded border-2 border-primary-600">
-                        <p className="font-medium text-primary-700">Phase 1: Reading Emails</p>
-                        <p className="text-primary-600">Searching your Gmail for subscription emails...</p>
+                        <p className="heading-3 text-primary-700">Phase 1: Reading Emails</p>
+                        <p className="body-text text-primary-600">Searching your Gmail for subscription emails...</p>
                       </div>
                     )}
                     {(scanStatus === 'ready_for_analysis' || scanStatus === 'analyzing') && (
                       <div className="bg-gray-50 p-4 rounded border-2 border-primary-600">
-                        <p className="font-medium text-primary-700">Phase 2: AI Analysis</p>
+                        <p className="heading-3 text-primary-700">Phase 2: AI Analysis</p>
                       </div>
                     )}
                     {scanStatus === 'quota_exhausted' && (

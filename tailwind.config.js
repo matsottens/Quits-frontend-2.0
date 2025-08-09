@@ -7,6 +7,10 @@ export default {
   theme: {
     extend: {
       colors: {
+        galaxy: '#1D3B8B',
+        darkGrey: '#2B2B2B',
+        gain: '#28A745',
+        loss: '#D9534F',
         primary: {
           50: '#e6f7ff',
           100: '#b3e0ff',
@@ -45,8 +49,16 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Body text
+        sans: ['IBM Plex Sans', 'Inter', 'system-ui', 'sans-serif'],
+        // Headings
+        display: ['Inter', 'system-ui', 'sans-serif'],
+        // Numbers / tables
+        mono: ['IBM Plex Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
       },
+      letterSpacing: {
+        heading: '-0.005em' // roughly -0.5%
+      }
     },
   },
   plugins: [],

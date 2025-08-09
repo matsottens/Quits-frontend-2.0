@@ -30,7 +30,7 @@ const Settings = () => {
     <SettingsProvider>
     <div className="min-h-screen bg-gray-50 lg:ml-64 flex flex-col lg:flex-row">
       {/* Mobile header */}
-      <div className="lg:hidden bg-[#26457A] text-white shadow-sm">
+      <div className="lg:hidden bg-galaxy text-white shadow-sm">
         <div className="px-4 py-3 flex items-center">
           {section ? (
             <Link
@@ -51,7 +51,7 @@ const Settings = () => {
               </svg>
             </Link>
           )}
-          <h1 className="text-lg font-semibold">Settings</h1>
+          <h1 className="heading-2">Settings</h1>
         </div>
       </div>
 
@@ -63,7 +63,7 @@ const Settings = () => {
               key={s.key}
               onClick={() => navigate(`/settings/${s.key}`)}
               className={`w-full text-left px-6 py-2 text-sm font-medium rounded-r-full transition-colors
-                ${section === s.key ? 'bg-gray-100 text-[#26457A]' : 'text-gray-600 hover:bg-gray-50'}`}
+                ${section === s.key ? 'bg-gray-100 text-galaxy' : 'text-gray-600 hover:bg-gray-50'}`}
             >
               {s.label}
             </button>

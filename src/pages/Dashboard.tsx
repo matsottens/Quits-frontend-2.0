@@ -4,6 +4,8 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLogo } from '../hooks/useLogo';
 import AddSubscriptionModal from '../components/AddSubscriptionModal';
+import MobileMetricCarousel from '../components/MobileMetricCarousel';
+// import BottomActionBar from '../components/BottomActionBar';
 
 interface Subscription {
   id: string;
@@ -37,6 +39,9 @@ const Dashboard = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [polling, setPolling] = useState(false);
   const [pollCount, setPollCount] = useState(0);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showCostMenu, setShowCostMenu] = useState(false);
 
   const justScanned = location.state && location.state.justScanned;
 
@@ -210,6 +215,13 @@ const Dashboard = () => {
     return filtered;
   };
 
+  const sortLabel = (key: string) => (
+    key === 'name' ? 'Name' :
+    key === 'price-low' ? 'Price (Low to High)' :
+    key === 'price-high' ? 'Price (High to Low)' :
+    key === 'date' ? 'Next Billing Date' : key
+  );
+
   // Format currency safely. If an invalid or missing currency code is supplied, fall back to USD to
   // avoid runtime "RangeError: invalid currency code" which would otherwise crash the dashboard.
   const formatCurrency = (amount: number, currency?: string) => {
@@ -274,7 +286,7 @@ const Dashboard = () => {
           />
 
           <div className="flex items-center space-x-4 ml-auto">
-            <Link to="/settings" className="text-gray-500 hover:text-gray-700">
+            <Link to="/settings" className="text-gray-500 hover:text-galaxy">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -282,7 +294,7 @@ const Dashboard = () => {
             </Link>
             <button
               onClick={() => logout()}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-500 hover:text-galaxy"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -296,7 +308,7 @@ const Dashboard = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* New scan alert */}
         {showNewScanAlert && (
-          <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded" role="alert">
+          <div className="bg-[#E8EFFA] border-l-4 border-galaxy text-galaxy p-4 mb-6 rounded" role="alert">
             <div className="flex items-center">
               <div className="py-1">
                 <svg className="h-6 w-6 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -304,8 +316,8 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div>
-                <p className="font-bold">Scan Complete!</p>
-                <p className="text-sm">
+                <p className="heading-3">Scan Complete!</p>
+                <p className="small-label">
                   {subscriptionsFound > 0
                     ? `We found ${subscriptionsFound} subscription${subscriptionsFound > 1 ? 's' : ''} in your emails.`
                     : 'No new subscriptions were found in your emails.'}
@@ -323,26 +335,22 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        {/* Summary Cards (desktop grid) */}
+        <div className="hidden md:grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
           {/* Total Subscriptions */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center">
-                <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                <div className="flex-shrink-0 bg-galaxy rounded-md p-3">
                   <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
-                      Total Subscriptions
-                    </dt>
+                    <dt className="small-label text-gray-600 truncate">Total Subscriptions</dt>
                     <dd>
-                      <div className="text-lg font-medium text-gray-900">
-                        {subscriptions.length}
-                      </div>
+                      <div className="data-strong">{subscriptions.length}</div>
                     </dd>
                   </dl>
                 </div>
@@ -354,18 +362,18 @@ const Dashboard = () => {
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center">
-                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                <div className="flex-shrink-0 bg-gain rounded-md p-3">
                   <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
+                    <dt className="small-label text-gray-600 truncate">
                       {costView === 'monthly' ? 'Monthly Cost' : 'Total Cost'}
                     </dt>
                     <dd>
-                      <div className="text-lg font-medium text-gray-900">
+                      <div className="data-strong">
                         {formatCurrency(costView === 'monthly' ? calculateMonthlyTotal() : subscriptions.reduce((t,s)=>t+s.price,0))}
                       </div>
                     </dd>
@@ -386,11 +394,11 @@ const Dashboard = () => {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
+                    <dt className="small-label text-gray-600 truncate">
                       Upcoming Renewals (7 days)
                     </dt>
                     <dd>
-                      <div className="text-lg font-medium text-gray-900">
+                      <div className="data-strong">
                         {subscriptions.filter(sub => {
                           if (!sub.next_billing_date) return false;
                           const nextBilling = new Date(sub.next_billing_date);
@@ -408,11 +416,50 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="mb-8 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+        {/* Mobile Metric Carousel */}
+        <div className="md:hidden mb-6">
+          <MobileMetricCarousel
+            cards={[
+              {
+                title: 'Total Subscriptions',
+                value: subscriptions.length,
+                sublabel: 'Active',
+                trend: { direction: 'up', pct: 0 },
+                icon: (
+                  <svg className="h-6 w-6 text-galaxy" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                ),
+              },
+              {
+                title: costView === 'monthly' ? 'Monthly Cost' : 'Total Cost',
+                value: formatCurrency(costView === 'monthly' ? calculateMonthlyTotal() : subscriptions.reduce((t,s)=>t+s.price,0)),
+                sublabel: costView === 'monthly' ? 'per month' : 'all subscriptions',
+                icon: (
+                  <svg className="h-6 w-6 text-gain" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ),
+              },
+              {
+                title: 'Upcoming Renewals (7d)',
+                value: subscriptions.filter(sub => { if (!sub.next_billing_date) return false; const next = new Date(sub.next_billing_date); const today = new Date(); const inOneWeek = new Date(); inOneWeek.setDate(today.getDate() + 7); return next >= today && next <= inOneWeek; }).length,
+                sublabel: 'next 7 days',
+                icon: (
+                  <svg className="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ),
+              },
+            ]}
+          />
+        </div>
+
+        {/* Action buttons (desktop only) */}
+        <div className="hidden md:flex mb-8 flex-row space-x-4">
           <button
             onClick={handleScan}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-galaxy hover:bg-[#17306f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-galaxy"
           >
             <div className="flex items-center">
               <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -424,7 +471,7 @@ const Dashboard = () => {
           
           <button
             onClick={handleAddSubscription}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-galaxy bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-galaxy"
           >
             <div className="flex items-center">
               <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -435,45 +482,166 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Filters & Sort Controls */}
-        <div className="mb-6 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-          <div className="sm:w-1/2">
-            <label htmlFor="filter" className="block text-sm font-medium text-gray-700 mb-1">
-              Filter by
-            </label>
-            <select
-              id="filter"
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
+        {/* Mobile Filter & Sort (two compact icon dropdowns) */}
+        <div className="mb-4 md:hidden flex items-center space-x-3">
+          {/* Filter dropdown trigger */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowFilterMenu((v) => !v); setShowSortMenu(false); setShowCostMenu(false); }}
+              className="p-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+              aria-haspopup="true"
+              aria-expanded={showFilterMenu}
+              aria-label="Filter"
             >
-              <option value="all">All Subscriptions</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-              <option value="weekly">Weekly</option>
-            </select>
-          </div>
-          
-          <div className="sm:w-1/2">
-            <label htmlFor="sort" className="block text-sm font-medium text-gray-700 mb-1">
-              Sort by
-            </label>
-            <select
-              id="sort"
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
-              <option value="name">Name</option>
-              <option value="price-low">Price (Low to High)</option>
-              <option value="price-high">Price (High to Low)</option>
-              <option value="date">Next Billing Date</option>
-            </select>
+              {/* Funnel icon */}
+              <svg className="h-5 w-5 text-gray-600" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v2H3V5zm3 6h12v2H6v-2zm3 6h6v2H9v-2z"/></svg>
+            </button>
+            {showFilterMenu && (
+              <div className="absolute left-0 mt-2 bg-white border rounded-lg shadow-md z-20 overflow-hidden w-40">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'monthly', label: 'Monthly' },
+                  { key: 'weekly', label: 'Weekly' },
+                  { key: 'yearly', label: 'Yearly' },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => { setFilter(opt.key); setShowFilterMenu(false); }}
+                    className={`w-full text-left px-3 py-2 small-label ${
+                      filter === opt.key ? 'bg-[#E8EFFA] text-galaxy' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Cost View Toggle */}
-          <div className="sm:w-1/2">
-            <label htmlFor="costView" className="block text-sm font-medium text-gray-700 mb-1">
+          {/* Sort dropdown trigger */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowSortMenu((v) => !v); setShowFilterMenu(false); setShowCostMenu(false); }}
+              className="p-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+              aria-haspopup="true"
+              aria-expanded={showSortMenu}
+              aria-label="Sort"
+            >
+              {/* Sort icon */}
+              <svg className="h-5 w-5 text-gray-600" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v2H7zM7 11h8v2H7zM7 15h6v2H7z"/></svg>
+            </button>
+            {showSortMenu && (
+              <div className="absolute left-0 mt-2 bg-white border rounded-lg shadow-md z-20 overflow-hidden w-56">
+                {[
+                  { key: 'name', label: 'Name' },
+                  { key: 'price-low', label: 'Price (Low to High)' },
+                  { key: 'price-high', label: 'Price (High to Low)' },
+                  { key: 'date', label: 'Next Billing Date' },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => { setSort(opt.key); setShowSortMenu(false); }}
+                    className={`w-full text-left px-3 py-2 small-label ${
+                      sort === opt.key ? 'bg-[#E8EFFA] text-galaxy' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Cost view dropdown trigger */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowCostMenu((v) => !v); setShowFilterMenu(false); setShowSortMenu(false); }}
+              className="p-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50"
+              aria-haspopup="true"
+              aria-expanded={showCostMenu}
+              aria-label="Display prices as"
+            >
+              {/* Currency icon */}
+              <svg className="h-5 w-5 text-gray-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 6c-2.21 0-4 1.343-4 3h2c0-.552.895-1 2-1s2 .448 2 1-.895 1-2 1c-2.21 0-4 1.343-4 3s1.79 3 4 3v1h2v-1c2.21 0 4-1.343 4-3h-2c0 .552-.895 1-2 1s-2-.448-2-1 .895-1 2-1c2.21 0 4-1.343 4-3s-1.79-3-4-3V5h-2v1z"/></svg>
+            </button>
+            {showCostMenu && (
+              <div className="absolute left-0 mt-2 bg-white border rounded-lg shadow-md z-20 overflow-hidden w-56">
+                <button
+                  onClick={() => { setCostView('monthly'); setShowCostMenu(false); }}
+                  className={`w-full text-left px-3 py-2 small-label ${costView === 'monthly' ? 'bg-[#E8EFFA] text-galaxy' : 'hover:bg-gray-50'}`}
+                >
+                  Monthly Equivalent
+                </button>
+                <button
+                  onClick={() => { setCostView('total'); setShowCostMenu(false); }}
+                  className={`w-full text-left px-3 py-2 small-label ${costView === 'total' ? 'bg-[#E8EFFA] text-galaxy' : 'hover:bg-gray-50'}`}
+                >
+                  Full Billing Amount
+                </button>
+              </div>
+            )}
+          </div>
+
+          {(showFilterMenu || showSortMenu || showCostMenu) && (
+            <div className="fixed inset-0 z-10" onClick={() => { setShowFilterMenu(false); setShowSortMenu(false); setShowCostMenu(false); }} />
+          )}
+        </div>
+
+        {/* Filters & Sort Controls (desktop) */}
+        <div className="mb-6 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+          {/* Compact icon filter */}
+          <div className="hidden md:flex md:w-1/2 items-center space-x-3">
+            <span className="small-label text-gray-700">Filter:</span>
+            <button
+              onClick={() => setFilter('all')}
+              className={`p-2 rounded-md border ${filter==='all'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`}
+              title="All"
+            >
+              <svg className={`h-5 w-5 ${filter==='all'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v2H3V5zm3 4h8v2H6V9zm-3 4h14v2H3v-2z"/></svg>
+            </button>
+            <button
+              onClick={() => setFilter('monthly')}
+              className={`p-2 rounded-md border ${filter==='monthly'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`}
+              title="Monthly"
+            >
+              <svg className={`h-5 w-5 ${filter==='monthly'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a1 1 0 011 1v1h8V3a1 1 0 112 0v1h1a2 2 0 012 2v3H4V6a2 2 0 012-2h1V3a1 1 0 011-1z"/><path d="M4 10h16v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8z"/></svg>
+            </button>
+            <button
+              onClick={() => setFilter('weekly')}
+              className={`p-2 rounded-md border ${filter==='weekly'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`}
+              title="Weekly"
+            >
+              <svg className={`h-5 w-5 ${filter==='weekly'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zM4 11h16v2H4zM4 17h10v2H4z"/></svg>
+            </button>
+            <button
+              onClick={() => setFilter('yearly')}
+              className={`p-2 rounded-md border ${filter==='yearly'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`}
+              title="Yearly"
+            >
+              <svg className={`h-5 w-5 ${filter==='yearly'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14v2H5z"/><path d="M7 7h10v2H7zM9 11h6v2H9zM11 15h2v2h-2z"/></svg>
+            </button>
+          </div>
+          
+          {/* Compact icon sort */}
+          <div className="hidden md:flex md:w-1/2 items-center space-x-3 justify-end">
+            <span className="small-label text-gray-700">Sort:</span>
+            <button onClick={() => setSort('name')} className={`p-2 rounded-md border ${sort==='name'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`} title="Name">
+              <svg className={`h-5 w-5 ${sort==='name'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v2H7zM7 11h8v2H7zM7 15h6v2H7z"/></svg>
+            </button>
+            <button onClick={() => setSort('price-low')} className={`p-2 rounded-md border ${sort==='price-low'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`} title="Price Low-High">
+              <svg className={`h-5 w-5 ${sort==='price-low'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M6 16l4 4 4-4H6zM6 4h8v2H6z"/></svg>
+            </button>
+            <button onClick={() => setSort('price-high')} className={`p-2 rounded-md border ${sort==='price-high'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`} title="Price High-Low">
+              <svg className={`h-5 w-5 ${sort==='price-high'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M6 8l4-4 4 4H6zM6 18h8v-2H6z"/></svg>
+            </button>
+            <button onClick={() => setSort('date')} className={`p-2 rounded-md border ${sort==='date'?'border-galaxy bg-[#E8EFFA]':'border-gray-200 bg-white'} hover:bg-gray-50`} title="Next Billing Date">
+              <svg className={`h-5 w-5 ${sort==='date'?'text-galaxy':'text-gray-500'}`} viewBox="0 0 24 24" fill="currentColor"><path d="M7 3v2H5a2 2 0 00-2 2v3h18V7a2 2 0 00-2-2h-2V3h-2v2H9V3H7z"/><path d="M3 10h18v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8z"/></svg>
+            </button>
+          </div>
+
+          {/* Cost View Toggle (desktop only) */}
+          <div className="hidden md:block md:w-1/2">
+            <label htmlFor="costView" className="block small-label text-gray-700 mb-1">
               Display prices as
             </label>
             <select
@@ -547,7 +715,7 @@ const Dashboard = () => {
                     <div className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          <p className="text-sm font-medium text-blue-600 truncate">{subscription.name}</p>
+                          <p className="text-sm font-medium text-gray-900 truncate">{subscription.name}</p>
                           {subscription.is_manual && (
                             <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                               Manual
@@ -561,14 +729,14 @@ const Dashboard = () => {
                           {/* Confidence score removed for cleaner UI */}
                         </div>
                         <div className="ml-2 flex-shrink-0 flex">
-                          <p className="px-2 inline-flex text-sm leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          <p className="px-2 inline-flex text-sm leading-5 font-semibold rounded-full bg-green-100 text-green-800 font-mono">
                             {formatCurrency(costView === 'monthly' ? getMonthlyPrice(subscription) : subscription.price, subscription.currency)}
                           </p>
                         </div>
                       </div>
                       <div className="mt-2 sm:flex sm:justify-between">
                         <div className="sm:flex">
-                          <p className="flex items-center text-sm text-gray-500">
+                          <p className="flex items-center small-label text-gray-500">
                             {subscription.provider && (
                               <>
                                 <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -578,7 +746,7 @@ const Dashboard = () => {
                               </>
                             )}
                           </p>
-                          <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                          <p className="mt-2 flex items-center small-label text-gray-500 sm:mt-0 sm:ml-6">
                             <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
@@ -611,6 +779,7 @@ const Dashboard = () => {
           )}
         </div>
       </main>
+      {/* Mobile bottom actions removed per design */}
     </div>
   );
 };

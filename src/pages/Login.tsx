@@ -246,12 +246,8 @@ const Login: React.FC = () => {
             onError={handleImageError}
           />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Manage your subscriptions with ease
-        </p>
+        <h2 className="mt-6 text-center heading-1">Sign in</h2>
+        <p className="mt-2 text-center body-text text-darkGrey">Manage your subscriptions with ease</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -275,23 +271,23 @@ const Login: React.FC = () => {
             {/* Email/Password Form */}
             <form className="space-y-4" onSubmit={handleEmailLogin}>
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                <label htmlFor="email" className="block small-label text-gray-700">Email</label>
                 <input id="email" type="email" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
+                <label htmlFor="password" className="block small-label text-gray-700">Password</label>
                 <input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
               </div>
               <div>
-                <button type="submit" disabled={isLoading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#26457A] hover:bg-[#1d3557] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#26457A]">
+                <button type="submit" disabled={isLoading} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-galaxy hover:bg-[#17306f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-galaxy">
                   {isLoading ? 'Signing in…' : 'Sign in'}
                 </button>
               </div>
             </form>
 
             <div className="flex justify-between text-sm">
-              <a href="/forgot-password" className="text-primary-600 hover:text-primary-500">Forgot password?</a>
-              <a href="/signup" className="text-primary-600 hover:text-primary-500">Create account</a>
+              <a href="/forgot-password" className="text-galaxy hover:underline">Forgot password?</a>
+              <a href="/signup" className="text-galaxy hover:underline">Create account</a>
             </div>
 
             <button
@@ -339,7 +335,7 @@ const Login: React.FC = () => {
             )}
             
             <div className="text-sm text-center text-gray-600">
-              <p>By signing in, you agree to our <a href="/terms" className="font-medium text-primary-600 hover:text-primary-500">Terms of Service</a> and <a href="/privacy" className="font-medium text-primary-600 hover:text-primary-500">Privacy Policy</a></p>
+              <p>By signing in, you agree to our <a href="/terms" className="font-medium text-galaxy hover:underline">Terms of Service</a> and <a href="/privacy" className="font-medium text-galaxy hover:underline">Privacy Policy</a></p>
             </div>
           </div>
         </div>

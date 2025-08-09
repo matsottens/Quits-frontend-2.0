@@ -433,7 +433,7 @@ const SubscriptionDetails = () => {
           ) : (
             <div>
               <div className="px-4 py-5 sm:px-6 bg-gray-50">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">{subscription.name}</h3>
+                <h3 className="heading-2 text-galaxy">{subscription.name}</h3>
                 <p className="mt-1 max-w-2xl text-sm text-gray-500">
                   {subscription.is_manual ? 'Manually added' : 'Detected from emails'}
                 </p>
@@ -441,64 +441,64 @@ const SubscriptionDetails = () => {
               <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
                 <dl className="sm:divide-y sm:divide-gray-200">
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Price</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Price</dt>
+                    <dd className="mt-1 data-strong sm:mt-0 sm:col-span-2">
                       {formatCurrency(subscription.price, subscription.currency)}&nbsp;
-                      <span className="text-gray-500">({subscription.billing_cycle})</span>
+                      <span className="small-label text-gray-500">({subscription.billing_cycle})</span>
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Yearly cost</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Yearly cost</dt>
+                    <dd className="mt-1 data-text sm:mt-0 sm:col-span-2">
                       {formatCurrency(calculateYearlyCost(), subscription.currency)}
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Next billing date</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Next billing date</dt>
+                    <dd className="mt-1 body-text sm:mt-0 sm:col-span-2">
                       {subscription.next_billing_date ? formatDate(subscription.next_billing_date) : 'Not specified'}
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Provider</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Provider</dt>
+                    <dd className="mt-1 body-text sm:mt-0 sm:col-span-2">
                       {subscription.provider || 'Not specified'}
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Category</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Category</dt>
+                    <dd className="mt-1 body-text sm:mt-0 sm:col-span-2">
                       {subscription.category || 'Not categorized'}
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Added on</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Added on</dt>
+                    <dd className="mt-1 body-text sm:mt-0 sm:col-span-2">
                       {formatDate(subscription.created_at)}
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Monthly cost (equiv.)</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Monthly cost (equiv.)</dt>
+                    <dd className="mt-1 data-text sm:mt-0 sm:col-span-2">
                       {formatCurrency(getMonthlyPrice(), subscription.currency)}
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">Start date</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">Start date</dt>
+                    <dd className="mt-1 body-text sm:mt-0 sm:col-span-2">
                       {formatDate(subscription.created_at || subscription.start_date)}
                     </dd>
                   </div>
                   <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                    <dt className="text-sm font-medium text-gray-500">End date</dt>
-                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    <dt className="small-label text-gray-600">End date</dt>
+                    <dd className="mt-1 body-text sm:mt-0 sm:col-span-2">
                       {subscription.end_date ? formatDate(subscription.end_date) : 'Indefinite'}
                     </dd>
                   </div>
                   {subscription.notes && (
                     <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500">Notes</dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                      <dt className="small-label text-gray-600">Notes</dt>
+                      <dd className="mt-1 body-text sm:mt-0 sm:col-span-2">
                         {subscription.notes}
                       </dd>
                     </div>

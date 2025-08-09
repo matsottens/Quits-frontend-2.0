@@ -41,17 +41,18 @@ export default function SubscriptionList() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Your Subscriptions</h1>
+      <h1 className="heading-1 mb-4">Your Subscriptions</h1>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {subscriptions.map((sub) => (
           <div 
             key={sub.id} 
             className="p-4 border rounded-lg shadow-sm hover:shadow-md transition-shadow"
           >
-            <h2 className="text-xl font-semibold">{sub.name}</h2>
-            <p className="text-gray-600">
-              ${sub.price} / {sub.billingCycle}
-            </p>
+            <h2 className="heading-2">{sub.name}</h2>
+            <div className="mt-1">
+              <span className="data-text">${sub.price}</span>
+              <span className="small-label"> / {sub.billingCycle}</span>
+            </div>
           </div>
         ))}
       </div>
