@@ -155,9 +155,19 @@ const ScanningPage: React.FC = () => {
     console.log('SCAN-DEBUG: Current scanId state:', scanId);
     console.log('SCAN-DEBUG: localStorage scanId:', localStorage.getItem(scanIdKey!));
     
-    // Prevent multiple simultaneous scans
+    // Prevent multiple simultaneous scans - more robust check
     if (scanInitiatedRef.current) {
       console.log('SCAN-DEBUG: Scan already initiated, skipping');
+      return;
+    }
+
+    // Additional check for existing scan in localStorage
+    const existingScanId = localStorage.getItem(scanIdKey);
+    if (existingScanId && scanStatus === 'scanning') {
+      console.log('SCAN-DEBUG: Found existing scan in progress, resuming polling instead of starting new scan');
+      setScanId(existingScanId);
+      currentScanIdRef.current = existingScanId;
+      pollScanStatus(existingScanId);
       return;
     }
 
@@ -631,6 +641,15 @@ const ScanningPage: React.FC = () => {
     // Only clear state and start new scan if no scan is currently running
     if (!scanInitiatedRef.current) {
       console.log('SCAN-DEBUG: No scan in progress, initializing new scan');
+      
+      // Prevent rapid multiple calls by checking last scan start time
+      const lastScanStart = localStorage.getItem('lastScanStart');
+      const now = Date.now();
+      if (lastScanStart && (now - parseInt(lastScanStart)) < 10000) { // 10 second cooldown
+        console.log('SCAN-DEBUG: Recent scan detected, waiting before starting new one');
+        return;
+      }
+      localStorage.setItem('lastScanStart', now.toString());
       
       if (scanIdKey) {
         // Remove any stale scan reference so the backend will create a new row
