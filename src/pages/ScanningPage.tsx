@@ -42,6 +42,7 @@ const ScanningPage: React.FC = () => {
   const [scanId, setScanId] = useState<string | null>(null);
   const [scanStatus, setScanStatus] = useState<string>('idle');
   const [progress, setProgress] = useState(0);
+  const [targetProgress, setTargetProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -395,13 +396,10 @@ const ScanningPage: React.FC = () => {
         console.log('SCAN-DEBUG: API warning:', warning);
       }
 
-      // Update numeric progress directly from backend when provided
+      // Update target progress from backend numeric value when provided
       if (typeof progress === 'number' && !Number.isNaN(progress)) {
-        // Clamp to [0,100] for safety
         const clamped = Math.max(0, Math.min(100, progress));
-        if (clamped !== undefined) {
-          setProgress(clamped);
-        }
+        setTargetProgress(prev => Math.max(prev, clamped));
       }
       
       // Update scan ID if the API returned a different one (e.g., latest scan)
@@ -811,18 +809,29 @@ const ScanningPage: React.FC = () => {
     quota_exhausted: 90
   };
 
-  // Step-based progress bar logic – whenever the status coming from the backend
-  // changes, look up the corresponding percentage and apply it.  This gives a
-  // deterministic "jump" between clearly defined steps rather than a smooth
-  // incremental bar.  The mapping is defined in STATUS_PROGRESS_MAP above.
-  // Baseline progress only when no numeric progress has been received yet
+  // Set target progress from status mapping when numeric progress isn't available
   useEffect(() => {
-    if (progress > 0) return;
     const mapped = STATUS_PROGRESS_MAP[scanStatus as ScanningStatus];
-    if (mapped !== undefined && mapped !== progress) {
-      setProgress(mapped);
+    if (mapped !== undefined) {
+      setTargetProgress(prev => Math.max(prev, mapped));
     }
-  }, [scanStatus, progress]);
+  }, [scanStatus]);
+
+  // Smoothly animate progress towards targetProgress without backend changes
+  useEffect(() => {
+    if (progress >= targetProgress) return;
+    const diff = targetProgress - progress;
+    // Choose a step size so we reach target in ~1s (10 ticks) but at least 1%
+    const step = Math.max(1, Math.ceil(diff / 10));
+    const id = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= targetProgress) return prev;
+        const next = Math.min(targetProgress, prev + step);
+        return next;
+      });
+    }, 100);
+    return () => clearInterval(id);
+  }, [targetProgress, progress]);
 
   const handleSuggestionAction = async (suggestionId: string, confirmed: boolean) => {
     try {
