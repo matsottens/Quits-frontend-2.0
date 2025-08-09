@@ -62,6 +62,7 @@ const ScanningPage: React.FC = () => {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentScanIdRef = useRef<string | null>(null);
   const analysisPhaseStartRef = useRef<number | null>(null);
+  const workerTimeoutDetectedRef = useRef(false);
   const maxRetries = 3;
 
   const addDebugLog = useCallback((message: string) => {
@@ -98,8 +99,8 @@ const ScanningPage: React.FC = () => {
   const PROGRESS_COMPLETE = 100;
 
   // Add these new constants at the top with other constants
-  const MAX_SCAN_DURATION_MS = 10 * 60 * 1000; // Extended to 10 minutes to give Edge Function time
-  const MAX_POLLING_COUNT = 200; // Maximum number of times to poll (at 3 second intervals = 10 minutes)
+  const MAX_SCAN_DURATION_MS = 15 * 60 * 1000; // Extended to 15 minutes to give Edge Function time
+  const MAX_POLLING_COUNT = 300; // Maximum number of times to poll (at 2-3 second intervals = 15 minutes)
 
   // Add a new state variable to track polling count
   const [pollingCount, setPollingCount] = useState(0);
@@ -517,6 +518,71 @@ const ScanningPage: React.FC = () => {
           }
         }
       } else {
+        // Detect if we're in a post-worker-timeout state where analysis might be running in background
+        if (progress >= 70 && (uiStatus === 'ready_for_analysis' || uiStatus === 'analyzing' || uiStatus === 'in_progress')) {
+          if (!analysisPhaseStartRef.current) {
+            analysisPhaseStartRef.current = Date.now();
+            addDebugLog(`Analysis phase started, will poll more aggressively for completion`);
+          }
+          
+          // If we've been in analysis for a while, check if subscriptions were found
+          const analysisTime = Date.now() - analysisPhaseStartRef.current;
+          if (analysisTime > 30000) { // After 30 seconds
+            addDebugLog(`Been in analysis for ${Math.round(analysisTime/1000)}s, checking for completed subscriptions`);
+            
+            // Check if subscriptions were found (indicates completion)
+            if (stats?.subscriptions_found > 0) {
+              addDebugLog(`Found ${stats.subscriptions_found} subscriptions, treating as completed`);
+              analysisPhaseStartRef.current = null;
+              if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+              }
+              setScanStatus('completed');
+              setTimeout(() => {
+                navigate('/dashboard', { state: { justScanned: true } });
+              }, 1000);
+              return;
+            }
+            
+            // As a fallback, check the subscriptions API directly to see if any new subscriptions were created
+            if (analysisTime > 60000) { // After 1 minute
+              addDebugLog(`Checking subscriptions API directly as fallback`);
+              try {
+                const subsResponse = await fetch('/api/subscriptions', {
+                  headers: {
+                    'Authorization': `Bearer ${getToken()}`
+                  }
+                });
+                if (subsResponse.ok) {
+                  const subsData = await subsResponse.json();
+                  const recentSubs = subsData.filter((sub: any) => {
+                    const subCreated = new Date(sub.created_at).getTime();
+                    const scanStarted = scanStartTimeRef.current || Date.now();
+                    return subCreated >= scanStarted - 60000; // Created within scan timeframe
+                  });
+                  
+                  if (recentSubs.length > 0) {
+                    addDebugLog(`Found ${recentSubs.length} recent subscriptions via API, completing scan`);
+                    analysisPhaseStartRef.current = null;
+                    if (pollingIntervalRef.current) {
+                      clearInterval(pollingIntervalRef.current);
+                      pollingIntervalRef.current = null;
+                    }
+                    setScanStatus('completed');
+                    setTimeout(() => {
+                      navigate('/dashboard', { state: { justScanned: true } });
+                    }, 1000);
+                    return;
+                  }
+                }
+              } catch (subsError) {
+                console.warn('Error checking subscriptions API:', subsError);
+              }
+            }
+          }
+        }
+        
         // Local-dev fast path: if we're in analysis phase for too long locally, mark as complete
         if ((uiStatus === 'ready_for_analysis' || uiStatus === 'analyzing') && window.location.hostname === 'localhost') {
           if (analysisPhaseStartRef.current == null) {
@@ -534,8 +600,11 @@ const ScanningPage: React.FC = () => {
             }, 500);
             return;
           }
-        } else {
-          analysisPhaseStartRef.current = null;
+        } else if (window.location.hostname !== 'localhost') {
+          // Only reset analysis timer for non-localhost
+          if (uiStatus !== 'ready_for_analysis' && uiStatus !== 'analyzing') {
+            analysisPhaseStartRef.current = null;
+          }
         }
         // Continue scanning - let the cron job handle Gemini analysis triggering
         // The cron job runs every minute; as fallback, if analysis is already detecting results we can redirect early
