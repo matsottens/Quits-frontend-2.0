@@ -41,17 +41,19 @@ export const ScanProgressBar: React.FC<ScanProgressBarProps> = ({ userId, onComp
         setStatus(currentStatus);
         setScanId(data.scan_id);
         
-        // Determine phase based on status
+        // Determine phase and use actual backend progress
+        const backendProgress = data.progress || 0;
+        
         if (currentStatus === 'in_progress') {
           setPhase('reading');
-          setProgress(Math.min(50, data.progress || 0)); // Reading phase: 0-50%
+          setProgress(backendProgress); // Use actual backend progress
         } else if (currentStatus === 'ready_for_analysis' || currentStatus === 'analyzing') {
           setPhase('analyzing');
-          setProgress(50 + (data.progress || 0) / 2); // Analysis phase: 50-100%
+          setProgress(backendProgress); // Use actual backend progress
           
-          // Let the cron job handle Gemini analysis triggering
+          // Let the scan worker handle edge function triggering
           if (currentStatus === 'ready_for_analysis') {
-            console.log('Email scan completed, waiting for cron job to trigger Gemini analysis');
+            console.log('Email scan completed, scan worker will trigger Gemini analysis');
           }
         } else if (currentStatus === 'completed') {
           setPhase('complete');
