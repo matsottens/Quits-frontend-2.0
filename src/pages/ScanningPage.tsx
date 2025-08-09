@@ -195,13 +195,10 @@ const ScanningPage: React.FC = () => {
       
       console.log('SCAN-DEBUG: api.email.scanEmails() response:', response);
 
-      // If backend already completed the processing (development mock), skip polling
+      // If backend reports processingCompleted, continue to status polling instead of redirecting.
+      // This ensures the Edge Function has time to complete analysis and write results.
       if (response.processingCompleted) {
-        console.log('SCAN-DEBUG: Scan processing already completed – skipping status polling');
-        setProgress(100);
-        setScanStatus('completed');
-        navigate('/dashboard', { state: { justScanned: true, subscriptionsFound: response?.subscriptions?.length || 0 } });
-        return;
+        console.log('SCAN-DEBUG: Backend indicated processingCompleted; continuing to poll scan status');
       }
       
       // Check for mock response (indicating connection issues)
