@@ -79,10 +79,7 @@ const Dashboard = () => {
         const response = await api.subscriptions.getAll();
         if (!isMounted) return;
         if (response && response.subscriptions) {
-          // Only keep subscriptions that are fully processed. We exclude any items that
-          // (a) have analysis_status and it is NOT "completed", OR
-          // (b) have is_pending === true.
-          // Manual subscriptions (no analysis_status) are always included.
+          // Only surface items that are explicitly completed by Gemini (or manual entries).
           const completedSubs = response.subscriptions.filter((sub: Subscription) => {
             const notCompletedStatus = sub.analysis_status && sub.analysis_status !== 'completed';
             const stillPending = !!sub.is_pending;
