@@ -706,8 +706,8 @@ const ScanningPage: React.FC = () => {
   const STATUS_PROGRESS_MAP: Record<ScanningStatus, number> = {
     idle: 0,
     initial: 0,
-    scanning: 5,
-    in_progress: 10,
+    scanning: 10,
+    in_progress: 30,
     ready_for_analysis: 70,
     analyzing: 80,
     complete: 100,     // some legacy flows use "complete"
