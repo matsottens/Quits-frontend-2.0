@@ -602,6 +602,7 @@ const ScanningPage: React.FC = () => {
     console.log('SCAN-DEBUG: authLoading:', authLoading);
     console.log('SCAN-DEBUG: user:', user);
     console.log('SCAN-DEBUG: isAuthenticated:', isAuthenticated);
+    console.log('SCAN-DEBUG: scanInitiatedRef.current:', scanInitiatedRef.current);
 
     if (authLoading) {
       console.log('SCAN-DEBUG: Auth is loading, waiting...');
@@ -627,22 +628,38 @@ const ScanningPage: React.FC = () => {
     const scanIdKey = getScanIdKey();
     console.log('SCAN-DEBUG: scanIdKey:', scanIdKey);
     
-    if (scanIdKey) {
-      // Remove any stale scan reference so the backend will create a new row
-      localStorage.removeItem(scanIdKey);
-    }
-
-    // Ensure we start from a clean state (do not reset scanInitiatedRef here to avoid double-starts in React StrictMode)
-    setScanId(null);
-    setScanStatus('idle');
-    setProgress(0);
-
-    // Start the scan automatically only if not already initiated
+    // Only clear state and start new scan if no scan is currently running
     if (!scanInitiatedRef.current) {
+      console.log('SCAN-DEBUG: No scan in progress, initializing new scan');
+      
+      if (scanIdKey) {
+        // Remove any stale scan reference so the backend will create a new row
+        localStorage.removeItem(scanIdKey);
+      }
+
+      // Ensure we start from a clean state
+      setScanId(null);
+      setScanStatus('idle');
+      setProgress(0);
+
       console.log('SCAN-DEBUG: Starting scan automatically');
       startScanning();
     } else {
-      console.log('SCAN-DEBUG: Scan already initiated, skipping auto-start');
+      console.log('SCAN-DEBUG: Scan already in progress, preserving current state');
+      // If scan is already running, try to restore state from localStorage if needed
+      if (scanIdKey && !scanId) {
+        const storedScanId = localStorage.getItem(scanIdKey);
+        if (storedScanId) {
+          console.log('SCAN-DEBUG: Restoring scanId from localStorage:', storedScanId);
+          setScanId(storedScanId);
+          currentScanIdRef.current = storedScanId;
+          // Resume polling if not already active
+          if (!pollingIntervalRef.current) {
+            console.log('SCAN-DEBUG: Resuming polling for existing scan');
+            pollScanStatus(storedScanId);
+          }
+        }
+      }
     }
 
     return () => {
