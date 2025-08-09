@@ -709,8 +709,8 @@ const ScanningPage: React.FC = () => {
   const STATUS_PROGRESS_MAP: Record<ScanningStatus, number> = {
     idle: 0,
     initial: 0,
-    scanning: 10,
-    in_progress: 30,
+    scanning: 5,
+    in_progress: 10,
     ready_for_analysis: 70,
     analyzing: 80,
     complete: 100,     // some legacy flows use "complete"
@@ -723,7 +723,9 @@ const ScanningPage: React.FC = () => {
   // changes, look up the corresponding percentage and apply it.  This gives a
   // deterministic "jump" between clearly defined steps rather than a smooth
   // incremental bar.  The mapping is defined in STATUS_PROGRESS_MAP above.
+  // Baseline progress only when no numeric progress has been received yet
   useEffect(() => {
+    if (progress > 0) return;
     const mapped = STATUS_PROGRESS_MAP[scanStatus as ScanningStatus];
     if (mapped !== undefined && mapped !== progress) {
       setProgress(mapped);
